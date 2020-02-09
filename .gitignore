@@ -1,2 +1,49 @@
 /target
 **/*.rs.bk
+
+# See http://help.github.com/ignore-files/ for more about ignoring files.
+
+# compiled output
+/zorius/dist
+/zorius/tmp
+/zorius/out-tsc
+# Only exists if Bazel was run
+/bazel-out
+
+# dependencies
+/zorius/node_modules
+
+# profiling files
+/zorius/chrome-profiler-events*.json
+/zorius/speed-measure-plugin*.json
+
+# IDEs and editors
+/zorius/.idea
+/zorius/.project
+/zorius/.classpath
+/zorius/.c9/
+/zorius/*.launch
+/zorius/.settings/
+/zorius/*.sublime-workspace
+
+# IDE - VSCode
+/zorius/.vscode/*
+/zorius/!.vscode/settings.json
+/zorius/!.vscode/tasks.json
+/zorius/!.vscode/launch.json
+/zorius/!.vscode/extensions.json
+/zorius/.history/*
+
+# misc
+/zorius/.sass-cache
+/zorius/connect.lock
+/zorius/coverage
+/zorius/libpeerconnection.log
+/zorius/npm-debug.log
+/zorius/yarn-error.log
+/zorius/testem.log
+/zorius/typings
+
+# System Files
+/zorius/.DS_Store
+/zorius/Thumbs.db
