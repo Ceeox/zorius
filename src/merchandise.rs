@@ -1,13 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
-use bson::to_bson;
-use bson::{bson, doc};
-use juniper::DefaultScalarValue;
-use juniper::FieldResult;
-use juniper::GraphQLObject;
-use juniper::RootNode;
-use mongodb::{options::ClientOptions, Client};
+use bson::{bson, doc, from_bson, to_bson, Bson};
+use juniper::{FieldResult, GraphQLObject, RootNode};
+use mongodb::Collection;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 static MONGO_DB_NAME: &str = "zorius";
 static MONGO_DB_COLLECTION_NAME_INTERN: &str = "merchandise_intern";
@@ -18,10 +15,9 @@ pub struct Context {
 }
 
 impl juniper::Context for Context {}
-
-#[derive(GraphQLObject, Deserialize, Serialize)]
+#[derive(GraphQLObject, Deserialize, Serialize, Debug)]
 pub struct InternMerchandise {
-    id: String,
+    _id: String,
     merchandise_name: String,
     count: i32,
     orderer: String,
@@ -39,7 +35,7 @@ pub struct InternMerchandise {
     url: Option<String>,
 }
 
-#[derive(juniper::GraphQLEnum, Deserialize, Serialize)]
+#[derive(juniper::GraphQLEnum, Deserialize, Serialize, Debug)]
 pub enum InternMerchandiseStatus {
     Ordered,
     Delivered,
@@ -65,25 +61,29 @@ pub struct InternMerchandiseQueryRoot;
 
 #[juniper::object(Context = Context)]
 impl InternMerchandiseQueryRoot {
-    fn table_data(ctx: &Context) -> FieldResult<InternMerchandise> {
-        Ok(InternMerchandise {
-            id: "909fgdg",
-            merchandise_name: "Test".to_owned(),
-            count: 42,
-            orderer: "mw".to_owned(),
-            purchased_on: "01/01/2020".to_owned(),
-            cost: 6.54,
-            status: InternMerchandiseStatus::Ordered,
-
-            merchandise_id: None,
-            article_number: None,
-            postage: None,
-            serial_number: None,
-            invoice_number: None,
-            use_case: None,
-            arived_on: None,
-            url: None,
-        })
+    fn table_data(ctx: &Context) -> FieldResult<Vec<InternMerchandise>> {
+        let db = ctx.client.database(MONGO_DB_NAME);
+        let collection = db.collection(MONGO_DB_COLLECTION_NAME_INTERN);
+        // TODO: Limit Query size
+        let cursor = collection.find(None, None)?;
+        Ok(cursor
+            .map(|x| {
+                let bson = to_bson(&x.unwrap()).unwrap();
+                from_bson::<InternMerchandise>(bson).unwrap()
+            })
+            .collect())
+    }
+    fn get_order(ctx: &Context, id: String) -> FieldResult<Option<InternMerchandise>> {
+        let db = ctx.client.database(MONGO_DB_NAME);
+        let collection = db.collection(MONGO_DB_COLLECTION_NAME_INTERN);
+        let filter = doc! { "_id": id};
+        let item = match collection.find_one(filter, None)? {
+            None => return Ok(None),
+            Some(r) => to_bson(&r)?,
+        };
+        let res = from_bson::<InternMerchandise>(item)?;
+        println!("{:?}", res);
+        Ok(Some(res))
     }
 }
 
@@ -95,29 +95,37 @@ impl InternMerchandiseMutationRoot {
         ctx: &Context,
         new_intern_order: NewInternOrder,
     ) -> FieldResult<InternMerchandise> {
-        let order = InternMerchandise {
-            id: "kdas",
+        let mut order = InternMerchandise {
+            _id: Uuid::new_v4().to_string(),
             merchandise_name: new_intern_order.merchandise_name,
             count: new_intern_order.count,
             orderer: new_intern_order.orderer,
             purchased_on: new_intern_order.purchased_on,
             cost: new_intern_order.cost,
             status: InternMerchandiseStatus::Ordered,
-
-            merchandise_id: None,
+            url: new_intern_order.url,
+            use_case: new_intern_order.use_case,
             article_number: new_intern_order.article_number,
             postage: new_intern_order.postage,
+
+            merchandise_id: None,
             serial_number: None,
             invoice_number: None,
-            use_case: new_intern_order.use_case,
             arived_on: None,
-            url: new_intern_order.url,
         };
         let db = ctx.client.database(MONGO_DB_NAME);
         let collection = db.collection(MONGO_DB_COLLECTION_NAME_INTERN);
-        let doc = bson::to_bson(&order).unwrap();
-        collection.insert_one(doc.as_document().unwrap().clone(), None)?;
+        let bson: Bson = bson::to_bson(&order)?;
+        let doc = bson
+            .as_document()
+            .expect("Failed to convert to bson::Document");
+        let _ = collection.insert_one(doc.clone(), None)?;
         Ok(order)
+    }
+
+    // TODO: implement an update funtion
+    fn update_intern_order(ctx: &Context, new_intern_order: NewInternOrder) -> FieldResult<String> {
+        Ok(String::new())
     }
 }
 
