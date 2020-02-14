@@ -4,3 +4,6 @@
 .env
 config.conf
 /static
+/build
+.idea
+.vscode

@@ -4,9 +4,13 @@ use mongodb::{options::ClientOptions, Client};
 use std::io;
 use std::sync::Arc;
 
-use actix_web::{get, middleware, post, web, App, Error, HttpResponse, HttpServer};
+use actix_web::{get, middleware, post, web, App, Error, HttpResponse, HttpServer, http::header};
+use actix_files::Files;
+use actix_cors::Cors;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
+use dotenv::dotenv;
+use dotenv_codegen::dotenv;
 
 mod merchandise;
 mod config;
@@ -15,7 +19,6 @@ use crate::merchandise::{Context, Schema};
 use crate::config::ZoriusConfig;
 
 const GRAPH_QL_URL: &str = "http://localhost:8080/graphql";
-const MONGODB_URL: &str = "mongodb://localhost:27017";
 
 #[post("/graphql")]
 async fn graphql(
@@ -35,7 +38,7 @@ async fn graphql(
 
 // Enable only when we're running in debug mode
 #[cfg(debug_assertions)]
-#[get("/graphql")]
+#[get("/graphiql")]
 async fn graphiql() -> HttpResponse {
     let html = graphiql_source(GRAPH_QL_URL);
     HttpResponse::Ok()
@@ -47,7 +50,8 @@ async fn graphiql() -> HttpResponse {
 async fn main() -> io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
     env_logger::init();
-
+    dotenv().ok();
+    
     let config = config::ZoriusConfig::new()?;
     let dbconf = config.db_config;
     
@@ -65,11 +69,21 @@ async fn main() -> io::Result<()> {
     let webserver_url = format!("{}:{}", config.web_config.ip, config.web_config.port);
     HttpServer::new(move || {
         App::new()
+            // .wrap(
+            //     Cors::new() // <- Construct CORS middleware builder
+            //     .allowed_origin("http://localhost:8080/")
+            //     .allowed_methods(vec!["GET", "POST"])
+            //     .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+            //     .allowed_header(header::CONTENT_TYPE)
+            //     .max_age(3600)
+            //     .finish()
+            // )                
             .data(ctx.clone())
             .data(schema.clone())
             .wrap(middleware::Logger::default())
             .service(graphql)
             .service(graphiql)
+            .service(Files::new("/static", "/"))
     })
     .bind(webserver_url)?
     .run()

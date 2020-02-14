@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, ViewChild } from '@angular/core';
+import { Component, OnInit, Inject, ViewChild, Injectable } from '@angular/core';
 
 import { MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { Url } from 'url';
@@ -7,10 +7,14 @@ import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 
+import { Apollo } from 'apollo-angular';
+import gql from 'graphql-tag';
+import { url } from 'inspector';
+
 export interface NewInternOrder {
   merchandise_name: String;
   count: number;
-  url?: Url;
+  url?: String;
   oderer: String,
   purchased_on: Date;
   article_number?: String,
@@ -34,7 +38,7 @@ export interface InternMerchandise {
 
   useCase?: String;
   arived_on?: Date;
-  url?: Url;
+  url?: String;
 }
 
 export enum InternMerchandiseStatus {
@@ -44,6 +48,26 @@ export enum InternMerchandiseStatus {
   Used,
 }
 
+
+@Injectable()
+class InternOrderService {
+  mutNewInternOrder = gql`mutation new_intern_order {
+    newInternOrder(newInternOrder: $newInternOrder) {
+      Id
+    }
+  }`;
+
+  constructor(private apollo: Apollo) {}
+
+  submitNewInternOrder(order: NewInternOrder) {
+    return this.apollo.mutate({
+      mutation: this.mutNewInternOrder,
+      variables: {
+        newInternOrder: order
+      }
+    });
+  }
+}
 
 @Component({
   selector: 'app-intern-orders',
@@ -58,6 +82,8 @@ export enum InternMerchandiseStatus {
   ],
 })
 export class InternOrdersComponent implements OnInit {
+  
+
   dataSource: MatTableDataSource<InternMerchandise>;
   columnsToDisplay = ['BANF Nummer', 'Artikelname', 'Anzahl', 'Besteller', 'Status'];
   expandedElement: InternMerchandise | null;
@@ -68,7 +94,7 @@ export class InternOrdersComponent implements OnInit {
   @ViewChild(MatPaginator, { static: true }) paginator: MatPaginator;
   @ViewChild(MatSort, { static: true }) sort: MatSort;
 
-  constructor(public dialog: MatDialog) {
+  constructor(public dialog: MatDialog, private internOrderService: InternOrderService) {
     this.dataSource = new MatTableDataSource(this.internMerchandise);
   }
 
@@ -86,6 +112,28 @@ export class InternOrdersComponent implements OnInit {
     }
   }
 
+  submitNewInternOrder() {
+    var order: NewInternOrder =  {
+      merchandise_name: "Test",
+      count: 42,
+      url: "sndfjdshouhusiof",
+      oderer: "mw",
+      purchased_on: new Date(),
+      article_number: "aksjk3",
+      postage: 2.345,
+      use_case: "slkjdkldjfk",
+      cost: 345.34,
+    };
+
+    this.internOrderService.submitNewInternOrder(order).subscribe(({data}) => {
+      console.log('go data: ' + data);
+      return data;
+    }, (error) => {
+      console.log('there was an error: ' + error);
+      return;
+    });
+  }
+
   openIncomingGoods(): void {
     console.log("TODO: Implement incoming goods");
   }
@@ -101,7 +149,7 @@ export class InternOrdersComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(result => {
       console.log(result);
-      // TODO: Implement POST api/v1/merchandise/new_intern_order
+      // this.submitNewInternOrder();
     });
   }
 
@@ -113,7 +161,6 @@ export class InternOrdersComponent implements OnInit {
   styleUrls: ['./new-intern-order-dialog.scss'],
 })
 export class NewInternOrderDialog {
-
   constructor(
     public dialogRef: MatDialogRef<NewInternOrderDialog>,
     @Inject(MAT_DIALOG_DATA) public data: NewInternOrder) { }
