@@ -9,8 +9,10 @@ use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 
 mod merchandise;
+mod config;
 
 use crate::merchandise::{Context, Schema};
+use crate::config::ZoriusConfig;
 
 const GRAPH_QL_URL: &str = "http://localhost:8080/graphql";
 const MONGODB_URL: &str = "mongodb://localhost:27017";
@@ -46,9 +48,13 @@ async fn main() -> io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
     env_logger::init();
 
+    let config = config::ZoriusConfig::new()?;
+    let dbconf = config.db_config;
+    
     // create mongodb connection
-    let mut client_options = ClientOptions::parse(MONGODB_URL).unwrap();
-    client_options.app_name = Some("zorius".to_owned());
+    let url = format!("mongodb+srv://{}:{}@{}/{}", dbconf.username, dbconf.password, dbconf.server_domain, dbconf.db_name);
+    let mut client_options = ClientOptions::parse(&url).unwrap();
+    client_options.app_name = Some(dbconf.application_name);
     let client = Client::with_options(client_options).unwrap();
     let ctx = Context { client };
 
@@ -56,6 +62,7 @@ async fn main() -> io::Result<()> {
     let schema = std::sync::Arc::new(merchandise::create_schema());
 
     // Start http server
+    let webserver_url = format!("{}:{}", config.web_config.ip, config.web_config.port);
     HttpServer::new(move || {
         App::new()
             .data(ctx.clone())
@@ -64,7 +71,7 @@ async fn main() -> io::Result<()> {
             .service(graphql)
             .service(graphiql)
     })
-    .bind("localhost:8080")?
+    .bind(webserver_url)?
     .run()
     .await
 }
