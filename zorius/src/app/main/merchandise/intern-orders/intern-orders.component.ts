@@ -1,44 +1,49 @@
 import { Component, OnInit, Inject, ViewChild, Injectable } from '@angular/core';
-
 import { MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { Url } from 'url';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
-
-import { Apollo } from 'apollo-angular';
-import gql from 'graphql-tag';
-import { url } from 'inspector';
+import { InternOrderTableDataGQL, NewInternOrderGQL } from './graphql.module';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export interface NewInternOrder {
-  merchandise_name: String;
+  merchandiseName: String;
   count: number;
   url?: String;
-  oderer: String,
-  purchased_on: Date;
-  article_number?: String,
+  purchasedOn: Date;
+  articleNumber?: String,
   postage?: number;
-  use_case?: String;
+  useCase: String;
   cost: number;
 }
 
-export interface InternMerchandise {
-  merchandise_id: number;
-  merchandise_name: String;
-  count: number;
-  orderer: String,
-  purchased_on: Date;
-  article_number?: String,
-  postage: number;
-  cost: number;
-  status: InternMerchandiseStatus;
-  serial_number: String;
-  invoice_number: number;
+// export interface InternMerchandise {
+//   merchandise_id: number;
+//   merchandise_name: String;
+//   count: number;
+//   orderer: String,
+//   purchased_on: Date;
+//   article_number?: String,
+//   postage: number;
+//   cost: number;
+//   status: InternMerchandiseStatus;
+//   serial_number: String;
+//   invoice_number: number;
 
-  useCase?: String;
-  arived_on?: Date;
-  url?: String;
+//   useCase?: String;
+//   arived_on?: Date;
+//   url?: String;
+// }
+
+export interface InternOrderTableData {
+  merchandiseName: String;
+  merchandiseId: number;
+  cost: number;
+  ordererId: String;
+  status: InternMerchandiseStatus;
+  purchasedOn: Date;
 }
 
 export enum InternMerchandiseStatus {
@@ -46,27 +51,6 @@ export enum InternMerchandiseStatus {
   Delivered,
   Stored,
   Used,
-}
-
-
-@Injectable()
-class InternOrderService {
-  mutNewInternOrder = gql`mutation new_intern_order {
-    newInternOrder(newInternOrder: $newInternOrder) {
-      Id
-    }
-  }`;
-
-  constructor(private apollo: Apollo) {}
-
-  submitNewInternOrder(order: NewInternOrder) {
-    return this.apollo.mutate({
-      mutation: this.mutNewInternOrder,
-      variables: {
-        newInternOrder: order
-      }
-    });
-  }
 }
 
 @Component({
@@ -82,25 +66,33 @@ class InternOrderService {
   ],
 })
 export class InternOrdersComponent implements OnInit {
-  
 
-  dataSource: MatTableDataSource<InternMerchandise>;
-  columnsToDisplay = ['BANF Nummer', 'Artikelname', 'Anzahl', 'Besteller', 'Status'];
-  expandedElement: InternMerchandise | null;
 
-  internMerchandise: InternMerchandise[];
-  newOrder: NewInternOrder | null;
+  dataSource: MatTableDataSource<InternOrderTableData>;
+  columnsToDisplay = ['count', 'merchandiseName', 'cost', 'ordererId', 'merchandiseId', 'status'];
+  expandedElement: InternOrderTableData | null;
+
+  tableData: InternOrderTableData[];
 
   @ViewChild(MatPaginator, { static: true }) paginator: MatPaginator;
   @ViewChild(MatSort, { static: true }) sort: MatSort;
 
-  constructor(public dialog: MatDialog, private internOrderService: InternOrderService) {
-    this.dataSource = new MatTableDataSource(this.internMerchandise);
+  constructor(public dialog: MatDialog,
+    private tableDataGQL: InternOrderTableDataGQL,
+    private newInternOrderGQL: NewInternOrderGQL) {
   }
 
   ngOnInit() {
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
+    this.loadTableData();
+  }
+
+  loadTableData() {
+    this.getTableData().subscribe(data => {
+      this.tableData = data;
+      this.dataSource = new MatTableDataSource(this.tableData);
+      this.dataSource.paginator = this.paginator;
+      this.dataSource.sort = this.sort;
+    });
   }
 
   applyFilter(event: Event) {
@@ -112,44 +104,45 @@ export class InternOrdersComponent implements OnInit {
     }
   }
 
-  submitNewInternOrder() {
-    var order: NewInternOrder =  {
-      merchandise_name: "Test",
-      count: 42,
-      url: "sndfjdshouhusiof",
-      oderer: "mw",
-      purchased_on: new Date(),
-      article_number: "aksjk3",
-      postage: 2.345,
-      use_case: "slkjdkldjfk",
-      cost: 345.34,
-    };
+  getTableData(): Observable<InternOrderTableData[]> {
+    return this.tableDataGQL.watch({
+      first: 10
+    }, {
+      fetchPolicy: 'network-only'
+    }).valueChanges
+      .pipe(
+        map(result => result.data.tableData)
+      );
+  }
 
-    this.internOrderService.submitNewInternOrder(order).subscribe(({data}) => {
-      console.log('go data: ' + data);
-      return data;
-    }, (error) => {
-      console.log('there was an error: ' + error);
-      return;
-    });
+  submitNewInternOrder(newOder: NewInternOrder) {
+    this.newInternOrderGQL
+      .mutate({
+        newInternOrder: newOder,
+      })
+      .subscribe();
+    this.loadTableData();
   }
 
   openIncomingGoods(): void {
     console.log("TODO: Implement incoming goods");
   }
 
-
   openNewInternOrder(): void {
+    const newOrder = undefined;
     const dialogRef = this.dialog.open(NewInternOrderDialog, {
       width: '40vw',
       hasBackdrop: true,
       disableClose: true,
-      data: { newInternOrder: this.newOrder }
+      data: { newInternOrder: newOrder }
     });
 
     dialogRef.afterClosed().subscribe(result => {
-      console.log(result);
-      // this.submitNewInternOrder();
+      if (result === undefined)
+        return;
+      result.ordererId = "83215719-3835-4726-b356-47c33e4c74a2";
+      result.purchasedOn = Date.now().toString();
+      this.submitNewInternOrder(result);
     });
   }
 

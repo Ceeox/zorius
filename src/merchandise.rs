@@ -20,7 +20,7 @@ pub struct InternMerchandise {
     _id: String,
     merchandise_name: String,
     count: i32,
-    orderer: String,
+    orderer_id: String,
     purchased_on: String,
     cost: f64,
     status: InternMerchandiseStatus,
@@ -38,7 +38,7 @@ pub struct InternMerchandise {
 #[derive(juniper::GraphQLEnum, Deserialize, Serialize, Debug)]
 pub enum InternMerchandiseStatus {
     Ordered,
-    Delivered,
+    Arrived,
     Stored,
     Used,
 }
@@ -49,7 +49,7 @@ pub struct NewInternOrder {
     merchandise_name: String,
     count: i32,
     url: Option<String>,
-    orderer: String,
+    orderer_id: String,
     purchased_on: String,
     article_number: Option<String>,
     cost: f64,
@@ -99,7 +99,7 @@ impl InternMerchandiseMutationRoot {
             _id: Uuid::new_v4().to_string(),
             merchandise_name: new_intern_order.merchandise_name,
             count: new_intern_order.count,
-            orderer: new_intern_order.orderer,
+            orderer_id: new_intern_order.orderer_id,
             purchased_on: new_intern_order.purchased_on,
             cost: new_intern_order.cost,
             status: InternMerchandiseStatus::Ordered,
