@@ -1,14 +1,12 @@
+use std::io::{Result, Write};
 use std::net::IpAddr;
-use std::io::{Result, Read, Write};
-use std::io::{BufReader, BufWriter };
 
-use ron::{de::from_reader, ser::to_string_pretty, ser::PrettyConfig};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 const CONFIG_NAME: &str = "./config.conf";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct ZoriusConfig {
+pub struct Config {
     #[serde()]
     pub web_config: WebServerConfig,
     pub db_config: DbServerConfig,
@@ -18,7 +16,6 @@ pub struct ZoriusConfig {
 pub struct WebServerConfig {
     pub ip: IpAddr,
     pub port: u16,
-
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -26,7 +23,7 @@ pub struct DbServerConfig {
     pub username: String,
     pub server_domain: String,
     pub password: String,
-    pub application_name: String,
+    pub app_name: String,
     pub db_name: String,
 }
 
@@ -39,7 +36,7 @@ impl Default for WebServerConfig {
     }
 }
 
-impl ZoriusConfig {
+impl Config {
     pub fn new() -> Result<Self> {
         match Self::load_config() {
             Ok(r) => Ok(r),
@@ -55,7 +52,7 @@ impl ZoriusConfig {
     pub fn load_config() -> Result<Self> {
         let file = std::fs::File::open(CONFIG_NAME)?;
         let buf = std::io::BufReader::new(file);
-        // TODO: replace expect with a ZoriusError enum 
+        // TODO: replace expect with a ZoriusError enum
         let res = ron::de::from_reader(buf).expect("ron: failed to read config file");
         Ok(res)
     }

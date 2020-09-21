@@ -1,6 +1,13 @@
 /target
 **/*.rs.bk
 
+.vscode/
+
 .env
 config.conf
 /static
+cert.pem
+key.pem
+
+zorius/node_modules
+zorius/e2e
