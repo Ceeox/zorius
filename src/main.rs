@@ -65,6 +65,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
         std::env::set_var("RUST_LOG", "actix_web=info");
     }
     env_logger::init();
+    dotenv().ok();
 
     let config = config::Config::new()?;
 
@@ -97,6 +98,14 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let webserver_url = format!("{}:{}", config.web_config.ip, config.web_config.port);
     HttpServer::new(move || {
         App::new()
+            .wrap(
+                Cors::new() // <- Construct CORS middleware builder
+                    .allowed_methods(vec!["GET", "POST"])
+                    .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+                    .allowed_header(header::CONTENT_TYPE)
+                    .max_age(3600)
+                    .finish(),
+            )
             .data(ctx.clone())
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new("IP:%a DATETIME:%t REQUEST:\"%r\" STATUS: %s DURATION: %D X-REQUEST-ID:%{x-request-id}o"))

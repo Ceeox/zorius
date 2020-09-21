@@ -11,3 +11,6 @@ key.pem
 
 zorius/node_modules
 zorius/e2e
+/build
+.idea
+.vscode

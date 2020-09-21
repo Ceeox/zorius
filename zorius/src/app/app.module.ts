@@ -28,6 +28,8 @@ import { WarenComponent } from './main/merchandise/waren.component';
 import { InternOrdersComponent, NewInternOrderDialog } from './main/merchandise/intern-orders/intern-orders.component';
 import { ExternOrdersComponent } from './main/merchandise/extern-orders/extern-orders.component';
 import { StockComponent } from './main/merchandise/stock/stock.component';
+import { GraphQLModule } from './graphql.module';
+import { HttpClientModule } from '@angular/common/http';
 
 @NgModule({
   declarations: [
@@ -61,7 +63,9 @@ import { StockComponent } from './main/merchandise/stock/stock.component';
 
     BrowserModule,
     AppRoutingModule,
-    BrowserAnimationsModule
+    BrowserAnimationsModule,
+    GraphQLModule,
+    HttpClientModule
   ],
   entryComponents: [
     NewInternOrderDialog
