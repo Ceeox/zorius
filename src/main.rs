@@ -12,7 +12,6 @@ use juniper_actix::{
     graphiql_handler as gqli_handler, graphql_handler, playground_handler as play_handler,
 };
 use mongodb::{options::ClientOptions, Client};
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys,
     internal::pemfile::rsa_private_keys, NoClientAuth, ServerConfig,
@@ -65,7 +64,6 @@ async fn main() -> Result<(), errors::ZoriusError> {
         std::env::set_var("RUST_LOG", "actix_web=info");
     }
     env_logger::init();
-    dotenv().ok();
 
     let config = config::Config::new()?;
 
@@ -98,14 +96,6 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let webserver_url = format!("{}:{}", config.web_config.ip, config.web_config.port);
     HttpServer::new(move || {
         App::new()
-            .wrap(
-                Cors::new() // <- Construct CORS middleware builder
-                    .allowed_methods(vec!["GET", "POST"])
-                    .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
-                    .allowed_header(header::CONTENT_TYPE)
-                    .max_age(3600)
-                    .finish(),
-            )
             .data(ctx.clone())
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new("IP:%a DATETIME:%t REQUEST:\"%r\" STATUS: %s DURATION: %D X-REQUEST-ID:%{x-request-id}o"))
