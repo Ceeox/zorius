@@ -20,12 +20,14 @@ use crate::{
 
 pub type Schema = RootNode<'static, QueryRoot, MutationRoot, EmptySubscription<Context>>;
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 pub struct QueryRoot;
 
 #[juniper::graphql_object(Context = Context)]
 impl QueryRoot {
     async fn api_version() -> String {
-        "0.1".to_owned()
+        VERSION.to_owned()
     }
 
     async fn table_data(ctx: &Context) -> FieldResult<InternMerchandiseList> {

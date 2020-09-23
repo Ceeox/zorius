@@ -7,12 +7,11 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures = "0.3"
-tokio = "0.2"
-# with 0.9.1 mongodb uses async resolver. this prevents it from running with actix_rt. because it spawns a runtime in a runtime
 bson = "1.1"
+futures = "0.3"
 mongodb = "1.1"
 ron = "0.6"
+tokio = "0.2"
 
 uuid = {version = "0.8", features = ["serde", "v4"]}
 
