@@ -1,13 +1,9 @@
-use bson::{bson, doc, from_bson, to_bson, Bson};
 use chrono::{DateTime, Utc};
-use futures::prelude::*;
-use juniper::{FieldResult, GraphQLObject};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::models::company::CompanyType;
 
-#[derive(GraphQLObject, Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, juniper::GraphQLInputObject)]
 pub struct InternMerchandise {
     #[serde(rename = "_id")]
     pub id: String,
@@ -32,6 +28,11 @@ pub struct InternMerchandise {
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
+}
+
+#[derive(Deserialize, Serialize, Debug, juniper::GraphQLInputObject)]
+pub struct InternMerchandiseList {
+    pub intern_list: Vec<InternMerchandise>,
 }
 
 #[derive(juniper::GraphQLEnum, Deserialize, Serialize, Debug)]

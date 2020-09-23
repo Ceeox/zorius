@@ -6,7 +6,7 @@ use juniper::FieldResult;
 use uuid::Uuid;
 
 use crate::models::merchandise::intern_merchandise::{
-    InternMerchandise, InternMerchandiseStatus, NewInternOrder,
+    InternMerchandise, InternMerchandiseList, InternMerchandiseStatus, NewInternOrder,
 };
 
 use crate::Context;
@@ -16,7 +16,7 @@ static MONGO_DB_COLLECTION_NAME_INTERN: &str = "merchandise_intern";
 pub struct InternMerchandiseQuery;
 
 impl InternMerchandiseQuery {
-    pub async fn table_data(ctx: &Context) -> FieldResult<Vec<InternMerchandise>> {
+    pub async fn table_data(ctx: &Context) -> FieldResult<InternMerchandiseList> {
         let collection = ctx.db.collection(MONGO_DB_COLLECTION_NAME_INTERN);
         // TODO: Limit Query size
         let cursor = collection.find(None, None).await?;
@@ -26,11 +26,12 @@ impl InternMerchandiseQuery {
                 let doc = x.unwrap();
                 match from_document(doc) {
                     Ok(r) => Some(r),
-                    Err(e) => None,
+                    Err(_) => None,
                 }
             })
             .collect::<Vec<_>>()
             .await;
+        let res = InternMerchandiseList { intern_list: res };
         Ok(res)
     }
 
@@ -89,10 +90,16 @@ impl InternMerchandiseMutation {
     }
 
     // TODO: implement an update funtion
-    pub fn update_intern_order(
+    pub async fn update_intern_order(
         ctx: &Context,
-        new_intern_order: NewInternOrder,
-    ) -> FieldResult<String> {
-        unimplemented!();
+        new_intern_order: InternMerchandise,
+    ) -> FieldResult<InternMerchandise> {
+        let doc = mongodb::bson::to_document(&new_intern_order)?;
+        let collection = ctx.db.collection("merchandise_intern");
+        let query = doc! {
+            "_id": new_intern_order.id.clone()
+        };
+        let _ = collection.update_one(query, doc, None).await.unwrap();
+        Ok(new_intern_order)
     }
 }

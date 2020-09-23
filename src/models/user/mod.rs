@@ -1,14 +1,5 @@
-use std::sync::Mutex;
-
-use bson::{bson, doc, from_bson, to_bson, Bson};
 use chrono::{DateTime, Utc};
-use juniper::{FieldResult, GraphQLObject, RootNode};
-use mongodb::Collection;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
-use crate::errors::ZoriusError;
-use crate::Context;
 
 #[derive(juniper::GraphQLInputObject, Deserialize, Serialize, Debug)]
 #[graphql(description = "Stores the userdata")]

@@ -1,18 +1,22 @@
 use std::sync::Arc;
 
-use juniper::{EmptyMutation, EmptySubscription, FieldResult, RootNode};
+use juniper::{EmptySubscription, FieldResult, RootNode};
+use user::UserMutation;
 
 mod intern_merchandise;
 mod user;
 
-use crate::api::intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery};
-use crate::api::user::{UserMutation, UserQuery};
-use crate::errors::ZoriusError;
+use crate::api::user::UserQuery;
+
 use crate::models::{
     merchandise::intern_merchandise::{InternMerchandise, NewInternOrder},
-    user::{NewUser, User},
+    user::User,
 };
 use crate::Context;
+use crate::{
+    api::intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
+    models::merchandise::intern_merchandise::InternMerchandiseList,
+};
 
 pub type Schema = RootNode<'static, QueryRoot, MutationRoot, EmptySubscription<Context>>;
 
@@ -24,7 +28,7 @@ impl QueryRoot {
         "0.1".to_owned()
     }
 
-    async fn table_data(ctx: &Context) -> FieldResult<Vec<InternMerchandise>> {
+    async fn table_data(ctx: &Context) -> FieldResult<InternMerchandiseList> {
         InternMerchandiseQuery::table_data(ctx).await
     }
 
@@ -32,9 +36,9 @@ impl QueryRoot {
         InternMerchandiseQuery::get_order(ctx, id).await
     }
 
-    // async fn get_user(ctx: &Context, id: String) -> FieldResult<Option<User>> {
-    //     UserQuery::get_user(ctx, id).await
-    // }
+    async fn get_user(ctx: &Context, id: String) -> FieldResult<Option<User>> {
+        UserQuery::get_user(ctx, id).await
+    }
 }
 
 pub struct MutationRoot;
@@ -48,9 +52,16 @@ impl MutationRoot {
         InternMerchandiseMutation::new_intern_order(ctx, new_intern_order).await
     }
 
-    // // async fn update_user(ctx: &Context, user: User) -> FieldResult<Option<User>> {
-    // //     UserMutation::update_user(ctx, user).await
-    // // }
+    async fn update_intern_order(
+        ctx: &Context,
+        new_intern_order: InternMerchandise,
+    ) -> FieldResult<InternMerchandise> {
+        InternMerchandiseMutation::update_intern_order(ctx, new_intern_order).await
+    }
+
+    async fn update_user(ctx: &Context, user: User) -> FieldResult<Option<User>> {
+        UserMutation::update_user(ctx, user).await
+    }
 }
 
 pub fn create_schema() -> Arc<Schema> {
