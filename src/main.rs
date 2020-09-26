@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
@@ -8,6 +9,7 @@ use actix_web::{
     middleware::{Compress, DefaultHeaders, Logger},
     web, App, Error, HttpResponse, HttpServer,
 };
+use juniper::RootNode;
 use juniper_actix::{
     graphiql_handler as gqli_handler, graphql_handler, playground_handler as play_handler,
 };
@@ -22,13 +24,13 @@ mod config;
 mod errors;
 mod models;
 
-use crate::api::{create_schema, Schema};
+use crate::api::{create_schema, RootSchema};
 
 #[derive(Clone)]
 pub struct Context {
     pub client: mongodb::Client,
     pub db: mongodb::Database,
-    pub schema: Arc<Schema>,
+    pub root_schema: Arc<RootSchema>,
 }
 
 impl juniper::Context for Context {}
@@ -38,18 +40,18 @@ async fn graphql(
     payload: actix_web::web::Payload,
     ctx: web::Data<Context>,
 ) -> Result<HttpResponse, Error> {
-    graphql_handler(&ctx.schema, &ctx, req, payload).await
+    graphql_handler(&ctx.root_schema, &ctx, req, payload).await
 }
 
 // Enable only when we're running in debug mode
-#[cfg(debug_assertions)]
+// #[cfg(debug_assertions)]
 #[get("/graphiql")]
 async fn graphiql() -> Result<HttpResponse, Error> {
     gqli_handler("/graphql", None).await
 }
 
 // Enable only when we're running in debug mode
-#[cfg(debug_assertions)]
+// #[cfg(debug_assertions)]
 #[get("/playground")]
 async fn zorius_playground() -> Result<HttpResponse, Error> {
     play_handler("/graphql", None).await
@@ -57,7 +59,7 @@ async fn zorius_playground() -> Result<HttpResponse, Error> {
 
 #[actix_web::main]
 async fn main() -> Result<(), errors::ZoriusError> {
-    if cfg!(debug_accertions) {
+    if cfg!(debug_assertions) {
         std::env::set_var("RUST_LOG", "actix_web=debug");
     } else {
         std::env::set_var("RUST_LOG", "actix_web=info");
@@ -77,10 +79,14 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let mut client_options = ClientOptions::parse(&url).await?;
     client_options.app_name = Some(config.db_config.app_name);
     let client = Client::with_options(client_options)?;
-    let db = client.database("zorius");
+    let db = client.database(&config.db_config.db_name);
     // Create Juniper schema
-    let schema = create_schema();
-    let ctx = Context { client, db, schema };
+    let root_schema = create_schema();
+    let ctx = Context {
+        client,
+        db,
+        root_schema,
+    };
 
     let mut tls_config = ServerConfig::new(NoClientAuth::new());
     let cert_file = &mut BufReader::new(File::open("cert.pem").unwrap());

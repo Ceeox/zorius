@@ -1,12 +1,16 @@
 use std::sync::Arc;
 
+use bson::oid::ObjectId;
 use juniper::{EmptySubscription, FieldResult, RootNode};
-use user::UserMutation;
+use user::{UserMutation, UserQuery};
 
 mod intern_merchandise;
 mod user;
 
-use crate::api::user::UserQuery;
+use crate::{
+    models::merchandise::intern_merchandise::InternMerchandiseUpdate, models::user::NewUser,
+    models::user::UserUpdate,
+};
 
 use crate::models::{
     merchandise::intern_merchandise::{InternMerchandise, NewInternOrder},
@@ -18,7 +22,7 @@ use crate::{
     models::merchandise::intern_merchandise::InternMerchandiseList,
 };
 
-pub type Schema = RootNode<'static, QueryRoot, MutationRoot, EmptySubscription<Context>>;
+pub type RootSchema = RootNode<'static, QueryRoot, MutationRoot, EmptySubscription<Context>>;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -34,12 +38,11 @@ impl QueryRoot {
         InternMerchandiseQuery::table_data(ctx).await
     }
 
-    async fn get_order(ctx: &Context, id: String) -> FieldResult<Option<InternMerchandise>> {
+    async fn get_order(ctx: &Context, id: ObjectId) -> FieldResult<InternMerchandise> {
         InternMerchandiseQuery::get_order(ctx, id).await
     }
-
-    async fn get_user(ctx: &Context, id: String) -> FieldResult<Option<User>> {
-        UserQuery::get_user(ctx, id).await
+    async fn get_user(ctx: &Context, user_id: ObjectId) -> FieldResult<User> {
+        UserQuery::get_user(ctx, user_id).await
     }
 }
 
@@ -53,21 +56,29 @@ impl MutationRoot {
     ) -> FieldResult<InternMerchandise> {
         InternMerchandiseMutation::new_intern_order(ctx, new_intern_order).await
     }
-
     async fn update_intern_order(
         ctx: &Context,
-        new_intern_order: InternMerchandise,
+        order_id: ObjectId,
+        inter_update: InternMerchandiseUpdate,
     ) -> FieldResult<InternMerchandise> {
-        InternMerchandiseMutation::update_intern_order(ctx, new_intern_order).await
+        InternMerchandiseMutation::update_intern_order(ctx, order_id, inter_update).await
     }
 
-    async fn update_user(ctx: &Context, user: User) -> FieldResult<Option<User>> {
-        UserMutation::update_user(ctx, user).await
+    async fn new_user(ctx: &Context, new_user: NewUser) -> FieldResult<User> {
+        UserMutation::new_user(ctx, new_user).await
+    }
+
+    async fn update_user(
+        ctx: &Context,
+        user_id: ObjectId,
+        user_update: UserUpdate,
+    ) -> FieldResult<User> {
+        UserMutation::update_user(ctx, user_id, user_update).await
     }
 }
 
-pub fn create_schema() -> Arc<Schema> {
-    Arc::new(Schema::new(
+pub fn create_schema() -> Arc<RootSchema> {
+    Arc::new(RootSchema::new(
         QueryRoot {},
         MutationRoot {},
         EmptySubscription::<Context>::new(),

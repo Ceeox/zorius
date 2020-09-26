@@ -1,17 +1,20 @@
-use bson::de::from_document;
-use bson::{doc, from_bson, to_bson};
+use bson::{bson, doc, from_bson, to_bson};
+use bson::{de::from_document, oid::ObjectId, to_document, Bson, DateTime};
 use chrono::Utc;
 use futures::stream::StreamExt;
-use juniper::FieldResult;
-use uuid::Uuid;
+use juniper::{graphql_value, EmptySubscription, FieldError, FieldResult, RootNode};
+use mongodb::options::FindOptions;
 
 use crate::models::merchandise::intern_merchandise::{
-    InternMerchandise, InternMerchandiseList, InternMerchandiseStatus, NewInternOrder,
+    InternMerchandise, InternMerchandiseList, InternMerchandiseStatus, InternMerchandiseUpdate,
+    NewInternOrder,
 };
 
 use crate::Context;
 
 static MONGO_DB_COLLECTION_NAME_INTERN: &str = "merchandise_intern";
+
+const MAX_TABLE_DATA_RESULTS: i64 = 50;
 
 pub struct InternMerchandiseQuery;
 
@@ -19,14 +22,16 @@ impl InternMerchandiseQuery {
     pub async fn table_data(ctx: &Context) -> FieldResult<InternMerchandiseList> {
         let collection = ctx.db.collection(MONGO_DB_COLLECTION_NAME_INTERN);
         // TODO: Limit Query size
-        let cursor = collection.find(None, None).await?;
+        let find_opt = Some(FindOptions::builder().limit(MAX_TABLE_DATA_RESULTS).build());
+        let cursor = collection.find(None, find_opt).await?;
         let res = cursor
             .filter_map(|x| async move {
-                println!("{:?}", x);
-                let doc = x.unwrap();
-                match from_document(doc) {
+                match from_document(x.clone().unwrap()) {
                     Ok(r) => Some(r),
-                    Err(_) => None,
+                    Err(e) => {
+                        eprintln!("Got error with: {:?} with error: {:?}", x, e);
+                        None
+                    }
                 }
             })
             .collect::<Vec<_>>()
@@ -35,19 +40,18 @@ impl InternMerchandiseQuery {
         Ok(res)
     }
 
-    pub async fn get_order(
-        ctx: &Context,
-        order_id: String,
-    ) -> FieldResult<Option<InternMerchandise>> {
+    pub async fn get_order(ctx: &Context, order_id: ObjectId) -> FieldResult<InternMerchandise> {
         let collection = ctx.db.collection(MONGO_DB_COLLECTION_NAME_INTERN);
         let filter = doc! { "_id": order_id };
-        let item = match collection.find_one(Some(filter), None).await? {
-            None => return Ok(None),
-            Some(r) => to_bson(&r)?,
-        };
-        let res = from_bson::<InternMerchandise>(item)?;
-        println!("{:?}", res);
-        Ok(Some(res))
+        match collection.find_one(Some(filter), None).await? {
+            None => {
+                return Err(FieldError::new(
+                    "specified order not found",
+                    graphql_value!({ "error": "specified order not found" }),
+                ))
+            }
+            Some(r) => Ok(from_document(r)?),
+        }
     }
 }
 
@@ -59,12 +63,12 @@ impl InternMerchandiseMutation {
         new_intern_order: NewInternOrder,
     ) -> FieldResult<InternMerchandise> {
         let order = InternMerchandise {
-            id: Uuid::new_v4().to_string(),
+            id: ObjectId::new(),
             merchandise_name: new_intern_order.merchandise_name,
-            bought_through: None,
+            // bought_through: None,
             count: new_intern_order.count,
             orderer: new_intern_order.orderer,
-            purchased_on: Utc::now(),
+            purchased_on: Utc::now().into(),
             cost: new_intern_order.cost,
             status: InternMerchandiseStatus::Ordered,
             url: new_intern_order.url,
@@ -79,12 +83,11 @@ impl InternMerchandiseMutation {
             serial_number: None,
             arived_on: None,
             invoice_number: None,
+            created_date: Utc::now().into(),
+            updated_date: Utc::now().into(),
         };
         let collection = ctx.db.collection("merchandise_intern");
-        let bson = bson::to_bson(&order)?;
-        let doc = bson
-            .as_document()
-            .expect("Failed to convert to bson::Document");
+        let doc = to_document(&order)?;
         let _ = collection.insert_one(doc.clone(), None).await?;
         Ok(order)
     }
@@ -92,14 +95,17 @@ impl InternMerchandiseMutation {
     // TODO: implement an update funtion
     pub async fn update_intern_order(
         ctx: &Context,
-        new_intern_order: InternMerchandise,
+        order_id: ObjectId,
+        update: InternMerchandiseUpdate,
     ) -> FieldResult<InternMerchandise> {
-        let doc = mongodb::bson::to_document(&new_intern_order)?;
         let collection = ctx.db.collection("merchandise_intern");
+        let mut order = InternMerchandiseQuery::get_order(ctx, order_id.clone()).await?;
+        order.update(update);
         let query = doc! {
-            "_id": new_intern_order.id.clone()
+            "_id": order_id
         };
-        let _ = collection.update_one(query, doc, None).await.unwrap();
-        Ok(new_intern_order)
+        let update_doc = to_document(&order)?;
+        let _ = collection.update_one(query, update_doc, None).await?;
+        Ok(order)
     }
 }

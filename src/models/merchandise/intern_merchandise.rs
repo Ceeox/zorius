@@ -1,19 +1,19 @@
-use chrono::{DateTime, Utc};
+use bson::{oid::ObjectId, DateTime};
+use chrono::Utc;
+use juniper::{GraphQLEnum, GraphQLInputObject, GraphQLObject};
 use serde::{Deserialize, Serialize};
 
 use crate::models::company::CompanyType;
 
-#[derive(Deserialize, Serialize, Debug, juniper::GraphQLInputObject)]
+#[derive(Deserialize, Serialize, Debug, GraphQLObject)]
 pub struct InternMerchandise {
     #[serde(rename = "_id")]
-    pub id: String,
-
+    pub id: ObjectId,
     pub merchandise_id: Option<i32>,
-    pub bought_through: Option<CompanyType>,
+    //    pub bought_through: Option<CompanyType>,
     pub orderer: String,
     pub project_leader: Option<String>,
-    pub purchased_on: DateTime<Utc>,
-
+    pub purchased_on: DateTime,
     pub count: i32,
     pub merchandise_name: String,
     pub use_case: Option<String>,
@@ -21,21 +21,17 @@ pub struct InternMerchandise {
     pub article_number: Option<String>,
     pub shop: Option<String>,
     pub cost: f64,
-
     pub serial_number: Option<Vec<String>>,
-    pub arived_on: Option<String>,
+    pub arived_on: Option<DateTime>,
     pub status: InternMerchandiseStatus,
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
+    pub created_date: DateTime,
+    pub updated_date: DateTime,
 }
 
-#[derive(Deserialize, Serialize, Debug, juniper::GraphQLInputObject)]
-pub struct InternMerchandiseList {
-    pub intern_list: Vec<InternMerchandise>,
-}
-
-#[derive(juniper::GraphQLEnum, Deserialize, Serialize, Debug)]
+#[derive(GraphQLEnum, Deserialize, Serialize, Debug, Clone)]
 pub enum InternMerchandiseStatus {
     Ordered,
     Delivered,
@@ -49,7 +45,12 @@ impl Default for InternMerchandiseStatus {
     }
 }
 
-#[derive(juniper::GraphQLInputObject, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug, GraphQLObject)]
+pub struct InternMerchandiseList {
+    pub intern_list: Vec<InternMerchandise>,
+}
+
+#[derive(GraphQLInputObject, Deserialize, Serialize)]
 #[graphql(description = "Stores internal merchandise infos")]
 pub struct NewInternOrder {
     pub merchandise_name: String,
@@ -64,4 +65,52 @@ pub struct NewInternOrder {
     pub project_leader: String,
     pub location: String,
     pub shop: String,
+}
+
+#[derive(GraphQLInputObject, Deserialize, Serialize)]
+#[graphql(description = "Stores internal merchandise infos")]
+pub struct InternMerchandiseUpdate {
+    pub merchandise_id: Option<i32>,
+    //    pub bought_through: Option<CompanyType>,
+    pub orderer: Option<String>,
+    pub project_leader: Option<String>,
+    pub purchased_on: Option<DateTime>,
+    pub count: Option<i32>,
+    pub merchandise_name: Option<String>,
+    pub use_case: Option<String>,
+    pub location: Option<String>,
+    pub article_number: Option<String>,
+    pub shop: Option<String>,
+    pub cost: Option<f64>,
+    pub serial_number: Option<Vec<String>>,
+    pub arived_on: Option<DateTime>,
+    pub status: Option<InternMerchandiseStatus>,
+    pub url: Option<String>,
+    pub postage: Option<f64>,
+    pub invoice_number: Option<i32>,
+}
+
+impl InternMerchandise {
+    pub fn update(&mut self, update: InternMerchandiseUpdate) {
+        self.merchandise_id = update.merchandise_id.or(self.merchandise_id);
+        self.orderer = update.orderer.unwrap_or(self.orderer.clone());
+        self.project_leader = update.project_leader.or(self.project_leader.clone());
+        self.purchased_on = update.purchased_on.unwrap_or(self.purchased_on);
+        self.count = update.count.unwrap_or(self.count);
+        self.merchandise_name = update
+            .merchandise_name
+            .unwrap_or(self.merchandise_name.clone());
+        self.use_case = update.use_case.or(self.use_case.clone());
+        self.location = update.location.or(self.location.clone());
+        self.article_number = update.article_number.or(self.article_number.clone());
+        self.shop = update.shop.or(self.shop.clone());
+        self.cost = update.cost.unwrap_or(self.cost);
+        self.serial_number = update.serial_number.or(self.serial_number.clone());
+        self.arived_on = update.arived_on.or(self.arived_on);
+        self.status = update.status.unwrap_or(self.status.clone());
+        self.url = update.url.or(self.url.clone());
+        self.postage = update.postage.or(self.postage);
+        self.invoice_number = update.invoice_number.or(self.invoice_number);
+        self.updated_date = Utc::now().into();
+    }
 }
