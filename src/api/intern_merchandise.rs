@@ -29,7 +29,7 @@ impl InternMerchandiseQuery {
                 match from_document(x.clone().unwrap()) {
                     Ok(r) => Some(r),
                     Err(e) => {
-                        eprintln!("Got error with: {:?} with error: {:?}", x, e);
+                        eprintln!("Got error on {:?} with error: {:?}", x, e);
                         None
                     }
                 }

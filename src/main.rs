@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
@@ -10,7 +9,7 @@ use actix_web::{
     web, App, Error, HttpResponse, HttpServer,
 };
 use config::Config;
-use juniper::RootNode;
+use errors::ZoriusError;
 use juniper_actix::{
     graphiql_handler as gqli_handler, graphql_handler, playground_handler as play_handler,
 };
@@ -61,7 +60,7 @@ async fn zorius_playground() -> Result<HttpResponse, Error> {
     play_handler("/graphql", None).await
 }
 
-async fn setup_mongo(config: &Config) -> Result<Client, mongodb::error::Error> {
+async fn setup_mongo(config: &Config) -> Result<Client, ZoriusError> {
     let url = format!(
         "mongodb+srv://{}:{}@{}/{}",
         config.db_config.username,
@@ -113,11 +112,13 @@ async fn main() -> Result<(), errors::ZoriusError> {
 
     // Create Juniper schema
     let root_schema = create_schema();
+
     let ctx = Context {
         client,
         db,
         root_schema,
     };
+
     let tls_config = setup_tls(&config);
 
     // Start http server

@@ -16,8 +16,56 @@ static MONGO_DB_COLLECTION_NAME: &str = "time_recordings";
 
 pub struct TimeRecordingQuery;
 
-impl TimeRecordingQuery {}
+impl TimeRecordingQuery {
+    pub async fn time_record(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn customer(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn activity(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn project(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+}
 
 pub struct TimeRecordingMutation;
 
-impl TimeRecordingMutation {}
+impl TimeRecordingMutation {
+    pub async fn new_time_record(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn update_time_record(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn new_customer(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn update_customer(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn new_activity(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn update_activity(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn new_project(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+
+    pub async fn update_project(ctx: &Context) -> FieldResult<()> {
+        unimplemented!()
+    }
+}
