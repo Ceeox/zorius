@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
 
+use actix_files::Files;
 use actix_web::{
     get,
     http::ContentEncoding,
@@ -22,6 +23,8 @@ use uuid::Uuid;
 mod api;
 mod config;
 mod errors;
+mod helper;
+mod middleware;
 mod models;
 
 use crate::api::{create_schema, RootSchema};
@@ -60,7 +63,7 @@ async fn zorius_playground() -> Result<HttpResponse, Error> {
     play_handler("/graphql", None).await
 }
 
-async fn setup_mongo(config: &Config) -> Result<Client, ZoriusError> {
+async fn setup_mongodb(config: &Config) -> Result<Client, ZoriusError> {
     let url = format!(
         "mongodb+srv://{}:{}@{}/{}",
         config.db_config.username,
@@ -86,6 +89,7 @@ fn setup_log() {
     } else {
         std::env::set_var("RUST_LOG", "actix_web=info");
     }
+    println!("{:#?}", std::env::var("RUST_LOG"));
     env_logger::init();
 }
 
@@ -107,7 +111,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
 
     let config = Config::new()?;
 
-    let client = setup_mongo(&config).await?;
+    let client = setup_mongodb(&config).await?;
     let db = client.database(&config.db_config.db_name);
 
     // Create Juniper schema
@@ -137,8 +141,8 @@ async fn main() -> Result<(), errors::ZoriusError> {
             )
             .service(graphiql)
             .service(zorius_playground)
+            .service(Files::new("/static", "static").prefer_utf8(true))
         // TODO: add service for frontend files
-        // TODO: add service for static files
     })
     .bind_rustls(webserver_url, tls_config)?
     .run()

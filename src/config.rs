@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use std::io::{Result, Write};
 use std::net::IpAddr;
 
@@ -5,11 +6,15 @@ use serde::{Deserialize, Serialize};
 
 const CONFIG_NAME: &str = "./config.conf";
 
+lazy_static! {
+    pub static ref CONFIG: Config = Config::new().unwrap();
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Config {
-    #[serde()]
     pub web_config: WebServerConfig,
     pub db_config: DbServerConfig,
+    pub secret_key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,10 +26,10 @@ pub struct WebServerConfig {
     pub log_format: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DbServerConfig {
-    pub username: String,
     pub server_domain: String,
+    pub username: String,
     pub password: String,
     pub app_name: String,
     pub db_name: String,
@@ -38,6 +43,18 @@ impl Default for WebServerConfig {
             cert_path: "cert.pem".to_owned(),
             key_path: "key.pem".to_owned(),
             log_format: "IP:%a DATETIME:%t REQUEST:\"%r\" STATUS: %s DURATION: %D X-REQUEST-ID:%{x-request-id}o".to_owned(),
+        }
+    }
+}
+
+impl Default for DbServerConfig {
+    fn default() -> Self {
+        Self {
+            server_domain: "localhost".to_owned(),
+            username: "".to_owned(),
+            password: "".to_owned(),
+            app_name: "zorius".to_owned(),
+            db_name: "zorius".to_owned(),
         }
     }
 }
