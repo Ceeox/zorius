@@ -21,8 +21,9 @@ pub struct Config {
 pub struct WebServerConfig {
     pub ip: IpAddr,
     pub port: u16,
-    pub cert_path: String,
-    pub key_path: String,
+    pub enable_ssl: bool,
+    pub cert_path: Option<String>,
+    pub key_path: Option<String>,
     pub log_format: String,
 }
 
@@ -40,8 +41,9 @@ impl Default for WebServerConfig {
         Self {
             ip: "127.0.0.1".parse::<IpAddr>().unwrap(),
             port: 8080,
-            cert_path: "cert.pem".to_owned(),
-            key_path: "key.pem".to_owned(),
+            enable_ssl: true,
+            cert_path: Some("cert.pem".to_owned()),
+            key_path: Some("key.pem".to_owned()),
             log_format: "IP:%a DATETIME:%t REQUEST:\"%r\" STATUS: %s DURATION: %D X-REQUEST-ID:%{x-request-id}o".to_owned(),
         }
     }

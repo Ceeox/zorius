@@ -28,6 +28,7 @@ mod middleware;
 mod models;
 
 use crate::api::{create_schema, RootSchema};
+use crate::config::CONFIG;
 
 const API_VERSION: &str = "v1";
 const API_BASE_URL: &str = "graphql";
@@ -63,13 +64,13 @@ async fn zorius_playground() -> Result<HttpResponse, Error> {
     play_handler("/graphql", None).await
 }
 
-async fn setup_mongodb(config: &Config) -> Result<Client, ZoriusError> {
+async fn setup_mongodb() -> Result<Client, ZoriusError> {
     let url = format!(
         "mongodb+srv://{}:{}@{}/{}",
-        config.db_config.username,
-        config.db_config.password,
-        config.db_config.server_domain,
-        config.db_config.db_name
+        CONFIG.db_config.username,
+        CONFIG.db_config.password,
+        CONFIG.db_config.server_domain,
+        CONFIG.db_config.db_name
     );
     // Use to cloudflare resolver to work around a mongodb dns resolver issue.
     // For more Infos: https://github.com/mongodb/mongo-rust-driver#windows-dns-note
@@ -79,7 +80,7 @@ async fn setup_mongodb(config: &Config) -> Result<Client, ZoriusError> {
         ClientOptions::parse(&url).await?
     };
 
-    client_options.app_name = Some(config.db_config.app_name.clone());
+    client_options.app_name = Some(CONFIG.db_config.app_name.clone());
     Ok(Client::with_options(client_options)?)
 }
 
@@ -93,10 +94,12 @@ fn setup_log() {
     env_logger::init();
 }
 
-fn setup_tls(config: &Config) -> ServerConfig {
+fn setup_tls() -> ServerConfig {
     let mut tls_config = ServerConfig::new(NoClientAuth::new());
-    let cert_file = &mut BufReader::new(File::open(&config.web_config.cert_path).unwrap());
-    let key_file = &mut BufReader::new(File::open(&config.web_config.key_path).unwrap());
+    let cert_file =
+        &mut BufReader::new(File::open(CONFIG.web_config.cert_path.clone().unwrap()).unwrap());
+    let key_file =
+        &mut BufReader::new(File::open(CONFIG.web_config.key_path.clone().unwrap()).unwrap());
     let cert_chain = certs(cert_file).unwrap();
     let mut keys = pkcs8_private_keys(key_file).unwrap();
     tls_config
@@ -109,10 +112,8 @@ fn setup_tls(config: &Config) -> ServerConfig {
 async fn main() -> Result<(), errors::ZoriusError> {
     setup_log();
 
-    let config = Config::new()?;
-
-    let client = setup_mongodb(&config).await?;
-    let db = client.database(&config.db_config.db_name);
+    let client = setup_mongodb().await?;
+    let db = client.database(&CONFIG.db_config.db_name);
 
     // Create Juniper schema
     let root_schema = create_schema();
@@ -123,12 +124,10 @@ async fn main() -> Result<(), errors::ZoriusError> {
         root_schema,
     };
 
-    let tls_config = setup_tls(&config);
-
     // Start http server
-    let webserver_url = format!("{}:{}", config.web_config.ip, config.web_config.port);
-    let log_format = config.web_config.log_format.clone();
-    HttpServer::new(move || {
+    let webserver_url = format!("{}:{}", CONFIG.web_config.ip, CONFIG.web_config.port);
+    let log_format = CONFIG.web_config.log_format.clone();
+    let http_server = HttpServer::new(move || {
         App::new()
             .data(ctx.clone())
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
@@ -143,10 +142,17 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .service(zorius_playground)
             .service(Files::new("/static", "static").prefer_utf8(true))
         // TODO: add service for frontend files
-    })
-    .bind_rustls(webserver_url, tls_config)?
-    .run()
-    .await?;
+    });
+    let res = if CONFIG.web_config.enable_ssl {
+        let tls_config = setup_tls();
 
-    Ok(())
+        http_server
+            .bind_rustls(webserver_url, tls_config)?
+            .run()
+            .await?
+    } else {
+        http_server.bind(webserver_url)?.run().await?
+    };
+
+    Ok(res)
 }
