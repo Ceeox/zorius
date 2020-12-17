@@ -25,6 +25,7 @@ pub struct RoleSearch {
     start_at: usize,
     count: usize,
 }
+
 pub enum RoleSearchIdent {
     ById(ObjectId),
     ByName(String),

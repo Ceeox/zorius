@@ -1,5 +1,5 @@
-mod holidays;
-mod time_record;
+pub(crate) mod holidays;
+pub(crate) mod time_record;
 
 use std::time::Duration;
 

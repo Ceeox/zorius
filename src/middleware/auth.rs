@@ -12,13 +12,13 @@ pub struct AuthorizationService;
 impl FromRequest for AuthorizationService {
     type Error = Error;
     type Future = Ready<Result<AuthorizationService, Error>>;
-    type Config = ();
+    type Config = Config;
 
     fn from_request(_req: &HttpRequest, _payload: &mut dev::Payload) -> Self::Future {
-        let _auth = _req.headers().get("Authorization");
-        match _auth {
+        let auth = _req.headers().get("Authorization");
+        match auth {
             Some(_) => {
-                let _split: Vec<&str> = _auth.unwrap().to_str().unwrap().split("Bearer").collect();
+                let _split: Vec<&str> = auth.unwrap().to_str().unwrap().split("Bearer").collect();
                 let token = _split[1].trim();
                 let key = CONFIG.secret_key.as_bytes();
                 match decode::<Claim>(

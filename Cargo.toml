@@ -10,6 +10,7 @@ version = "0.1.0"
 bson = "1.1"
 futures = "0.3"
 lazy_static = "1.4"
+log = "0.4"
 mongodb = "1.1"
 ron = "0.6"
 tokio = "0.3"
@@ -26,7 +27,7 @@ actix-web = {version = "3.3", features = ["rustls"]}
 rustls = "0.18"
 
 env_logger = "0.8"
-juniper = {git = "https://github.com/graphql-rust/juniper.git", features = ["chrono", "uuid", "url", "bson"]}
+juniper = {git = "https://github.com/graphql-rust/juniper.git", features = ["chrono", "url", "bson"]}
 juniper_actix = {git = "https://github.com/graphql-rust/juniper.git"}
 serde = "1.0"
 serde_derive = "1.0"

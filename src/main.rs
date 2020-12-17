@@ -4,16 +4,11 @@ use std::sync::Arc;
 
 use actix_files::Files;
 use actix_web::{
-    get,
     http::ContentEncoding,
     middleware::{Compress, DefaultHeaders, Logger},
-    web, App, Error, HttpResponse, HttpServer,
+    web, App, HttpServer,
 };
-use config::Config;
 use errors::ZoriusError;
-use juniper_actix::{
-    graphiql_handler as gqli_handler, graphql_handler, playground_handler as play_handler,
-};
 use mongodb::{options::ClientOptions, options::ResolverConfig, Client};
 use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
@@ -27,11 +22,17 @@ mod helper;
 mod middleware;
 mod models;
 
-use crate::api::{create_schema, RootSchema};
-use crate::config::CONFIG;
+use crate::{
+    api::{
+        auth::{login, register},
+        create_schema, graphiql, graphql, zorius_playground, RootSchema,
+    },
+    config::CONFIG,
+};
 
 const API_VERSION: &str = "v1";
 const API_BASE_URL: &str = "graphql";
+const API_AUTH_URL: &str = "auth";
 
 #[derive(Clone)]
 pub struct Context {
@@ -41,28 +42,6 @@ pub struct Context {
 }
 
 impl juniper::Context for Context {}
-
-async fn graphql(
-    req: actix_web::HttpRequest,
-    payload: actix_web::web::Payload,
-    ctx: web::Data<Context>,
-) -> Result<HttpResponse, Error> {
-    graphql_handler(&ctx.root_schema, &ctx, req, payload).await
-}
-
-// Enable only when we're running in debug mode
-// #[cfg(debug_assertions)]
-#[get("/graphiql")]
-async fn graphiql() -> Result<HttpResponse, Error> {
-    gqli_handler("/graphql", None).await
-}
-
-// Enable only when we're running in debug mode
-// #[cfg(debug_assertions)]
-#[get("/playground")]
-async fn zorius_playground() -> Result<HttpResponse, Error> {
-    play_handler("/graphql", None).await
-}
 
 async fn setup_mongodb() -> Result<Client, ZoriusError> {
     let url = format!(
@@ -133,6 +112,11 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
             .wrap(Compress::new(ContentEncoding::Br))
+            // auth api
+            .service(login)
+            .service(register)
+            //.service(reset_password)
+            // graphql api
             .service(
                 web::resource(&format!("{}/{}", API_VERSION, API_BASE_URL))
                     .route(web::post().to(graphql))
@@ -140,7 +124,14 @@ async fn main() -> Result<(), errors::ZoriusError> {
             )
             .service(graphiql)
             .service(zorius_playground)
-            .service(Files::new("/static", "static").prefer_utf8(true))
+            // static file serving
+            .service(
+                Files::new("/", "/static")
+                    .prefer_utf8(true)
+                    .index_file("index.html"),
+            )
+            .service(Files::new("/assets", "/assets").prefer_utf8(true))
+            .service(Files::new("/files", "/files").prefer_utf8(true))
         // TODO: add service for frontend files
     });
     let res = if CONFIG.web_config.enable_ssl {

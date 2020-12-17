@@ -1,30 +1,58 @@
 use std::sync::Arc;
 
+use actix_web::{get, web, HttpResponse};
 use bson::oid::ObjectId;
 use juniper::{EmptySubscription, FieldResult, RootNode};
+use juniper_actix::{
+    graphiql_handler as gqli_handler, graphql_handler, playground_handler as play_handler,
+};
 use user::{UserMutation, UserQuery};
 
-mod intern_merchandise;
-mod user;
-mod role;
-mod time_recording;
+pub(crate) mod auth;
+pub(crate) mod intern_merchandise;
+// pub(crate) mod role;
+pub(crate) mod time_recording;
+pub(crate) mod user;
 
-use crate::Context;
 use crate::{
     api::intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
+    errors::ZoriusError,
+    middleware::auth::AuthorizationService,
     models::user::{NewUserQuery, UpdateUserQuery},
 };
 use crate::{
     models::merchandise::intern_merchandise::{
-        InternMerchandise, InternMerchandiseResponse, NewInternMerchandiseQuery,
-        UpdateInternMerchandiseQuery,
+        InternMerchandiseResponse, NewInternMerchandiseQuery, UpdateInternMerchandiseQuery,
     },
     models::user::UserResponse,
 };
+use crate::{models::user::UserId, Context};
 
 pub type RootSchema = RootNode<'static, RootQuery, RootMutation, EmptySubscription<Context>>;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
+pub async fn graphql(
+    req: actix_web::HttpRequest,
+    payload: actix_web::web::Payload,
+    ctx: web::Data<Context>,
+    _: AuthorizationService,
+) -> Result<HttpResponse, ZoriusError> {
+    Ok(graphql_handler(&ctx.root_schema, &ctx, req, payload).await?)
+}
+
+// Enable only when we're running in debug mode
+// #[cfg(debug_assertions)]
+#[get("/graphiql")]
+pub async fn graphiql() -> Result<HttpResponse, ZoriusError> {
+    Ok(gqli_handler("/graphql", None).await?)
+}
+// Enable only when we're running in debug mode
+// #[cfg(debug_assertions)]
+#[get("/playground")]
+pub async fn zorius_playground() -> Result<HttpResponse, ZoriusError> {
+    Ok(play_handler("/graphql", None).await?)
+}
 
 pub struct RootQuery;
 
@@ -42,11 +70,11 @@ impl RootQuery {
         InternMerchandiseQuery::get_order(ctx, id).await
     }
 
-    async fn get_user(ctx: &Context, user_id: ObjectId) -> FieldResult<UserResponse> {
+    async fn get_user(ctx: &Context, user_id: UserId) -> FieldResult<UserResponse> {
         UserQuery::get_user(ctx, user_id).await
     }
 
-    async fn get_users(ctx: &Context, user_ids: Vec<ObjectId>) -> FieldResult<Vec<UserResponse>> {
+    async fn get_users(ctx: &Context, user_ids: Vec<UserId>) -> FieldResult<Vec<UserResponse>> {
         UserQuery::get_users(ctx, user_ids).await
     }
 
@@ -80,7 +108,7 @@ impl RootMutation {
 
     async fn update_user(
         ctx: &Context,
-        user_id: ObjectId,
+        user_id: UserId,
         user_update: UpdateUserQuery,
     ) -> FieldResult<UserResponse> {
         UserMutation::update_user(ctx, user_id, user_update).await

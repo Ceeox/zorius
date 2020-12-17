@@ -3253,6 +3253,7 @@ dependencies = [
  "juniper",
  "juniper_actix",
  "lazy_static",
+ "log",
  "mongodb",
  "pwhash",
  "ron",

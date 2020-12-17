@@ -8,6 +8,7 @@ config.conf
 /static
 cert.pem
 key.pem
+/files
 
 zorius/node_modules
 zorius/e2e

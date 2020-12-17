@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use super::permissions::{Permissions, UserPermissionUpdate};
 
+pub type UserId = ObjectId;
+
 #[derive(Deserialize, Debug, GraphQLInputObject)]
 #[graphql(description = "new user")]
 pub struct NewUserQuery {
@@ -17,7 +19,7 @@ pub struct NewUserQuery {
     pub lastname: Option<String>,
 }
 
-#[derive(Deserialize, Debug, GraphQLInputObject)]
+#[derive(Deserialize, Serialize, Debug, GraphQLInputObject)]
 #[graphql(description = "udpate the user data")]
 pub struct UpdateUserQuery {
     pub email: Option<String>,
@@ -33,7 +35,7 @@ pub struct UpdateUserQuery {
 #[graphql(description = "Stores the userdata")]
 pub struct UserResponse {
     #[serde(rename = "_id")]
-    pub id: ObjectId,
+    pub id: UserId,
     pub email: String,
     pub username: String,
     pub created_at: DateTime,
@@ -48,7 +50,7 @@ pub struct UserResponse {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct User {
     #[serde(rename = "_id")]
-    id: ObjectId,
+    id: UserId,
     email: String,
     password_hash: Option<String>,
     username: String,
@@ -86,6 +88,10 @@ impl User {
         };
         user.hash_password(&new_user.password);
         user
+    }
+
+    pub fn email(&self) -> &str {
+        &self.email
     }
 
     pub fn hash_password(&mut self, password: &str) {

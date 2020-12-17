@@ -4,24 +4,40 @@ use serde::{Deserialize, Serialize};
 
 use std::time::Duration;
 
+use crate::models::user::UserId;
+
+pub type TimeRecordId = ObjectId;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TimeRecord {
-    user_id: ObjectId,
+    id: TimeRecordId,
+    user_id: TimeRecordId,
     started: DateTime,
     ended: Option<DateTime>,
     duration: Option<Duration>,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct UpdateTimeRecord {
+    pub id: TimeRecordId,
+    pub started: DateTime,
+    pub ended: Option<DateTime>,
+}
+
 impl TimeRecord {
     /// creates a new time record for the given user
     /// sets the started time here
-    pub fn new(user_id: ObjectId) -> Self {
+    pub fn new(user_id: UserId) -> Self {
         Self {
+            id: ObjectId::new(),
             user_id,
             started: Utc::now().into(),
             ended: None,
             duration: None,
         }
+    }
+
+    pub fn id(&self) -> &TimeRecordId {
+        &self.id
     }
 
     /// returns the time were the record started
