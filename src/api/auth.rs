@@ -61,15 +61,3 @@ pub async fn register(
     let _ = collection.insert_one(doc.clone(), None).await?;
     Ok(HttpResponse::Ok().json::<UserResponse>(user.into()))
 }
-
-#[post("/auth/register")]
-pub async fn register(
-    ctx: web::Data<Context>,
-    data: web::Json<Register>,
-) -> Result<HttpResponse, ZoriusError> {
-    let user = User::new(data.0);
-    let collection = ctx.db.collection(MDB_COLL_NAME_USERS);
-    let doc = to_document(&user)?;
-    let _ = collection.insert_one(doc.clone(), None).await?;
-    Ok(HttpResponse::Ok().json::<UserResponse>(user.into()))
-}
