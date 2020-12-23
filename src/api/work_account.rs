@@ -1,21 +1,75 @@
 use std::time::Duration;
 
 use bson::{doc, from_document, to_document, DateTime};
+use chrono::{Date, Utc};
 use futures::{future, stream::StreamExt};
 use juniper::{graphql_value, FieldError, FieldResult};
 use mongodb::Cursor;
 
 use crate::{
+    helper::NullKeyRemover,
     models::time_recording::time_record::TimeRecord,
     models::{
-        time_recording::time_record::{TimeRecordId, UpdateTimeRecord},
+        time_recording::{
+            time_record::{TimeRecordId, UpdateTimeRecord},
+            WorkAccountId,
+        },
         user::UserId,
     },
     Context,
 };
 
-static MDB_COLL_NAME_TIME_REC: &str = "time_recordings";
+const MDB_COLL_NAME_TIME_REC: &str = "work_accounts";
 
+pub struct WorkAccountQuery;
+
+impl WorkAccountQuery {
+    pub async fn get_workdays(ctx: &Context) {
+        todo!();
+    }
+
+    pub async fn get_workday(ctx: &Context, date: Date<Utc>) {
+        todo!();
+    }
+
+    pub async fn get_time_record(ctx: &Context) {
+        todo!();
+    }
+
+    pub async fn get_work_account(ctx: &Context) {
+        todo!();
+    }
+}
+
+pub struct WorkAccountMutation;
+
+impl WorkAccountMutation {
+    pub async fn resume_work(ctx: &Context, user_id: UserId) {
+        todo!();
+    }
+
+    pub async fn pause_work(ctx: &Context, user_id: UserId, date: Date<Utc>) {
+        todo!();
+    }
+
+    pub async fn start_workday(ctx: &Context, user_id: UserId) {
+        todo!();
+    }
+
+    pub async fn new_work_account(ctx: &Context, user_id: UserId) {
+        todo!();
+    }
+
+    pub fn update_workday(ctx: &Context, user_id: UserId, date: Date<Utc>) {
+        todo!();
+    }
+
+    pub fn update_work_account(ctx: &Context, id: WorkAccountId) {
+        todo!();
+    }
+}
+
+/*
 pub struct TimeRecordingQuery;
 
 impl TimeRecordingQuery {
@@ -63,14 +117,37 @@ impl TimeRecordingMutation {
     pub async fn update_time_record(ctx: &Context, tr_id: TimeRecordId) -> FieldResult<TimeRecord> {
         todo!()
     }
-
+    /*
     pub async fn end_time_record(ctx: &Context, tr_id: TimeRecordId) -> FieldResult<TimeRecord> {
         let mut tr = get_single_tr(ctx, tr_id).await?;
         tr.end();
         // TODO: impl set_single_tr
         todo!();
-        //Ok(tr)
+        let collection = ctx.db.collection(MDB_COLL_NAME_TIME_REC);
+        let filter = doc! { "_id": tr_id };
+
+        let mut replacement = to_document(&user_update)?.remove_null_keys();
+        replacement.push(doc! { "$set": { "last_updated": Bson::DateTime(Utc::now()) } });
+
+        let options = FindOneAndUpdateOptions::builder()
+            .return_document(Some(ReturnDocument::After))
+            .build();
+
+        let user: User = match collection
+            .find_one_and_update(filter, replacement, Some(options))
+            .await?
+        {
+            None => {
+                return Err(FieldError::new(
+                    "specified user not found",
+                    graphql_value!({ "error": "specified user not found" }),
+                ))
+            }
+            Some(r) => from_document(r)?,
+        };
+        Ok(user.into())
     }
+    */
 }
 
 // async fn set_single_tr(ctx: &Context, tr_update: UpdateTimeRecord) -> FieldResult<TimeRecord> {
@@ -96,3 +173,4 @@ async fn get_single_tr(ctx: &Context, tr_id: TimeRecordId) -> FieldResult<TimeRe
         Some(r) => Ok(from_document(r)?),
     }
 }
+*/

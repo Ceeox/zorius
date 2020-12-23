@@ -1,5 +1,9 @@
 use bson::{doc, Bson, Document};
 
+pub trait Update<U, T> {
+    fn update(u: U) -> T;
+}
+
 pub trait NullKeyRemover {
     fn remove_null_keys(self) -> Vec<Document>;
 }
@@ -12,6 +16,7 @@ impl NullKeyRemover for Document {
                 res.push(doc! { "$set": { item.0.as_str(): item.1 }});
             }
         }
+        println!("{:?}", res);
         res
     }
 }

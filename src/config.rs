@@ -4,7 +4,7 @@ use std::net::IpAddr;
 
 use serde::{Deserialize, Serialize};
 
-const CONFIG_NAME: &str = "./config.conf";
+const CONFIG_NAME: &str = "./config.ron";
 
 lazy_static! {
     pub static ref CONFIG: Config = Config::new().unwrap();

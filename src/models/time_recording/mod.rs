@@ -1,42 +1,85 @@
-pub(crate) mod holidays;
 pub(crate) mod time_record;
-
-use std::time::Duration;
+pub(crate) mod workday;
 
 use bson::oid::ObjectId;
-use chrono::{DateTime, Utc};
+use chrono::{Date, Duration, Utc};
+use time_record::TimeRecord;
 
-//use crate::time_recording::holidays::Holiday;
-use crate::models::time_recording::holidays::Holiday;
-use crate::models::time_recording::time_record::TimeRecord;
+use self::workday::Workday;
 
-pub struct Record {
-    user_id: ObjectId,
-    time_records: Vec<TimeRecord>,
+use super::user::UserId;
 
-    worktime_account: Duration,
+pub type WorkAccountId = ObjectId;
+
+pub struct WorkAccount {
+    id: WorkAccountId,
+    user_id: UserId,
+    account: Duration,
+    workdays: Vec<Workday>,
+    default_work_target: Option<Duration>,
 }
 
-impl Record {
-    pub fn new(user_id: ObjectId) -> Self {
+impl WorkAccount {
+    pub fn new(user_id: UserId, default_work_target: Option<Duration>) -> Self {
         Self {
+            id: WorkAccountId::new(),
             user_id,
-            time_records: vec![],
-
-            worktime_account: Duration::new(0, 0),
+            account: Duration::hours(8),
+            workdays: vec![],
+            default_work_target,
         }
     }
 
-    pub fn add_time_record(&mut self, time_record: TimeRecord) {
-        self.worktime_account = time_record.get_duration().unwrap();
-        self.time_records.push(time_record);
+    pub fn id(&self) -> &WorkAccountId {
+        &self.id
     }
 
-    pub fn time_records<'a>(&'a self) -> &'a Vec<TimeRecord> {
-        self.time_records.as_ref()
+    pub fn user_id(&self) -> &UserId {
+        &self.user_id
     }
 
-    pub fn worktime_account<'a>(&'a self) -> &'a Duration {
-        &self.worktime_account
+    /// starts a new workday
+    ///
+    /// skips cration if a workday already exists for today
+    pub fn start_workday(&mut self, target: Option<Duration>) {
+        let today = Utc::today();
+
+        if self.find_workday_mut(&today).is_some() {
+            return;
+        }
+
+        let target = match target {
+            Some(r) => r,
+            None => match self.default_work_target {
+                Some(r) => r,
+                None => Duration::zero(),
+            },
+        };
+
+        let wd = Workday::new(target);
+        self.workdays.push(wd);
+    }
+
+    pub fn pause(&mut self) {
+        let today = Utc::today();
+        let wd = match self.find_workday_mut(&today) {
+            Some(r) => r,
+            None => return,
+        };
+        wd.end_time_record();
+    }
+
+    pub fn resume_work(&mut self) {
+        let today = Utc::today();
+        let wd = self.find_workday_mut(&today);
+
+        match wd {
+            Some(r) => r.start_time_record(),
+            None => {}
+        }
+    }
+
+    fn find_workday_mut(&mut self, date: &Date<Utc>) -> Option<&mut Workday> {
+        self.workdays.iter_mut().find(|item| item.date().eq(date))
     }
 }

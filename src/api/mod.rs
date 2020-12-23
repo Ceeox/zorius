@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use actix_web::{get, web, HttpResponse};
+use actix_web::{get, web, HttpRequest, HttpResponse};
 use bson::oid::ObjectId;
 use juniper::{EmptySubscription, FieldResult, RootNode};
 use juniper_actix::{
@@ -11,8 +11,8 @@ use user::{UserMutation, UserQuery};
 pub(crate) mod auth;
 pub(crate) mod intern_merchandise;
 // pub(crate) mod role;
-pub(crate) mod time_recording;
 pub(crate) mod user;
+// pub(crate) mod work_account;
 
 use crate::{
     api::intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
@@ -102,7 +102,7 @@ impl RootMutation {
         InternMerchandiseMutation::update_intern_order(ctx, order_id, inter_update).await
     }
 
-    async fn new_user(ctx: &Context, new_user: NewUserQuery) -> FieldResult<UserResponse> {
+    async fn create_user(ctx: &Context, new_user: NewUserQuery) -> FieldResult<UserResponse> {
         UserMutation::new_user(ctx, new_user).await
     }
 

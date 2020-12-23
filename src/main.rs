@@ -134,6 +134,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .service(Files::new("/files", "/files").prefer_utf8(true))
         // TODO: add service for frontend files
     });
+
     let res = if CONFIG.web_config.enable_ssl {
         let tls_config = setup_tls();
 
