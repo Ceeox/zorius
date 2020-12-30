@@ -1,8 +1,9 @@
-use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
+use std::{fs::File, time::Duration};
 
 use actix_files::Files;
+use actix_ratelimit::{MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{
     http::ContentEncoding,
     middleware::{Compress, DefaultHeaders, Logger},
@@ -106,12 +107,18 @@ async fn main() -> Result<(), errors::ZoriusError> {
     // Start http server
     let webserver_url = format!("{}:{}", CONFIG.web_config.ip, CONFIG.web_config.port);
     let log_format = CONFIG.web_config.log_format.clone();
+    let store = MemoryStore::new();
     let http_server = HttpServer::new(move || {
         App::new()
             .data(ctx.clone())
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
             .wrap(Compress::new(ContentEncoding::Br))
+            .wrap(
+                RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
+                    .with_interval(Duration::from_secs(60))
+                    .with_max_requests(100),
+            )
             // auth api
             .service(login)
             .service(register)
