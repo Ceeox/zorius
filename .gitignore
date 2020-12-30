@@ -4,7 +4,7 @@
 .vscode/
 
 .env
-config.conf
+config.ron
 /static
 cert.pem
 key.pem

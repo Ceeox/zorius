@@ -26,14 +26,14 @@ mod models;
 use crate::{
     api::{
         auth::{login, register},
-        create_schema, graphiql, graphql, zorius_playground, RootSchema,
+        create_schema, graphiql, graphql, upload, zorius_playground, RootSchema,
     },
     config::CONFIG,
 };
 
 const API_VERSION: &str = "v1";
-const API_BASE_URL: &str = "graphql";
-const API_AUTH_URL: &str = "auth";
+const API_BASE: &str = "graphql";
+const API_AUTH: &str = "auth";
 
 #[derive(Clone)]
 pub struct Context {
@@ -52,13 +52,11 @@ async fn setup_mongodb() -> Result<Client, ZoriusError> {
         CONFIG.db_config.server_domain,
         CONFIG.db_config.db_name
     );
+
     // Use to cloudflare resolver to work around a mongodb dns resolver issue.
     // For more Infos: https://github.com/mongodb/mongo-rust-driver#windows-dns-note
-    let mut client_options = if cfg!(windows) {
-        ClientOptions::parse_with_resolver_config(&url, ResolverConfig::cloudflare()).await?
-    } else {
-        ClientOptions::parse(&url).await?
-    };
+    let mut client_options =
+        ClientOptions::parse_with_resolver_config(&url, ResolverConfig::cloudflare()).await?;
 
     client_options.app_name = Some(CONFIG.db_config.app_name.clone());
     Ok(Client::with_options(client_options)?)
@@ -88,9 +86,27 @@ fn setup_tls() -> ServerConfig {
     tls_config
 }
 
+fn check_folders() -> Result<(), ZoriusError> {
+    use std::path::Path;
+
+    if !Path::new("static").exists() {
+        panic!("missing frondend fiels folder");
+    }
+
+    if !Path::new("assets").exists() {
+        panic!("missing assets folder");
+    }
+
+    if !Path::new("files").exists() {
+        std::fs::create_dir("files")?;
+    }
+    Ok(())
+}
+
 #[actix_web::main]
 async fn main() -> Result<(), errors::ZoriusError> {
     setup_log();
+    check_folders()?;
 
     let client = setup_mongodb().await?;
     let db = client.database(&CONFIG.db_config.db_name);
@@ -113,19 +129,23 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .data(ctx.clone())
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
-            .wrap(Compress::new(ContentEncoding::Br))
+            .wrap(Compress::new(ContentEncoding::Auto))
             .wrap(
                 RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
                     .with_interval(Duration::from_secs(60))
                     .with_max_requests(100),
             )
             // auth api
-            .service(login)
-            .service(register)
-            //.service(reset_password)
+            .service(
+                web::resource(&format!("api/{}/{}", API_VERSION, API_AUTH))
+                    .route(web::post().to(login))
+                    .route(web::post().to(register)),
+                //.route(web::post().to(reset_password)),
+            )
+            .service(upload)
             // graphql api
             .service(
-                web::resource(&format!("{}/{}", API_VERSION, API_BASE_URL))
+                web::resource(&format!("api/{}/{}", API_VERSION, API_BASE))
                     .route(web::post().to(graphql))
                     .route(web::get().to(graphql)),
             )
@@ -133,12 +153,12 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .service(zorius_playground)
             // static file serving
             .service(
-                Files::new("/", "/static")
+                Files::new("/", "static")
                     .prefer_utf8(true)
                     .index_file("index.html"),
             )
-            .service(Files::new("/assets", "/assets").prefer_utf8(true))
-            .service(Files::new("/files", "/files").prefer_utf8(true))
+            .service(Files::new("/assets", "assets").prefer_utf8(true))
+            .service(Files::new("/files", "files").prefer_utf8(true))
         // TODO: add service for frontend files
     });
 

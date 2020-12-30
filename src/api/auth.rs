@@ -2,7 +2,6 @@ use chrono::Duration;
 
 use actix_web::{
     cookie::Cookie,
-    post,
     web::{self},
     HttpResponse,
 };
@@ -23,7 +22,6 @@ use crate::{
 
 /// Logs the Provided user with an email an password in.
 /// It returns a token and sets a cookie
-#[post("/auth/login")]
 pub async fn login(
     ctx: web::Data<Context>,
     data: web::Json<LoginData>,
@@ -51,14 +49,13 @@ pub async fn login(
         token: token.clone(),
     };
     let mut cookie = Cookie::new("token", &token);
-    cookie.set_path("/v1/graphql");
+    cookie.set_path("/api/v1/graphql");
 
     Ok(HttpResponse::Ok().cookie(cookie).json(res))
 }
 
 // TODO: implement email verification!
 // TODO: check if e-mail is already used!
-#[post("/auth/register")]
 pub async fn register(
     ctx: web::Data<Context>,
     data: web::Json<Register>,

@@ -1,5 +1,5 @@
+use crate::config::Config;
 use crate::models::user::Claim;
-use crate::{config::Config, Context};
 
 use actix_web::error::ErrorUnauthorized;
 use actix_web::{dev, Error, FromRequest, HttpRequest};

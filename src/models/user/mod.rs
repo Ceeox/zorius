@@ -97,7 +97,7 @@ impl User {
     pub fn hash_password(&mut self, password: &str) {
         self.password_hash = Some(
             sha512_crypt::hash(password.as_bytes())
-                .expect("ERROR: system random number generator cannot be opened!"),
+                .expect("system random number generator cannot be opened!"),
         );
     }
 
