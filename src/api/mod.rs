@@ -1,157 +1,81 @@
-use std::{io::Write, sync::Arc};
-
-use actix_multipart::Multipart;
-use actix_web::{
-    get, post,
-    web::{self},
-    HttpResponse,
+use actix_web::{get, post, web::Data, HttpRequest, HttpResponse};
+use async_graphql::{
+    http::{playground_source, GraphQLPlaygroundConfig},
+    Context, EmptySubscription, Error, Result, Schema,
 };
-use bson::oid::ObjectId;
-use futures::{FutureExt, StreamExt, TryStreamExt};
-use juniper::{EmptySubscription, FieldResult, LookAheadMethods, RootNode};
-use juniper_actix::{
-    graphiql_handler as gqli_handler, graphql_handler, playground_handler as play_handler,
-};
-use tokio::io::AsyncWriteExt;
-use user::{UserMutation, UserQuery};
+use async_graphql_actix_web::{Request, Response};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use mongodb::Database;
+//use user::{UserMutation, UserQuery};
 
-pub(crate) mod auth;
-pub(crate) mod intern_merchandise;
+// pub(crate) mod auth;
+// pub(crate) mod intern_merchandise;
 // pub(crate) mod role;
-pub(crate) mod user;
+// pub(crate) mod user;
 // pub(crate) mod work_account;
+pub mod mutations;
+pub mod querys;
 
-use crate::{
-    api::intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
-    errors::ZoriusError,
-    middleware::auth::AuthorizationService,
-    models::user::{NewUserQuery, UpdateUserQuery},
-    API_VERSION,
-};
-use crate::{
-    models::merchandise::intern_merchandise::{
-        InternMerchandiseResponse, NewInternMerchandiseQuery, UpdateInternMerchandiseQuery,
-    },
-    models::user::UserResponse,
-};
-use crate::{models::user::UserId, Context};
+pub use crate::api::{mutations::RootMutation, querys::RootQuery};
+use crate::config::CONFIG;
+use crate::models::user::Claim;
 
-pub type RootSchema = RootNode<'static, RootQuery, RootMutation, EmptySubscription<Context>>;
+static MDB_COLL_NAME_INTERN: &str = "merchandise_intern";
+static MDB_COLL_NAME_USERS: &str = "users";
 
+pub type RootSchema = Schema<RootQuery, RootMutation, EmptySubscription>;
+
+struct MyToken(String);
+
+#[post("/graphql")]
 pub async fn graphql(
-    req: actix_web::HttpRequest,
-    payload: actix_web::web::Payload,
-    ctx: web::Data<Context>,
-    _: AuthorizationService,
-) -> Result<HttpResponse, ZoriusError> {
-    Ok(graphql_handler(&ctx.root_schema, &ctx, req, payload).await?)
+    schema: Data<RootSchema>,
+    http_request: HttpRequest,
+    gql_request: Request,
+) -> Response {
+    let token = http_request
+        .headers()
+        .get("authorization")
+        .and_then(|value| value.to_str().map(|s| MyToken(s.to_string())).ok());
+    let mut request = gql_request.into_inner();
+    if let Some(token) = token {
+        request = request.data(token);
+    }
+    schema.execute(request).await.into()
 }
 
 // Enable only when we're running in debug mode
 #[cfg(debug_assertions)]
-#[get("/graphiql")]
-pub async fn graphiql() -> Result<HttpResponse, ZoriusError> {
-    Ok(gqli_handler("/graphql", None).await?)
-}
-// Enable only when we're running in debug mode
-#[cfg(debug_assertions)]
-#[get("/playground")]
-pub async fn zorius_playground() -> Result<HttpResponse, ZoriusError> {
-    Ok(play_handler("/graphql", None).await?)
+#[get("/pg")]
+pub async fn gql_playgound() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(playground_source(
+            GraphQLPlaygroundConfig::new("/").subscription_endpoint("/"),
+        ))
 }
 
-#[post("api/v1/upload")]
-pub async fn upload(mut payload: Multipart) -> Result<HttpResponse, ZoriusError> {
-    // iterate over multipart stream
-    while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_type = field.content_disposition().unwrap();
-        let filename = content_type.get_filename().unwrap();
-        let filepath = format!("files\\{}", filename);
-
-        // File::create is blocking operation, use threadpool
-        let mut f = web::block(|| std::fs::File::create(filepath))
-            .await
-            .unwrap();
-
-        // Field in turn is stream of *Bytes* object
-        while let Some(chunk) = field.next().await {
-            let data = chunk.unwrap();
-            // filesystem operations are blocking, we have to use threadpool
-            f = web::block(move || f.write_all(&data).map(|_| f))
-                .await
-                .unwrap();
-        }
-    }
-    Ok(HttpResponse::Ok().into())
-}
-
-pub struct RootQuery;
-
-#[juniper::graphql_object(Context = Context)]
-impl RootQuery {
-    async fn api_version() -> &str {
-        API_VERSION
-    }
-
-    async fn table_data(ctx: &Context) -> FieldResult<Vec<InternMerchandiseResponse>> {
-        InternMerchandiseQuery::table_data(ctx).await
-    }
-
-    async fn get_order(ctx: &Context, id: ObjectId) -> FieldResult<InternMerchandiseResponse> {
-        InternMerchandiseQuery::get_order(ctx, id).await
-    }
-
-    async fn get_user(ctx: &Context, user_id: UserId) -> FieldResult<UserResponse> {
-        UserQuery::get_user(ctx, user_id).await
-    }
-
-    async fn get_users(ctx: &Context, user_ids: Vec<UserId>) -> FieldResult<Vec<UserResponse>> {
-        UserQuery::get_users(ctx, user_ids).await
-    }
-
-    async fn list_users(executor: &Executor, ctx: &Context) -> FieldResult<Vec<UserResponse>> {
-        let field_name = executor.look_ahead().field_name();
-        println!("{}", field_name);
-        UserQuery::list_users(ctx).await
+pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a Database> {
+    match ctx.data::<Database>() {
+        Err(_e) => Err(Error::new("missing Database in Context!")),
+        Ok(r) => Ok(r),
     }
 }
 
-pub struct RootMutation;
-
-#[juniper::graphql_object(Context = Context)]
-impl RootMutation {
-    async fn new_intern_order(
-        ctx: &Context,
-        new_intern_order: NewInternMerchandiseQuery,
-    ) -> FieldResult<InternMerchandiseResponse> {
-        InternMerchandiseMutation::new_intern_order(ctx, new_intern_order).await
+pub fn is_autherized(ctx: &Context<'_>) -> Result<()> {
+    let value: &MyToken = match ctx.data::<MyToken>() {
+        Err(_e) => return Err(Error::new("missing token")),
+        Ok(r) => r,
+    };
+    let _split: Vec<&str> = value.0.split("Bearer").collect();
+    let token = _split[1].trim();
+    let key = CONFIG.secret_key.as_bytes();
+    match decode::<Claim>(
+        token,
+        &DecodingKey::from_secret(key),
+        &Validation::new(Algorithm::HS512),
+    ) {
+        Ok(_token) => Ok(()),
+        Err(_e) => Err(Error::new("invalid token!")),
     }
-
-    async fn update_intern_order(
-        ctx: &Context,
-        order_id: ObjectId,
-        inter_update: UpdateInternMerchandiseQuery,
-    ) -> FieldResult<InternMerchandiseResponse> {
-        InternMerchandiseMutation::update_intern_order(ctx, order_id, inter_update).await
-    }
-
-    async fn create_user(ctx: &Context, new_user: NewUserQuery) -> FieldResult<UserResponse> {
-        UserMutation::new_user(ctx, new_user).await
-    }
-
-    async fn update_user(
-        ctx: &Context,
-        user_id: UserId,
-        user_update: UpdateUserQuery,
-    ) -> FieldResult<UserResponse> {
-        UserMutation::update_user(ctx, user_id, user_update).await
-    }
-}
-
-pub fn create_schema() -> Arc<RootSchema> {
-    Arc::new(RootSchema::new(
-        RootQuery {},
-        RootMutation {},
-        EmptySubscription::<Context>::new(),
-    ))
 }

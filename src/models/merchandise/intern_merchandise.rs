@@ -1,11 +1,8 @@
+use async_graphql::SimpleObject;
 use bson::{oid::ObjectId, DateTime};
-use chrono::Utc;
-use juniper::{GraphQLEnum, GraphQLInputObject, GraphQLObject};
 use serde::{Deserialize, Serialize};
 
-use crate::models::company::CompanyType;
-
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, SimpleObject)]
 pub struct InternMerchandise {
     #[serde(rename = "_id")]
     pub id: ObjectId,
@@ -23,7 +20,7 @@ pub struct InternMerchandise {
     pub cost: f64,
     pub serial_number: Option<Vec<String>>,
     pub arived_on: Option<DateTime>,
-    pub status: InternMerchandiseStatus,
+    //    pub status: InternMerchandiseStatus,
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
@@ -31,7 +28,7 @@ pub struct InternMerchandise {
     pub updated_date: DateTime,
 }
 
-#[derive(GraphQLEnum, Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum InternMerchandiseStatus {
     Ordered,
     Delivered,
@@ -45,6 +42,7 @@ impl Default for InternMerchandiseStatus {
     }
 }
 
+/*
 #[derive(GraphQLInputObject, Deserialize, Serialize)]
 #[graphql(description = "Stores internal merchandise infos")]
 pub struct NewInternMerchandiseQuery {
@@ -190,3 +188,4 @@ impl From<InternMerchandise> for InternMerchandiseResponse {
         }
     }
 }
+*/
