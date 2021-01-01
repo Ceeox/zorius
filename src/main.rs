@@ -22,7 +22,6 @@ mod api;
 mod config;
 mod errors;
 mod helper;
-mod middleware;
 mod models;
 
 use crate::{
