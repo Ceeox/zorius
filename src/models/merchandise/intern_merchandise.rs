@@ -2,13 +2,15 @@ use async_graphql::SimpleObject;
 use bson::{oid::ObjectId, DateTime};
 use serde::{Deserialize, Serialize};
 
+use crate::models::user::UserId;
+
 #[derive(Deserialize, Serialize, Debug, SimpleObject)]
 pub struct InternMerchandise {
     #[serde(rename = "_id")]
     pub id: ObjectId,
     pub merchandise_id: Option<i32>,
     //    pub bought_through: Option<CompanyType>,
-    pub orderer: String,
+    pub orderer: UserId,
     pub project_leader: Option<String>,
     pub purchased_on: DateTime,
     pub count: i32,

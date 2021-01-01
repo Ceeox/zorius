@@ -1,17 +1,17 @@
-use async_graphql::{Context, Object, Result};
-use bson::to_document;
+use async_graphql::{Context, Error, Object, Result};
+use bson::{doc, from_document, to_document};
 
-use crate::models::user::User;
+use crate::models::{
+    user::{NewUser, User, UserId},
+    work_record::WorkAccount,
+};
 
-use super::{database, MDB_COLL_NAME_USERS};
+use super::{database, is_autherized, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS};
 
 pub struct RootMutation;
 
 #[Object]
 impl RootMutation {
-    async fn do_nothing(&self, _ctx: &Context<'_>) -> &str {
-        "nothing"
-    }
     /*
         async fn new_intern_order(
             ctx: &Context,
@@ -28,28 +28,109 @@ impl RootMutation {
             InternMerchandiseMutation::update_intern_order(ctx, order_id, inter_update).await
         }
     */
-    async fn create_user(
-        &self,
-        ctx: &Context<'_>,
-        email: String,
-        username: String,
-        password: String,
-        firstname: Option<String>,
-        lastname: Option<String>,
-    ) -> Result<User> {
-        let user = User::new(email, username, password, firstname, lastname);
+    async fn register(&self, ctx: &Context<'_>, new_user: NewUser) -> Result<User> {
+        let user = User::new(new_user);
         let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
         let doc = to_document(&user)?;
         let _ = collection.insert_one(doc.clone(), None).await?;
         Ok(user.into())
     }
-    /*
-    async fn update_user(
-        ctx: &Context,
+
+    async fn new_work_account(
+        &self,
+        ctx: &Context<'_>,
         user_id: UserId,
-        user_update: UpdateUserQuery,
-    ) -> FieldResult<UserResponse> {
-        UserMutation::update_user(ctx, user_id, user_update).await
+        default_work_target: Option<i64>,
+    ) -> Result<WorkAccount> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
+
+        let filter = doc! { "user_id": user_id.clone() };
+        match collection.find_one(filter, None).await? {
+            Some(_) => return Err(Error::new("work account for the user id already exists!")),
+            None => {}
+        }
+
+        let new_workaccount = WorkAccount::new(user_id, default_work_target);
+        let wa_id = new_workaccount.get_id().clone();
+        let insert = to_document(&new_workaccount)?;
+        let _ = collection.insert_one(insert, None).await?;
+
+        let filter = doc! { "_id": wa_id };
+        let wa = collection.find_one(filter, None).await?.unwrap();
+        Ok(from_document(wa)?)
+    }
+
+    async fn workday_start(&self, ctx: &Context<'_>) -> Result<WorkAccount> {
+        let user_id = is_autherized(ctx)?;
+
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
+        let filter = doc! { "user_id": user_id };
+        let wa_doc = collection.find_one(filter.clone(), None).await?.unwrap();
+        let mut wa: WorkAccount = from_document(wa_doc)?;
+
+        wa.start_workday();
+
+        let update = to_document(&wa)?;
+        let _ = collection.update_one(filter, update, None).await?;
+
+        Ok(wa)
+    }
+
+    async fn workday_pause(&self, ctx: &Context<'_>) -> Result<WorkAccount> {
+        let user_id = is_autherized(ctx)?;
+
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
+        let filter = doc! { "user_id": user_id };
+        let wa_doc = collection.find_one(filter.clone(), None).await?.unwrap();
+        let mut wa: WorkAccount = from_document(wa_doc)?;
+
+        wa.pause();
+
+        let update = to_document(&wa)?;
+        let _ = collection.update_one(filter, update, None).await?;
+
+        Ok(wa)
+    }
+
+    async fn workday_resume(&self, ctx: &Context<'_>) -> Result<WorkAccount> {
+        let user_id = is_autherized(ctx)?;
+
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
+        let filter = doc! { "user_id": user_id };
+        let wa_doc = collection.find_one(filter.clone(), None).await?.unwrap();
+        let mut wa: WorkAccount = from_document(wa_doc)?;
+
+        wa.resume_work();
+
+        let update = to_document(&wa)?;
+        let _ = collection.update_one(filter, update, None).await?;
+
+        Ok(wa)
+    }
+    /*
+    async fn update_user(&self, ctx: &Context<'_>, user_id: UserId, user_update: UpdateUser) -> Result<User> {
+        let _ = is_autherized(ctx)?;
+        let collection = ctx.db.collection(MDB_COLL_NAME_USERS);
+        let filter = doc! { "_id": user_id };
+
+        let mut replacement = to_document(&user_update)?.remove_null_keys();
+        replacement.push(doc! { "$set": {"last_updated": Bson::DateTime(Utc::now())}});
+
+        let options = FindOneAndUpdateOptions::builder()
+            .return_document(Some(ReturnDocument::After))
+            .build();
+
+        let user: User = match collection
+            .find_one_and_update(filter, replacement, Some(options))
+            .await?
+        {
+            None => {
+                return Err(Error::new("specified user not found")
+            }
+            Some(r) => from_document(r)?,
+        };
+        Ok(user.into())
     }
     */
 }

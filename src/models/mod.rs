@@ -3,5 +3,5 @@ pub(crate) mod auth;
 pub(crate) mod merchandise;
 //pub(crate) mod permissions;
 //pub(crate) mod roles;
-// pub(crate) mod time_recording;
 pub(crate) mod user;
+pub(crate) mod work_record;

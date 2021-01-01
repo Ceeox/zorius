@@ -1,7 +1,7 @@
 use async_graphql::validators::{Email, StringMaxLength, StringMinLength};
 use async_graphql::{Context, Error, Object, Result};
 use bson::{doc, from_document, oid::ObjectId};
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDate, Utc};
 use futures::{future, StreamExt, TryStreamExt};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use mongodb::{options::FindOptions, Collection, Cursor};
@@ -12,11 +12,14 @@ use crate::{
         auth::LoginResult,
         merchandise::intern_merchandise::InternMerchandise,
         user::{Claim, User, UserId},
+        work_record::workday::Workday,
     },
     API_VERSION,
 };
 
-use super::{database, is_autherized, MDB_COLL_NAME_INTERN, MDB_COLL_NAME_USERS};
+use super::{
+    database, is_autherized, MDB_COLL_NAME_INTERN, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS,
+};
 pub struct RootQuery;
 
 #[Object]
@@ -47,6 +50,7 @@ impl RootQuery {
         }
         let claims = Claim {
             sub: email,
+            user_id: user.get_id().clone(),
             exp: (Utc::now() + Duration::days(30)).timestamp() as usize,
         };
         let key = &EncodingKey::from_secret(&CONFIG.secret_key.as_bytes());
@@ -126,5 +130,20 @@ impl RootQuery {
             .await?;
 
         return Ok(res);
+    }
+
+    async fn get_workday(&self, ctx: &Context<'_>, date: NaiveDate) -> Result<Option<Workday>> {
+        let user_id = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
+        let pl = vec![
+            doc! {"$unwind": "$workdays"},
+            doc! {"$match": {"user_id": user_id.clone(), "workdays.date":  date.to_string()}},
+            doc! {"$replaceRoot": {"newRoot": "$workdays"}},
+        ];
+        let mut wd = collection.aggregate(pl, None).await?;
+        match wd.next().await {
+            Some(r) => Ok(Some(from_document(r?)?)),
+            None => Ok(None),
+        }
     }
 }

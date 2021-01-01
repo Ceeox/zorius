@@ -1,4 +1,4 @@
-use async_graphql::SimpleObject;
+use async_graphql::{InputObject, SimpleObject};
 use bson::oid::ObjectId;
 use bson::DateTime;
 use chrono::Utc;
@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 pub type UserId = ObjectId;
 
-#[derive(Deserialize, Debug)]
-pub struct NewUserQuery {
+#[derive(Deserialize, Debug, InputObject)]
+pub struct NewUser {
     pub email: String,
     pub username: String,
     pub password: String,
@@ -30,36 +30,34 @@ pub struct User {
     lastname: Option<String>,
     last_updated: Option<DateTime>,
     deleted: bool,
-    //    claim: Option<Claim>,
 }
 
 #[derive(Debug, Serialize, Deserialize, SimpleObject)]
 pub struct Claim {
     pub sub: String,
+    pub user_id: UserId,
     pub exp: usize,
 }
 
 impl User {
-    pub fn new(
-        email: String,
-        username: String,
-        password: String,
-        firstname: Option<String>,
-        lastname: Option<String>,
-    ) -> Self {
-        let password_hash = User::hash_password(&password);
+    pub fn new(new_user: NewUser) -> Self {
+        let password_hash = User::hash_password(&new_user.password);
         Self {
             id: ObjectId::new(),
-            email,
+            email: new_user.email,
             password_hash,
-            username,
-            firstname,
-            lastname,
+            username: new_user.username,
+            firstname: new_user.firstname,
+            lastname: new_user.lastname,
             created_at: Utc::now().into(),
             invitation_pending: true,
             deleted: false,
             last_updated: Some(Utc::now().into()),
         }
+    }
+
+    pub fn get_id(&self) -> &UserId {
+        &self.id
     }
 
     pub fn hash_password(password: &str) -> String {

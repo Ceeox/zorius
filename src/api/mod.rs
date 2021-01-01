@@ -17,11 +17,12 @@ pub mod mutations;
 pub mod querys;
 
 pub use crate::api::{mutations::RootMutation, querys::RootQuery};
-use crate::config::CONFIG;
 use crate::models::user::Claim;
+use crate::{config::CONFIG, models::user::UserId};
 
 static MDB_COLL_NAME_INTERN: &str = "merchandise_intern";
 static MDB_COLL_NAME_USERS: &str = "users";
+static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
 
 pub type RootSchema = Schema<RootQuery, RootMutation, EmptySubscription>;
 
@@ -62,7 +63,7 @@ pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a Database> {
     }
 }
 
-pub fn is_autherized(ctx: &Context<'_>) -> Result<()> {
+pub fn is_autherized(ctx: &Context<'_>) -> Result<UserId> {
     let value: &MyToken = match ctx.data::<MyToken>() {
         Err(_e) => return Err(Error::new("missing token")),
         Ok(r) => r,
@@ -75,7 +76,7 @@ pub fn is_autherized(ctx: &Context<'_>) -> Result<()> {
         &DecodingKey::from_secret(key),
         &Validation::new(Algorithm::HS512),
     ) {
-        Ok(_token) => Ok(()),
+        Ok(token) => Ok(token.claims.user_id),
         Err(_e) => Err(Error::new("invalid token!")),
     }
 }
