@@ -56,7 +56,10 @@ impl RootQuery {
         let key = &EncodingKey::from_secret(&CONFIG.secret_key.as_bytes());
         let token = jsonwebtoken::encode(&Header::new(Algorithm::HS512), &claims, key)?;
 
-        Ok(LoginResult { token: token })
+        Ok(LoginResult {
+            token: token,
+            expires_at: claims.exp,
+        })
     }
 
     async fn table_data(&self, ctx: &Context<'_>) -> Result<Vec<InternMerchandise>> {

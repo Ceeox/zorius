@@ -10,4 +10,5 @@ pub struct LoginData {
 #[derive(Serialize, SimpleObject)]
 pub struct LoginResult {
     pub token: String,
+    pub expires_at: usize,
 }
