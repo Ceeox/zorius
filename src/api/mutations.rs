@@ -1,8 +1,8 @@
-use async_graphql::{Context, Error, Object, Result};
+use async_graphql::{validators::StringMaxLength, Context, Error, Object, Result};
 use bson::{doc, from_document, to_document};
 
 use crate::models::{
-    user::{NewUser, User, UserId},
+    user::{NewUser, Password, User, UserId},
     work_record::WorkAccount,
 };
 
@@ -34,6 +34,33 @@ impl RootMutation {
         let doc = to_document(&user)?;
         let _ = collection.insert_one(doc.clone(), None).await?;
         Ok(user.into())
+    }
+
+    async fn reset_password(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(validator(StringMaxLength(length = "64")))] old_password: String,
+        #[graphql(validator(Password))] new_password: String,
+    ) -> Result<bool> {
+        let user_id = is_autherized(ctx)?;
+
+        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
+        let filter = doc! { "_id": user_id };
+        let mut user: User = match collection.find_one(filter.clone(), None).await? {
+            None => return Err(Error::new("specified user not found".to_owned())),
+            Some(r) => from_document(r)?,
+        };
+
+        if !user.is_password_correct(&old_password) {
+            return Err(Error::new("old password is wrong!".to_owned()));
+        } else {
+            user.change_password(&new_password);
+        }
+
+        let update = to_document(&user)?;
+        let _ = collection.update_one(filter, update, None).await?;
+
+        Ok(true)
     }
 
     async fn new_work_account(
