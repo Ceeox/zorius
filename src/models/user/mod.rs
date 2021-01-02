@@ -6,7 +6,6 @@ use bson::oid::ObjectId;
 use bson::DateTime;
 use chrono::Utc;
 use pwhash::sha512_crypt;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 pub type UserId = ObjectId;
