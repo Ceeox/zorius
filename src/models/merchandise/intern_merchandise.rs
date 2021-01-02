@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{helper::validators::Url, models::user::UserId};
 
 #[derive(InputObject, Deserialize, Serialize)]
-pub struct NewInternMerchandise {
+pub struct NewMerchandiseIntern {
     pub merchandise_name: String,
     #[graphql(validator(IntGreaterThan(value = "1")))]
     pub count: i32,
@@ -23,7 +23,7 @@ pub struct NewInternMerchandise {
 }
 
 #[derive(Deserialize, Serialize, Debug, SimpleObject)]
-pub struct InternMerchandise {
+pub struct MerchandiseIntern {
     #[serde(rename = "_id")]
     pub id: ObjectId,
     pub merchandise_id: Option<i32>,
@@ -40,7 +40,7 @@ pub struct InternMerchandise {
     pub cost: f64,
     pub serial_number: Option<Vec<String>>,
     pub arived_on: Option<DateTime>,
-    pub status: InternMerchandiseStatus,
+    pub status: MerchandiseInternStatus,
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
@@ -49,21 +49,21 @@ pub struct InternMerchandise {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Enum)]
-pub enum InternMerchandiseStatus {
+pub enum MerchandiseInternStatus {
     Ordered,
     Delivered,
     Stored,
     Used,
 }
 
-impl Default for InternMerchandiseStatus {
+impl Default for MerchandiseInternStatus {
     fn default() -> Self {
-        InternMerchandiseStatus::Ordered
+        MerchandiseInternStatus::Ordered
     }
 }
 
-impl InternMerchandise {
-    pub fn new(new_intern_merchandise: NewInternMerchandise) -> Self {
+impl MerchandiseIntern {
+    pub fn new(new_intern_merchandise: NewMerchandiseIntern) -> Self {
         Self {
             id: ObjectId::new(),
             merchandise_name: new_intern_merchandise.merchandise_name,
@@ -72,7 +72,7 @@ impl InternMerchandise {
             orderer: new_intern_merchandise.orderer,
             purchased_on: Utc::now().into(),
             cost: new_intern_merchandise.cost,
-            status: InternMerchandiseStatus::Ordered,
+            status: MerchandiseInternStatus::Ordered,
             url: new_intern_merchandise.url,
             use_case: new_intern_merchandise.use_case,
             article_number: new_intern_merchandise.article_number,

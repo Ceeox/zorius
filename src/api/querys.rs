@@ -10,7 +10,7 @@ use crate::{
     config::CONFIG,
     models::{
         auth::LoginResult,
-        merchandise::intern_merchandise::InternMerchandise,
+        merchandise::intern_merchandise::MerchandiseIntern,
         user::{Claim, User, UserId},
         work_record::workday::Workday,
     },
@@ -62,7 +62,7 @@ impl RootQuery {
         })
     }
 
-    async fn table_data(&self, ctx: &Context<'_>) -> Result<Vec<InternMerchandise>> {
+    async fn table_data(&self, ctx: &Context<'_>) -> Result<Vec<MerchandiseIntern>> {
         is_autherized(ctx)?;
         let collection: Collection = database(ctx)?.collection("merchandise_intern");
         let find_opt = Some(FindOptions::builder().limit(50).build());
@@ -71,16 +71,16 @@ impl RootQuery {
             .filter_map(|doc| async move {
                 match doc {
                     Err(_) => None,
-                    Ok(r) => Some(from_document::<InternMerchandise>(r)),
+                    Ok(r) => Some(from_document::<MerchandiseIntern>(r)),
                 }
             })
-            .try_collect::<Vec<InternMerchandise>>()
+            .try_collect::<Vec<_>>()
             .await?;
 
         Ok(res)
     }
 
-    async fn get_order(&self, ctx: &Context<'_>, id: ObjectId) -> Result<InternMerchandise> {
+    async fn get_order(&self, ctx: &Context<'_>, id: ObjectId) -> Result<MerchandiseIntern> {
         is_autherized(ctx)?;
         let collection = database(ctx)?.collection(MDB_COLL_NAME_INTERN);
         let filter = doc! { "_id": id };

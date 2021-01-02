@@ -5,7 +5,7 @@ use crate::{
     helper::validators::Password,
     models::user::{NewUser, User, UserId},
     models::{
-        merchandise::intern_merchandise::{InternMerchandise, NewInternMerchandise},
+        merchandise::intern_merchandise::{MerchandiseIntern, NewMerchandiseIntern},
         work_record::WorkAccount,
     },
 };
@@ -167,17 +167,17 @@ impl RootMutation {
     }
     */
 
-    async fn new_intern_merchandise(
+    async fn new_merchandise_intern(
         &self,
         ctx: &Context<'_>,
-        new_intern_merch: NewInternMerchandise,
-    ) -> Result<InternMerchandise> {
+        new_intern_merch: NewMerchandiseIntern,
+    ) -> Result<MerchandiseIntern> {
         let _ = is_autherized(ctx)?;
         let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
 
-        let new_inter_merch = InternMerchandise::new(new_intern_merch);
-        let im_id = new_inter_merch.get_id().clone();
-        let insert = to_document(&new_inter_merch)?;
+        let new_merch_intern = MerchandiseIntern::new(new_intern_merch);
+        let im_id = new_merch_intern.get_id().clone();
+        let insert = to_document(&new_merch_intern)?;
         let _ = collection.insert_one(insert, None).await?;
 
         let filter = doc! { "_id": im_id };
