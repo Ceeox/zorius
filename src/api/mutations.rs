@@ -1,12 +1,18 @@
 use async_graphql::{validators::StringMaxLength, Context, Error, Object, Result};
 use bson::{doc, from_document, to_document};
 
-use crate::models::{
-    user::{NewUser, Password, User, UserId},
-    work_record::WorkAccount,
+use crate::{
+    helper::validators::Password,
+    models::user::{NewUser, User, UserId},
+    models::{
+        merchandise::intern_merchandise::{InternMerchandise, NewInternMerchandise},
+        work_record::WorkAccount,
+    },
 };
 
-use super::{database, is_autherized, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS};
+use super::{
+    database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS,
+};
 
 pub struct RootMutation;
 
@@ -160,4 +166,22 @@ impl RootMutation {
         Ok(user.into())
     }
     */
+
+    async fn new_intern_merchandise(
+        &self,
+        ctx: &Context<'_>,
+        new_intern_merch: NewInternMerchandise,
+    ) -> Result<InternMerchandise> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
+
+        let new_inter_merch = InternMerchandise::new(new_intern_merch);
+        let im_id = new_inter_merch.get_id().clone();
+        let insert = to_document(&new_inter_merch)?;
+        let _ = collection.insert_one(insert, None).await?;
+
+        let filter = doc! { "_id": im_id };
+        let wa = collection.find_one(filter, None).await?.unwrap();
+        Ok(from_document(wa)?)
+    }
 }

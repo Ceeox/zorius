@@ -23,6 +23,7 @@ use crate::{config::CONFIG, models::user::UserId};
 static MDB_COLL_NAME_INTERN: &str = "merchandise_intern";
 static MDB_COLL_NAME_USERS: &str = "users";
 static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
+static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
 
 pub type RootSchema = Schema<RootQuery, RootMutation, EmptySubscription>;
 

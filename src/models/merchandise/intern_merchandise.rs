@@ -1,8 +1,26 @@
-use async_graphql::SimpleObject;
+use async_graphql::{validators::IntGreaterThan, Enum, InputObject, SimpleObject};
 use bson::{oid::ObjectId, DateTime};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::models::user::UserId;
+use crate::{helper::validators::Url, models::user::UserId};
+
+#[derive(InputObject, Deserialize, Serialize)]
+pub struct NewInternMerchandise {
+    pub merchandise_name: String,
+    #[graphql(validator(IntGreaterThan(value = "1")))]
+    pub count: i32,
+    #[graphql(validator(Url))]
+    pub url: Option<String>,
+    pub orderer: UserId,
+    pub article_number: Option<String>,
+    pub cost: f64,
+    pub postage: Option<f64>,
+    pub use_case: Option<String>,
+    pub project_leader: String,
+    pub location: String,
+    pub shop: String,
+}
 
 #[derive(Deserialize, Serialize, Debug, SimpleObject)]
 pub struct InternMerchandise {
@@ -22,7 +40,7 @@ pub struct InternMerchandise {
     pub cost: f64,
     pub serial_number: Option<Vec<String>>,
     pub arived_on: Option<DateTime>,
-    //    pub status: InternMerchandiseStatus,
+    pub status: InternMerchandiseStatus,
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
@@ -30,7 +48,7 @@ pub struct InternMerchandise {
     pub updated_date: DateTime,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Enum)]
 pub enum InternMerchandiseStatus {
     Ordered,
     Delivered,
@@ -44,23 +62,41 @@ impl Default for InternMerchandiseStatus {
     }
 }
 
-/*
-#[derive(GraphQLInputObject, Deserialize, Serialize)]
-#[graphql(description = "Stores internal merchandise infos")]
-pub struct NewInternMerchandiseQuery {
-    pub merchandise_name: String,
-    pub count: i32,
-    pub url: Option<String>,
-    pub orderer: String,
-    pub article_number: Option<String>,
-    pub cost: f64,
-    pub postage: Option<f64>,
-    pub use_case: Option<String>,
-    pub bought_through: Option<CompanyType>,
-    pub project_leader: String,
-    pub location: String,
-    pub shop: String,
+impl InternMerchandise {
+    pub fn new(new_intern_merchandise: NewInternMerchandise) -> Self {
+        Self {
+            id: ObjectId::new(),
+            merchandise_name: new_intern_merchandise.merchandise_name,
+            // bought_through: None,
+            count: new_intern_merchandise.count,
+            orderer: new_intern_merchandise.orderer,
+            purchased_on: Utc::now().into(),
+            cost: new_intern_merchandise.cost,
+            status: InternMerchandiseStatus::Ordered,
+            url: new_intern_merchandise.url,
+            use_case: new_intern_merchandise.use_case,
+            article_number: new_intern_merchandise.article_number,
+            postage: new_intern_merchandise.postage,
+            project_leader: Some(new_intern_merchandise.project_leader),
+            location: Some(new_intern_merchandise.location),
+            shop: Some(new_intern_merchandise.shop),
+
+            merchandise_id: None,
+            serial_number: None,
+            arived_on: None,
+            invoice_number: None,
+            created_date: Utc::now().into(),
+            updated_date: Utc::now().into(),
+        }
+    }
+
+    pub fn get_id(&self) -> &ObjectId {
+        &self.id
+    }
 }
+
+/*
+
 
 #[derive(GraphQLInputObject, Deserialize, Serialize)]
 #[graphql(description = "Stores internal merchandise infos")]
@@ -111,33 +147,7 @@ pub struct InternMerchandiseResponse {
     pub updated_date: DateTime,
 }
 
-impl InternMerchandise {
-    pub fn new(new_intern_merchandise: NewInternMerchandiseQuery) -> Self {
-        Self {
-            id: ObjectId::new(),
-            merchandise_name: new_intern_merchandise.merchandise_name,
-            // bought_through: None,
-            count: new_intern_merchandise.count,
-            orderer: new_intern_merchandise.orderer,
-            purchased_on: Utc::now().into(),
-            cost: new_intern_merchandise.cost,
-            status: InternMerchandiseStatus::Ordered,
-            url: new_intern_merchandise.url,
-            use_case: new_intern_merchandise.use_case,
-            article_number: new_intern_merchandise.article_number,
-            postage: new_intern_merchandise.postage,
-            project_leader: Some(new_intern_merchandise.project_leader),
-            location: Some(new_intern_merchandise.location),
-            shop: Some(new_intern_merchandise.shop),
 
-            merchandise_id: None,
-            serial_number: None,
-            arived_on: None,
-            invoice_number: None,
-            created_date: Utc::now().into(),
-            updated_date: Utc::now().into(),
-        }
-    }
 
     // TODO: ugly replace!!!
     pub fn update(&mut self, update: UpdateInternMerchandiseQuery) {

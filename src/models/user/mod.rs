@@ -1,6 +1,6 @@
 use async_graphql::{
-    validators::{Email, InputValueValidator, StringMaxLength, StringMinLength},
-    InputObject, SimpleObject, Value,
+    validators::{Email, StringMaxLength, StringMinLength},
+    InputObject, SimpleObject,
 };
 use bson::oid::ObjectId;
 use bson::DateTime;
@@ -8,22 +8,9 @@ use chrono::Utc;
 use pwhash::sha512_crypt;
 use serde::{Deserialize, Serialize};
 
-pub type UserId = ObjectId;
-pub struct Password;
+use crate::helper::validators::Password;
 
-impl InputValueValidator for Password {
-    fn is_valid(&self, value: &Value) -> Result<(), String> {
-        if let Value::String(s) = value {
-            if s.len() >= 8 && s.len() <= 64 {
-                Ok(())
-            } else {
-                Err("password must be longer than 8 chars and lower than 64 chars".to_owned())
-            }
-        } else {
-            Ok(())
-        }
-    }
-}
+pub type UserId = ObjectId;
 
 #[derive(Deserialize, Debug, InputObject)]
 pub struct NewUser {
