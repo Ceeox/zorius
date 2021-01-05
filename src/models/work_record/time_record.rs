@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, SimpleObject)]
 pub struct TimeRecord {
+    id: i64,
+    is_running: bool,
     started: DateTime,
     ended: Option<DateTime>,
     duration: Option<i64>,
@@ -22,8 +24,10 @@ pub struct UpdateTimeRecord {
 impl TimeRecord {
     /// creates a new time record for the given user
     /// sets the started time here
-    pub fn new() -> Self {
+    pub fn new(id: i64) -> Self {
         Self {
+            id,
+            is_running: true,
             started: Utc::now().into(),
             ended: None,
             duration: None,
@@ -35,12 +39,8 @@ impl TimeRecord {
     }
 
     /// returns the ended time
-    /// None if the record hasn't conculded yet
     pub fn has_ended(&self) -> bool {
-        match self.ended {
-            Some(_) => false,
-            None => true,
-        }
+        !self.is_running
     }
 
     /// ends the time record

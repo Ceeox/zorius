@@ -16,7 +16,7 @@ pub struct Workday {
 impl Workday {
     /// create a new workday and automaticly start a time record
     pub fn new(worktarget_secs: i64) -> Self {
-        let tr = TimeRecord::new();
+        let tr = TimeRecord::new(0);
         let worktime_secs = worktarget_secs * -1;
         let time_records = vec![tr];
         Self {
@@ -42,8 +42,7 @@ impl Workday {
         if tr.is_some() {
             return;
         }
-
-        let tr = TimeRecord::new();
+        let tr = TimeRecord::new((self.time_records.len() + 1) as i64);
         self.time_records.push(tr);
     }
 

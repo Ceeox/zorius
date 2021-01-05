@@ -33,10 +33,13 @@ pub struct User {
     password_hash: String,
     username: String,
     created_at: DateTime,
+    #[graphql(visible = false)]
     invitation_pending: bool,
+    avatar_url: Option<String>,
     firstname: Option<String>,
     lastname: Option<String>,
     last_updated: Option<DateTime>,
+    #[graphql(visible = false)]
     deleted: bool,
 }
 
@@ -61,6 +64,7 @@ impl User {
             invitation_pending: true,
             deleted: false,
             last_updated: Some(Utc::now().into()),
+            avatar_url: None,
         }
     }
 

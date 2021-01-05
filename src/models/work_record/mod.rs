@@ -70,7 +70,6 @@ impl WorkAccount {
     pub fn resume_work(&mut self) {
         let today = Utc::today().naive_utc();
         let wd = self.find_workday_mut(&today);
-        println!("{:?}", wd);
 
         match wd {
             Some(r) => r.start_time_record(),
