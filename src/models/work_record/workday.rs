@@ -38,7 +38,6 @@ impl Workday {
     pub fn start_time_record(&mut self) {
         // check if there is a running time record
         let tr = self.time_records.iter_mut().find(|tr| tr.has_ended());
-        println!("{:?}", tr);
         if tr.is_some() {
             return;
         }
@@ -50,7 +49,7 @@ impl Workday {
     ///
     /// if all time records already ended it returns the last one
     pub fn end_time_record(&mut self) {
-        let tr = self.time_records.iter_mut().find(|tr| tr.has_ended());
+        let tr = self.time_records.iter_mut().find(|tr| !tr.has_ended());
         if tr.is_none() {
             return;
         }

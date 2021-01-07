@@ -58,6 +58,18 @@ impl WorkAccount {
         self.workdays.push(wd);
     }
 
+    pub fn get_today_workday(&mut self) -> Option<Workday> {
+        let today = Utc::today().naive_utc();
+        match self
+            .workdays
+            .iter_mut()
+            .find(|item| item.get_date().eq(&today))
+        {
+            Some(ref mut r) => Some(std::mem::replace(r, Workday::new(0))),
+            None => None,
+        }
+    }
+
     pub fn pause(&mut self) {
         let today = Utc::today().naive_utc();
         let wd = match self.find_workday_mut(&today) {
@@ -77,7 +89,7 @@ impl WorkAccount {
         }
     }
 
-    fn find_workday_mut(&mut self, date: &NaiveDate) -> Option<&mut Workday> {
+    pub fn find_workday_mut(&mut self, date: &NaiveDate) -> Option<&mut Workday> {
         self.workdays
             .iter_mut()
             .find(|item| item.get_date().eq(date))

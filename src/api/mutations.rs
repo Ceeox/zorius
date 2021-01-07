@@ -6,7 +6,7 @@ use crate::{
     models::user::{NewUser, User, UserId},
     models::{
         merchandise::intern_merchandise::{MerchandiseIntern, NewMerchandiseIntern},
-        work_record::WorkAccount,
+        work_record::{workday::Workday, WorkAccount},
     },
 };
 
@@ -94,7 +94,7 @@ impl RootMutation {
         Ok(from_document(wa)?)
     }
 
-    async fn workday_start(&self, ctx: &Context<'_>) -> Result<WorkAccount> {
+    async fn workday_start(&self, ctx: &Context<'_>) -> Result<Workday> {
         let user_id = is_autherized(ctx)?;
 
         let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
@@ -107,10 +107,11 @@ impl RootMutation {
         let update = to_document(&wa)?;
         let _ = collection.update_one(filter, update, None).await?;
 
-        Ok(wa)
+        let wd = wa.get_today_workday().unwrap();
+        Ok(wd)
     }
 
-    async fn workday_pause(&self, ctx: &Context<'_>) -> Result<WorkAccount> {
+    async fn workday_pause(&self, ctx: &Context<'_>) -> Result<Workday> {
         let user_id = is_autherized(ctx)?;
 
         let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
@@ -123,10 +124,11 @@ impl RootMutation {
         let update = to_document(&wa)?;
         let _ = collection.update_one(filter, update, None).await?;
 
-        Ok(wa)
+        let wd = wa.get_today_workday().unwrap();
+        Ok(wd)
     }
 
-    async fn workday_resume(&self, ctx: &Context<'_>) -> Result<WorkAccount> {
+    async fn workday_resume(&self, ctx: &Context<'_>) -> Result<Workday> {
         let user_id = is_autherized(ctx)?;
 
         let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
@@ -139,7 +141,9 @@ impl RootMutation {
         let update = to_document(&wa)?;
         let _ = collection.update_one(filter, update, None).await?;
 
-        Ok(wa)
+        let wd = wa.get_today_workday().unwrap();
+
+        Ok(wd)
     }
     /*
     async fn update_user(&self, ctx: &Context<'_>, user_id: UserId, user_update: UpdateUser) -> Result<User> {

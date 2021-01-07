@@ -49,6 +49,7 @@ impl TimeRecord {
         let ended = Utc::now();
         let started = self.started.0;
         let dur = ended - started;
+        self.is_running = false;
         self.ended = Some(DateTime::from(ended));
         self.duration = Some(dur.num_seconds());
     }
