@@ -47,7 +47,6 @@ pub async fn graphql(
 }
 
 // Enable only when we're running in debug mode
-#[cfg(debug_assertions)]
 #[get("/pg")]
 pub async fn gql_playgound() -> HttpResponse {
     HttpResponse::Ok()
