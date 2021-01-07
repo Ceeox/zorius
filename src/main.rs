@@ -2,6 +2,7 @@ use std::io::BufReader;
 use std::sync::Arc;
 use std::{fs::File, time::Duration};
 
+use actix_cors::Cors;
 use actix_files::Files;
 use actix_ratelimit::{MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{
@@ -118,6 +119,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let http_server = HttpServer::new(move || {
         App::new()
             .data(schema.clone())
+            .wrap(Cors::permissive())
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
             .wrap(Compress::new(ContentEncoding::Auto))
