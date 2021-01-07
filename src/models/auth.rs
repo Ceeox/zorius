@@ -1,6 +1,7 @@
+use async_graphql::SimpleObject;
 use serde::{Deserialize, Serialize};
 
-use super::user::NewUserQuery;
+use super::user::UserId;
 
 #[derive(Deserialize)]
 pub struct LoginData {
@@ -8,9 +9,9 @@ pub struct LoginData {
     pub password: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, SimpleObject)]
 pub struct LoginResult {
     pub token: String,
+    pub expires_at: usize,
+    pub user_id: UserId,
 }
-
-pub type Register = NewUserQuery;

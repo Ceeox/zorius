@@ -1,25 +1,29 @@
+use async_graphql::{Context, Object};
 use bson::doc;
 use bson::{de::from_document, oid::ObjectId, to_document};
 use futures::stream::{StreamExt, TryStreamExt};
-use juniper::{graphql_value, FieldError, FieldResult};
 use mongodb::options::FindOptions;
 
-use crate::models::merchandise::intern_merchandise::{
-    InternMerchandise, InternMerchandiseResponse, NewInternMerchandiseQuery,
-    UpdateInternMerchandiseQuery,
+use crate::{
+    errors::ZoriusError,
+    models::merchandise::intern_merchandise::{
+        InternMerchandise, InternMerchandiseResponse, NewInternMerchandiseQuery,
+        UpdateInternMerchandiseQuery,
+    },
 };
 
-use crate::Context;
 
-static MDB_COLL_NAME_INTERN: &str = "merchandise_intern";
 
 // replace with gql query
 const MAX_TABLE_DATA_RESULTS: i64 = 50;
 
 pub struct InternMerchandiseQuery;
 
+#[Object]
 impl InternMerchandiseQuery {
-    pub async fn table_data(ctx: &Context) -> FieldResult<Vec<InternMerchandiseResponse>> {
+    pub async fn table_data(
+        ctx: &Context<'_>,
+    ) -> Result<&'_ Vec<InternMerchandiseResponse>, ZoriusError> {
         let collection = ctx.db.collection(MDB_COLL_NAME_INTERN);
         let find_opt = Some(FindOptions::builder().limit(MAX_TABLE_DATA_RESULTS).build());
         let cursor = collection.find(None, find_opt).await?;
@@ -35,8 +39,9 @@ impl InternMerchandiseQuery {
 
         Ok(res)
     }
-
+    /*
     pub async fn get_order(
+        &self,
         ctx: &Context,
         order_id: ObjectId,
     ) -> FieldResult<InternMerchandiseResponse> {
@@ -52,11 +57,13 @@ impl InternMerchandiseQuery {
             Some(r) => Ok(from_document(r)?),
         }
     }
+    */
 }
 
 pub struct InternMerchandiseMutation;
 
 impl InternMerchandiseMutation {
+    /*
     pub async fn new_intern_order(
         ctx: &Context,
         new_intern_merchandise: NewInternMerchandiseQuery,
@@ -93,4 +100,5 @@ impl InternMerchandiseMutation {
         let _ = collection.update_one(query, update_doc, None).await?;
         Ok(order.into())
     }
+    */
 }

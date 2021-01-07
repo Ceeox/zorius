@@ -2,13 +2,16 @@ use std::io::BufReader;
 use std::sync::Arc;
 use std::{fs::File, time::Duration};
 
+use actix_cors::Cors;
 use actix_files::Files;
 use actix_ratelimit::{MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{
     http::ContentEncoding,
     middleware::{Compress, DefaultHeaders, Logger},
-    web, App, HttpServer,
+    App, HttpServer,
 };
+use api::{gql_playgound, RootMutation, RootQuery};
+use async_graphql::{EmptySubscription, Schema};
 use errors::ZoriusError;
 use mongodb::{options::ClientOptions, options::ResolverConfig, Client};
 use rustls::{
@@ -20,29 +23,21 @@ mod api;
 mod config;
 mod errors;
 mod helper;
-mod middleware;
 mod models;
 
 use crate::{
-    api::{
-        auth::{login, register},
-        create_schema, graphiql, graphql, upload, zorius_playground, RootSchema,
-    },
+    api::{graphql, RootSchema},
     config::CONFIG,
 };
 
 const API_VERSION: &str = "v1";
-const API_BASE: &str = "graphql";
-const API_AUTH: &str = "auth";
 
 #[derive(Clone)]
-pub struct Context {
+pub struct ZoriusContext {
     pub client: mongodb::Client,
     pub db: mongodb::Database,
-    pub root_schema: Arc<RootSchema>,
+    pub schema: Arc<RootSchema>,
 }
-
-impl juniper::Context for Context {}
 
 async fn setup_mongodb() -> Result<Client, ZoriusError> {
     let url = format!(
@@ -111,14 +106,11 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let client = setup_mongodb().await?;
     let db = client.database(&CONFIG.db_config.db_name);
 
-    // Create Juniper schema
-    let root_schema = create_schema();
-
-    let ctx = Context {
-        client,
-        db,
-        root_schema,
-    };
+    // let ctx = web::Data::new(Mutex::new(ZoriusContext { client, db, schema }));
+    let schema = Schema::build(RootQuery, RootMutation, EmptySubscription)
+        .data(db)
+        .data(client)
+        .finish();
 
     // Start http server
     let webserver_url = format!("{}:{}", CONFIG.web_config.ip, CONFIG.web_config.port);
@@ -126,7 +118,8 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let store = MemoryStore::new();
     let http_server = HttpServer::new(move || {
         App::new()
-            .data(ctx.clone())
+            .data(schema.clone())
+            .wrap(Cors::permissive())
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
             .wrap(Compress::new(ContentEncoding::Auto))
@@ -136,29 +129,33 @@ async fn main() -> Result<(), errors::ZoriusError> {
                     .with_max_requests(100),
             )
             // auth api
+            /*
             .service(
                 web::resource(&format!("api/{}/{}", API_VERSION, API_AUTH))
                     .route(web::post().to(login))
                     .route(web::post().to(register)),
                 //.route(web::post().to(reset_password)),
             )
-            .service(upload)
+            */
             // graphql api
-            .service(
-                web::resource(&format!("api/{}/{}", API_VERSION, API_BASE))
-                    .route(web::post().to(graphql))
-                    .route(web::get().to(graphql)),
-            )
-            .service(graphiql)
-            .service(zorius_playground)
+            .service(graphql)
+            .service(gql_playgound)
             // static file serving
             .service(
                 Files::new("/", "static")
                     .prefer_utf8(true)
                     .index_file("index.html"),
             )
-            .service(Files::new("/assets", "assets").prefer_utf8(true))
-            .service(Files::new("/files", "files").prefer_utf8(true))
+            .service(
+                Files::new("/assets", "assets")
+                    .prefer_utf8(true)
+                    .show_files_listing(),
+            )
+            .service(
+                Files::new("/files", "files")
+                    .prefer_utf8(true)
+                    .show_files_listing(),
+            )
         // TODO: add service for frontend files
     });
 

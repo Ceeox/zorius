@@ -13,6 +13,8 @@ actix-multipart = "0.3"
 actix-ratelimit = "0.3"
 actix-rt = "1.1"
 actix-web = {version = "3.3", features = ["rustls"]}
+async-graphql = {version = "2.4", features = ["bson", "multipart", "chrono"]}
+async-graphql-actix-web = "2.4"
 bson = "1.1"
 chrono = {version = "0.4", features = ["serde"]}
 dotenv = "0.15"
@@ -20,8 +22,6 @@ dotenv_codegen = "0.15"
 env_logger = "0.8"
 futures = "0.3"
 jsonwebtoken = "7"
-juniper = {version = "0.15", features = ["chrono", "url", "bson"]}
-juniper_actix = "0.2"
 lazy_static = "1.4"
 log = "0.4"
 mongodb = "1.1"
@@ -32,4 +32,5 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 tokio = {version = "1.0", features = ["fs", "io-util", "rt"]}
+url = "2.2"
 uuid = {version = "0.8", features = ["serde", "v4"]}
