@@ -59,6 +59,7 @@ impl RootQuery {
         Ok(LoginResult {
             token: token,
             expires_at: claims.exp,
+            user_id: user.get_id().to_owned(),
         })
     }
 
