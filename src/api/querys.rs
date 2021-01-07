@@ -1,6 +1,7 @@
+use actix_web::test::start;
 use async_graphql::validators::{Email, StringMaxLength, StringMinLength};
 use async_graphql::{Context, Error, Object, Result};
-use bson::{doc, from_document, oid::ObjectId};
+use bson::{doc, from_document, oid::ObjectId, DateTime};
 use chrono::{Duration, NaiveDate, Utc};
 use futures::{future, StreamExt, TryStreamExt};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
@@ -12,7 +13,7 @@ use crate::{
         auth::LoginResult,
         merchandise::intern_merchandise::MerchandiseIntern,
         user::{Claim, User, UserId},
-        work_record::workday::Workday,
+        work_record::{workday::Workday, WorkAccount},
     },
     API_VERSION,
 };
@@ -147,6 +148,54 @@ impl RootQuery {
         let mut wd = collection.aggregate(pl, None).await?;
         match wd.next().await {
             Some(r) => Ok(Some(from_document(r?)?)),
+            None => Ok(None),
+        }
+    }
+
+    async fn get_workdays(
+        &self,
+        ctx: &Context<'_>,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+    ) -> Result<Vec<Workday>> {
+        let user_id = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
+        let pl = vec![
+            doc! {"$unwind": "$workdays"},
+            doc! {"$match": {
+                "user_id": user_id.clone(),
+                    "workdays.date": {
+                        "$lte": end_date.to_string(),
+                        "$gte": start_date.to_string(),
+                    }
+                }
+            },
+            doc! {"$replaceRoot": {"newRoot": "$workdays"}},
+        ];
+        Ok(collection
+            .aggregate(pl, None)
+            .await?
+            .filter_map(|item| async move {
+                if item.is_ok() {
+                    match from_document(item.unwrap()) {
+                        Ok(r) => Some(r),
+                        Err(_) => None,
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<Workday>>()
+            .await)
+    }
+
+    async fn get_workaccount(&self, ctx: &Context<'_>) -> Result<Option<WorkAccount>> {
+        let user_id = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
+        let filter = doc! { "user_id": user_id.clone() };
+        let wd = collection.find_one(filter, None).await?;
+        match wd {
+            Some(r) => Ok(Some(from_document(r)?)),
             None => Ok(None),
         }
     }
