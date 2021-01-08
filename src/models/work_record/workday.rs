@@ -38,10 +38,10 @@ impl Workday {
     pub fn start_time_record(&mut self) {
         // check if there is a running time record
         let tr = self.time_records.iter_mut().find(|tr| tr.has_ended());
-        if tr.is_some() {
+        if tr.is_none() {
             return;
         }
-        let tr = TimeRecord::new((self.time_records.len() + 1) as i64);
+        let tr = TimeRecord::new(self.time_records.len() as i64);
         self.time_records.push(tr);
     }
 
