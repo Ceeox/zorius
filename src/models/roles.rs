@@ -1,94 +1,55 @@
-use bson::{oid::ObjectId, DateTime};
+use std::collections::HashMap;
 
-#[derive(PartialEq, Clone)]
-pub struct Role {
-    id: ObjectId,
-    user_ids: Vec<ObjectId>,
-    name: String,
-    permissions: Vec<Permission>,
+use async_graphql::{guard::Guard, Context, Result};
+use bson::oid::ObjectId;
+
+use crate::api::is_autherized;
+
+use super::user::UserId;
+
+#[derive(Eq, PartialEq, Clone)]
+pub enum Role {
+    WorkReportModerator,
+    WorkAccountModerator,
+    RoleModerator,
+    Admin,
+    NoRole,
 }
 
-#[derive(PartialEq, Clone)]
-pub enum Permission {
-    CanReadInternMerch(bool),
-    UpdateInternMerch(bool),
-    DeleteInternMerch(bool),
-
-    ReadTimeRecords(bool),
-    UpdateTimeRechords(bool),
-    DeleteTimeRecords(bool),
-}
-pub struct RoleSearch {
-    ident: RoleSearchIdent,
-    before: DateTime,
-    after: DateTime,
-    start_at: usize,
-    count: usize,
+pub struct RoleGuard {
+    pub role: Role,
 }
 
-pub enum RoleSearchIdent {
-    ById(ObjectId),
-    ByName(String),
-    ByIds(Vec<ObjectId>),
-    ByNames(Vec<String>),
+pub struct RoleCache {
+    user_roles: HashMap<ObjectId, Vec<Role>>,
 }
 
-impl Role {
-    /// creates a new Role wit the given  user ids and name
-    pub fn new(user_ids: Vec<ObjectId>, name: &str) -> Self {
+impl RoleCache {
+    pub fn new() -> Self {
         Self {
-            id: ObjectId::new(),
-            user_ids,
-            name: name.to_owned(),
-            permissions: vec![],
+            user_roles: HashMap::new(),
         }
     }
 
-    /// gets the `role id`
-    pub fn id(&self) -> &ObjectId {
-        &self.id
-    }
-
-    /// gets the name of the Role
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// changes the name of the role
-    pub fn update_name(&mut self, new_name: &str) {
-        self.name = new_name.to_owned();
-    }
-
-    /// adds a new user
-    pub fn add_user(&mut self, new_user: &ObjectId) {
-        match self.user_ids.iter().position(|id| id == new_user) {
-            None => self.user_ids.push(new_user.to_owned()),
-            Some(_) => {}
+    pub fn has_role(&self, ctx: &Context<'_>, user_id: &UserId, role: &Role) -> bool {
+        match self.user_roles.get(user_id) {
+            Some(roles) => roles.contains(&role),
+            None => false,
         }
     }
 
-    /// Searchs for the given `user id` and returns the `user id`.
-    /// If the `user id` isn't in the role it returns `None`.
-    pub fn remove_user(&mut self, user: &ObjectId) -> Option<ObjectId> {
-        let index = self.user_ids.iter().position(|id| id == user);
-        match index {
-            Some(r) => Some(self.user_ids.remove(r)),
-            None => None,
-        }
+    fn load_roles(&self, ctx: &Context<'_>, user_id: &UserId) -> Option<Vec<Role>> {
+        None
     }
+}
 
-    /// adds the new `Permission` to role.
-    pub fn add_permission(&mut self, new_permission: Permission) {
-        self.permissions.push(new_permission)
-    }
-
-    pub fn update_permission(mut self, new_permission: Permission) {}
-
-    pub fn remove_permission(&mut self, permission: Permission) -> Option<Permission> {
-        let index = self.permissions.iter().position(|id| id == &permission);
-        match index {
-            Some(r) => Some(self.permissions.remove(r)),
-            None => None,
+#[async_trait::async_trait]
+impl Guard for RoleGuard {
+    async fn check(&self, ctx: &Context<'_>) -> Result<()> {
+        let user_id = is_autherized(ctx)?;
+        match ctx.data_opt::<RoleCache>() {
+            Some(role_cache) if role_cache.has_role(ctx, &user_id, &self.role) => Ok(()),
+            _ => Err("Forbidden".into()),
         }
     }
 }

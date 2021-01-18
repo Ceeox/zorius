@@ -1,39 +1,31 @@
-use async_graphql::{validators::StringMaxLength, Context, Error, Object, Result};
+use async_graphql::{
+    guard::Guard, validators::StringMaxLength, Context, Error, Object, Result, Upload,
+};
 use bson::{doc, from_document, to_document};
 
 use crate::{
     helper::validators::Password,
     models::user::{NewUser, User, UserId},
     models::{
+        customer::Customer,
         merchandise::intern_merchandise::{MerchandiseIntern, NewMerchandiseIntern},
+        project::Project,
+        roles::{Role, RoleGuard},
+        upload::{FileInfo, Storage},
         work_record::{workday::Workday, WorkAccount},
+        work_report::{NewWorkReport, WorkReport},
     },
 };
 
 use super::{
     database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS,
+    MDB_COLL_WORK_REPORTS,
 };
 
 pub struct RootMutation;
 
 #[Object]
 impl RootMutation {
-    /*
-        async fn new_intern_order(
-            ctx: &Context,
-            new_intern_order: NewInternMerchandiseQuery,
-        ) -> FieldResult<InternMerchandiseResponse> {
-            InternMerchandiseMutation::new_intern_order(ctx, new_intern_order).await
-        }
-
-        async fn update_intern_order(
-            ctx: &Context,
-            order_id: ObjectId,
-            inter_update: UpdateInternMerchandiseQuery,
-        ) -> FieldResult<InternMerchandiseResponse> {
-            InternMerchandiseMutation::update_intern_order(ctx, order_id, inter_update).await
-        }
-    */
     async fn register(&self, ctx: &Context<'_>, new_user: NewUser) -> Result<User> {
         let user = User::new(new_user);
         let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
@@ -69,6 +61,10 @@ impl RootMutation {
         Ok(true)
     }
 
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::WorkAccountModerator")
+    )))]
     async fn new_work_account(
         &self,
         ctx: &Context<'_>,
@@ -92,6 +88,77 @@ impl RootMutation {
         let filter = doc! { "_id": wa_id };
         let wa = collection.find_one(filter, None).await?.unwrap();
         Ok(from_document(wa)?)
+    }
+
+    async fn new_merchandise_intern(
+        &self,
+        ctx: &Context<'_>,
+        new_intern_merch: NewMerchandiseIntern,
+    ) -> Result<MerchandiseIntern> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
+
+        let new_merch_intern = MerchandiseIntern::new(new_intern_merch);
+        let im_id = new_merch_intern.get_id().clone();
+        let insert = to_document(&new_merch_intern)?;
+        let _ = collection.insert_one(insert, None).await?;
+
+        let filter = doc! { "_id": im_id };
+        let wa = collection.find_one(filter, None).await?.unwrap();
+        Ok(from_document(wa)?)
+    }
+
+    async fn new_workreport(&self, ctx: &Context<'_>, new_wr: NewWorkReport) -> Result<WorkReport> {
+        let user_id = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
+        let wr = WorkReport::new(user_id, new_wr);
+        let insert = to_document(&wr)?;
+        let _ = collection.insert_one(insert, None).await?;
+        Ok(wr)
+    }
+
+    async fn new_project(&self, ctx: &Context<'_>, name: String) -> Result<Project> {
+        let user_id = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
+        let project = Project::new(user_id, name);
+        let insert = to_document(&project)?;
+        let _ = collection.insert_one(insert, None).await?;
+        Ok(project)
+    }
+
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::WorkReportModerator")
+    )))]
+    async fn new_customer(
+        &self,
+        ctx: &Context<'_>,
+        name: String,
+        identifier: String,
+    ) -> Result<Customer> {
+        let user_id = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
+        let customer = Customer::new(user_id, name, identifier);
+        let insert = to_document(&customer)?;
+        let _ = collection.insert_one(insert, None).await?;
+        Ok(customer)
+    }
+
+    async fn upload(&self, ctx: &Context<'_>, files: Vec<Upload>) -> Result<Vec<FileInfo>> {
+        let mut infos = Vec::new();
+        let mut storage = ctx.data_unchecked::<Storage>().lock().await;
+        for file in files {
+            let entry = storage.vacant_entry();
+            let upload = file.value(ctx).unwrap();
+            let info = FileInfo {
+                id: entry.key().into(),
+                filename: upload.filename.clone(),
+                mimetype: upload.content_type.clone(),
+            };
+            entry.insert(info.clone());
+            infos.push(info)
+        }
+        Ok(infos)
     }
 
     async fn workday_start(&self, ctx: &Context<'_>) -> Result<Workday> {
@@ -170,22 +237,4 @@ impl RootMutation {
         Ok(user.into())
     }
     */
-
-    async fn new_merchandise_intern(
-        &self,
-        ctx: &Context<'_>,
-        new_intern_merch: NewMerchandiseIntern,
-    ) -> Result<MerchandiseIntern> {
-        let _ = is_autherized(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
-
-        let new_merch_intern = MerchandiseIntern::new(new_intern_merch);
-        let im_id = new_merch_intern.get_id().clone();
-        let insert = to_document(&new_merch_intern)?;
-        let _ = collection.insert_one(insert, None).await?;
-
-        let filter = doc! { "_id": im_id };
-        let wa = collection.find_one(filter, None).await?.unwrap();
-        Ok(from_document(wa)?)
-    }
 }

@@ -1,5 +1,5 @@
 use async_graphql::SimpleObject;
-use chrono::{NaiveDate, Utc};
+use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 
 use super::time_record::TimeRecord;
@@ -20,7 +20,7 @@ impl Workday {
         let worktime_secs = worktarget_secs * -1;
         let time_records = vec![tr];
         Self {
-            date: Utc::today().naive_utc(),
+            date: Local::today().naive_utc(),
             worktarget_secs,
             time_records,
             worktime_secs,

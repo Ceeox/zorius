@@ -12,9 +12,10 @@ lazy_static! {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Config {
-    pub web_config: WebServerConfig,
-    pub db_config: DbServerConfig,
+    pub web: WebServerConfig,
+    pub db: DbServerConfig,
     pub secret_key: String,
+    pub domain: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

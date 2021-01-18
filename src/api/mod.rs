@@ -1,9 +1,13 @@
-use actix_web::{get, post, web::Data, HttpRequest, HttpResponse};
+use actix_web::{
+    get, post,
+    web::{Data, Payload},
+    HttpRequest, HttpResponse,
+};
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
     Context, EmptySubscription, Error, Result, Schema,
 };
-use async_graphql_actix_web::{Request, Response};
+use async_graphql_actix_web::{Request, Response, WSSubscription};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use mongodb::Database;
 //use user::{UserMutation, UserQuery};
@@ -20,9 +24,11 @@ pub use crate::api::{mutations::RootMutation, querys::RootQuery};
 use crate::models::user::Claim;
 use crate::{config::CONFIG, models::user::UserId};
 
-static MDB_COLL_NAME_INTERN: &str = "merchandise_intern";
 static MDB_COLL_NAME_USERS: &str = "users";
+
 static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
+static MDB_COLL_WORK_REPORTS: &str = "work_reports";
+
 static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
 
 pub type RootSchema = Schema<RootQuery, RootMutation, EmptySubscription>;

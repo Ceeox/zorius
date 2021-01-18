@@ -1,5 +1,4 @@
 use std::io::BufReader;
-use std::sync::Arc;
 use std::{fs::File, time::Duration};
 
 use actix_cors::Cors;
@@ -10,13 +9,15 @@ use actix_web::{
     middleware::{Compress, DefaultHeaders, Logger},
     App, HttpServer,
 };
-use api::{gql_playgound, RootMutation, RootQuery};
 use async_graphql::{EmptySubscription, Schema};
-use errors::ZoriusError;
 use mongodb::{options::ClientOptions, options::ResolverConfig, Client};
 use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
+
+use api::{gql_playgound, RootMutation, RootQuery};
+use errors::ZoriusError;
+use models::{roles::RoleCache, upload::Storage};
 use uuid::Uuid;
 
 mod api;
@@ -25,27 +26,14 @@ mod errors;
 mod helper;
 mod models;
 
-use crate::{
-    api::{graphql, RootSchema},
-    config::CONFIG,
-};
+use crate::{api::graphql, config::CONFIG};
 
 const API_VERSION: &str = "v1";
-
-#[derive(Clone)]
-pub struct ZoriusContext {
-    pub client: mongodb::Client,
-    pub db: mongodb::Database,
-    pub schema: Arc<RootSchema>,
-}
 
 async fn setup_mongodb() -> Result<Client, ZoriusError> {
     let url = format!(
         "mongodb+srv://{}:{}@{}/{}",
-        CONFIG.db_config.username,
-        CONFIG.db_config.password,
-        CONFIG.db_config.server_domain,
-        CONFIG.db_config.db_name
+        CONFIG.db.username, CONFIG.db.password, CONFIG.db.server_domain, CONFIG.db.db_name
     );
 
     // Use to cloudflare resolver to work around a mongodb dns resolver issue.
@@ -53,7 +41,7 @@ async fn setup_mongodb() -> Result<Client, ZoriusError> {
     let mut client_options =
         ClientOptions::parse_with_resolver_config(&url, ResolverConfig::cloudflare()).await?;
 
-    client_options.app_name = Some(CONFIG.db_config.app_name.clone());
+    client_options.app_name = Some(CONFIG.db.app_name.clone());
     Ok(Client::with_options(client_options)?)
 }
 
@@ -69,10 +57,8 @@ fn setup_log() {
 
 fn setup_tls() -> ServerConfig {
     let mut tls_config = ServerConfig::new(NoClientAuth::new());
-    let cert_file =
-        &mut BufReader::new(File::open(CONFIG.web_config.cert_path.clone().unwrap()).unwrap());
-    let key_file =
-        &mut BufReader::new(File::open(CONFIG.web_config.key_path.clone().unwrap()).unwrap());
+    let cert_file = &mut BufReader::new(File::open(CONFIG.web.cert_path.clone().unwrap()).unwrap());
+    let key_file = &mut BufReader::new(File::open(CONFIG.web.key_path.clone().unwrap()).unwrap());
     let cert_chain = certs(cert_file).unwrap();
     let mut keys = pkcs8_private_keys(key_file).unwrap();
     tls_config
@@ -85,11 +71,7 @@ fn check_folders() -> Result<(), ZoriusError> {
     use std::path::Path;
 
     if !Path::new("static").exists() {
-        panic!("missing frondend fiels folder");
-    }
-
-    if !Path::new("assets").exists() {
-        panic!("missing assets folder");
+        panic!("missing frondend files folder");
     }
 
     if !Path::new("files").exists() {
@@ -104,17 +86,19 @@ async fn main() -> Result<(), errors::ZoriusError> {
     check_folders()?;
 
     let client = setup_mongodb().await?;
-    let db = client.database(&CONFIG.db_config.db_name);
+    let db = client.database(&CONFIG.db.db_name);
+    let role_cache = RoleCache::new();
 
-    // let ctx = web::Data::new(Mutex::new(ZoriusContext { client, db, schema }));
     let schema = Schema::build(RootQuery, RootMutation, EmptySubscription)
         .data(db)
         .data(client)
+        .data(role_cache)
+        .data(Storage::default())
         .finish();
 
     // Start http server
-    let webserver_url = format!("{}:{}", CONFIG.web_config.ip, CONFIG.web_config.port);
-    let log_format = CONFIG.web_config.log_format.clone();
+    let webserver_url = format!("{}:{}", CONFIG.web.ip, CONFIG.web.port);
+    let log_format = CONFIG.web.log_format.clone();
     let store = MemoryStore::new();
     let http_server = HttpServer::new(move || {
         App::new()
@@ -128,15 +112,6 @@ async fn main() -> Result<(), errors::ZoriusError> {
                     .with_interval(Duration::from_secs(60))
                     .with_max_requests(100),
             )
-            // auth api
-            /*
-            .service(
-                web::resource(&format!("api/{}/{}", API_VERSION, API_AUTH))
-                    .route(web::post().to(login))
-                    .route(web::post().to(register)),
-                //.route(web::post().to(reset_password)),
-            )
-            */
             // graphql api
             .service(graphql)
             .service(gql_playgound)
@@ -147,19 +122,13 @@ async fn main() -> Result<(), errors::ZoriusError> {
                     .index_file("index.html"),
             )
             .service(
-                Files::new("/assets", "assets")
-                    .prefer_utf8(true)
-                    .show_files_listing(),
-            )
-            .service(
                 Files::new("/files", "files")
                     .prefer_utf8(true)
                     .show_files_listing(),
             )
-        // TODO: add service for frontend files
     });
 
-    let res = if CONFIG.web_config.enable_ssl {
+    let res = if CONFIG.web.enable_ssl {
         let tls_config = setup_tls();
 
         http_server

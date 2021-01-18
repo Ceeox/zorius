@@ -1,7 +1,9 @@
-use actix_web::test::start;
-use async_graphql::validators::{Email, StringMaxLength, StringMinLength};
-use async_graphql::{Context, Error, Object, Result};
-use bson::{doc, from_document, oid::ObjectId, DateTime};
+use async_graphql::{
+    guard::Guard,
+    validators::{Email, StringMaxLength, StringMinLength},
+    Context, Error, Object, Result,
+};
+use bson::{doc, from_document, oid::ObjectId};
 use chrono::{Duration, NaiveDate, Utc};
 use futures::{future, StreamExt, TryStreamExt};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
@@ -11,15 +13,20 @@ use crate::{
     config::CONFIG,
     models::{
         auth::LoginResult,
+        customer::{Customer, CustomerId},
         merchandise::intern_merchandise::MerchandiseIntern,
+        project::{Project, ProjectId},
+        roles::{Role, RoleGuard},
         user::{Claim, User, UserId},
         work_record::{workday::Workday, WorkAccount},
+        work_report::{WorkReport, WorkReportId},
     },
     API_VERSION,
 };
 
 use super::{
-    database, is_autherized, MDB_COLL_NAME_INTERN, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS,
+    database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS,
+    MDB_COLL_WORK_REPORTS,
 };
 pub struct RootQuery;
 
@@ -84,7 +91,7 @@ impl RootQuery {
 
     async fn get_order(&self, ctx: &Context<'_>, id: ObjectId) -> Result<MerchandiseIntern> {
         is_autherized(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_INTERN);
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
         let filter = doc! { "_id": id };
         match collection.find_one(Some(filter), None).await? {
             None => return Err(Error::new("intern order not found")),
@@ -197,6 +204,52 @@ impl RootQuery {
         match wd {
             Some(r) => Ok(Some(from_document(r)?)),
             None => Ok(None),
+        }
+    }
+
+    async fn get_workreport(
+        &self,
+        ctx: &Context<'_>,
+        work_report_id: WorkReportId,
+    ) -> Result<Option<WorkReport>> {
+        let user_id = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
+        let filter = doc! { "user_id": user_id.clone(), "id": work_report_id };
+        match collection.find_one(filter, None).await? {
+            Some(r) => Ok(Some(from_document(r)?)),
+            None => Err(Error::new("work_report_id not found")),
+        }
+    }
+
+    async fn get_project(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ProjectId,
+    ) -> Result<Option<Project>> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
+        let filter = doc! {
+            "_id": project_id
+        };
+        match collection.find_one(filter, None).await? {
+            Some(r) => Ok(Some(from_document(r)?)),
+            None => Err(Error::new("customer not found")),
+        }
+    }
+
+    async fn get_customer(
+        &self,
+        ctx: &Context<'_>,
+        customer_id: CustomerId,
+    ) -> Result<Option<Customer>> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
+        let filter = doc! {
+            "_id": customer_id
+        };
+        match collection.find_one(filter, None).await? {
+            Some(r) => Ok(Some(from_document(r)?)),
+            None => Err(Error::new("customer not found")),
         }
     }
 }
