@@ -1,22 +1,12 @@
-use actix_web::{
-    get, post,
-    web::{Data, Payload},
-    HttpRequest, HttpResponse,
-};
+use actix_web::{get, post, web::Data, HttpRequest, HttpResponse};
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
     Context, EmptySubscription, Error, Result, Schema,
 };
-use async_graphql_actix_web::{Request, Response, WSSubscription};
+use async_graphql_actix_web::{Request, Response};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use mongodb::Database;
-//use user::{UserMutation, UserQuery};
 
-// pub(crate) mod auth;
-// pub(crate) mod intern_merchandise;
-// pub(crate) mod role;
-// pub(crate) mod user;
-// pub(crate) mod work_account;
 pub mod mutations;
 pub mod querys;
 
@@ -57,9 +47,7 @@ pub async fn graphql(
 pub async fn gql_playgound() -> HttpResponse {
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(playground_source(
-            GraphQLPlaygroundConfig::new("/").subscription_endpoint("/"),
-        ))
+        .body(playground_source(GraphQLPlaygroundConfig::new("/")))
 }
 
 pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a Database> {

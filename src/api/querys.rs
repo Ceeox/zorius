@@ -1,5 +1,4 @@
 use async_graphql::{
-    guard::Guard,
     validators::{Email, StringMaxLength, StringMinLength},
     Context, Error, Object, Result,
 };
@@ -13,13 +12,14 @@ use crate::{
     config::CONFIG,
     models::{
         auth::LoginResult,
-        customer::{Customer, CustomerId},
         merchandise::intern_merchandise::MerchandiseIntern,
-        project::{Project, ProjectId},
-        roles::{Role, RoleGuard},
         user::{Claim, User, UserId},
         work_record::{workday::Workday, WorkAccount},
-        work_report::{WorkReport, WorkReportId},
+        work_report::{
+            customer::{Customer, CustomerId},
+            project::{Project, ProjectId},
+            WorkReport, WorkReportId,
+        },
     },
     API_VERSION,
 };
