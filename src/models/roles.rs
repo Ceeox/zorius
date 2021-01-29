@@ -1,22 +1,31 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Formatter},
+    sync::Arc,
+};
 
 use crate::api::{database, is_autherized};
-use async_graphql::{guard::Guard, Context, Result};
+use async_graphql::{guard::Guard, Context, Enum, Result, SimpleObject};
 use bson::{doc, from_document, oid::ObjectId};
 use futures::lock::Mutex;
 use serde::{Deserialize, Serialize};
 
 use super::user::UserId;
+use crate::api::MDB_COLL_ROLES;
 
-static MDB_COLL_ROLES: &str = "roles";
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, SimpleObject)]
 pub struct Roles {
     pub user_id: UserId,
     pub roles: Vec<Role>,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize, Enum)]
+pub enum RoleUpdateMode {
+    Add,
+    Remove,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize, Enum)]
 pub enum Role {
     WorkReportModerator,
     WorkAccountModerator,
@@ -25,8 +34,31 @@ pub enum Role {
     NoRole,
 }
 
+impl Display for Role {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Role::WorkAccountModerator => write!(f, "WorkAccountModerator"),
+            Role::WorkReportModerator => write!(f, "WorkReportModerator"),
+            Role::RoleModerator => write!(f, "RoleModerator"),
+            Role::Admin => write!(f, "Admin"),
+            Role::NoRole => write!(f, "NoRole"),
+        }
+    }
+}
+
 pub struct RoleGuard {
     pub role: Role,
+}
+
+#[async_trait::async_trait]
+impl Guard for RoleGuard {
+    async fn check(&self, ctx: &Context<'_>) -> Result<()> {
+        let user_id = is_autherized(ctx)?;
+        match ctx.data_opt::<RoleCache>() {
+            Some(role_cache) if role_cache.has_role(ctx, &user_id, &self.role).await? => Ok(()),
+            _ => Err("Forbidden".into()),
+        }
+    }
 }
 
 pub struct RoleCache {
@@ -40,9 +72,23 @@ impl RoleCache {
         }
     }
 
+    pub async fn update_rolecache(&self, user_id: &UserId, mode: &RoleUpdateMode, role: &Role) {
+        let mut lock = self.user_roles.lock().await;
+        match mode {
+            RoleUpdateMode::Add => match lock.get_mut(user_id) {
+                Some(roles) => roles.push(*role),
+                None => {}
+            },
+            RoleUpdateMode::Remove => match lock.get_mut(user_id) {
+                Some(roles) => roles.retain(|r| !r.eq(role)),
+                None => {}
+            },
+        }
+    }
+
     pub async fn has_role(&self, ctx: &Context<'_>, user_id: &UserId, role: &Role) -> Result<bool> {
         let mut lock = self.user_roles.lock().await;
-        println!("{:#?}", lock);
+        println!("user_id: {},\nroles: {:#?}", user_id, lock.get(user_id));
         match lock.get(user_id) {
             Some(roles) => Ok(roles.contains(&role)),
             None => match self.load_roles(ctx, user_id).await? {
@@ -65,17 +111,6 @@ impl RoleCache {
                 Ok(Some(roles.roles))
             }
             _ => Ok(None),
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl Guard for RoleGuard {
-    async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let user_id = is_autherized(ctx)?;
-        match ctx.data_opt::<RoleCache>() {
-            Some(role_cache) if role_cache.has_role(ctx, &user_id, &self.role).await? => Ok(()),
-            _ => Err("Forbidden".into()),
         }
     }
 }

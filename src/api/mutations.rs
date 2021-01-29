@@ -10,7 +10,7 @@ use crate::{
     models::user::{NewUser, User, UserId},
     models::{
         merchandise::intern_merchandise::{MerchandiseIntern, NewMerchandiseIntern},
-        roles::{Role, RoleGuard},
+        roles::{Role, RoleCache, RoleGuard, RoleUpdateMode, Roles},
         upload::{FileInfo, Storage},
         user::UserUpdate,
         work_record::{workday::Workday, WorkAccount},
@@ -19,8 +19,8 @@ use crate::{
 };
 
 use super::{
-    database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS,
-    MDB_COLL_WORK_REPORTS,
+    database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_ROLES,
+    MDB_COLL_WORK_ACCOUNTS, MDB_COLL_WORK_REPORTS,
 };
 
 pub struct RootMutation;
@@ -252,6 +252,49 @@ impl RootMutation {
             None => return Err(Error::new("specified user not found")),
             Some(r) => r,
         };
+        Ok(from_document(user)?)
+    }
+
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::RoleModerator")
+    )))]
+    async fn update_role(
+        &self,
+        ctx: &Context<'_>,
+        user_id: UserId,
+        mode: RoleUpdateMode,
+        role: Role,
+    ) -> Result<Roles> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_ROLES);
+        let filter = doc! { "user_id": user_id.clone() };
+
+        let mut update = match mode {
+            RoleUpdateMode::Add => doc! {"$push": {"roles": role.to_string()}},
+            RoleUpdateMode::Remove => doc! {"$pull": {"roles": role.to_string()}},
+        };
+        update.insert("$setOnInsert", doc! { "user_id": user_id.clone() });
+        println!("{:#?}", update);
+
+        let options: FindOneAndUpdateOptions = FindOneAndUpdateOptions::builder()
+            .return_document(Some(ReturnDocument::After))
+            .upsert(Some(true))
+            .build();
+
+        let user = match collection
+            .find_one_and_update(filter, update, Some(options))
+            .await?
+        {
+            None => return Err(Error::new("user in roles not found")),
+            Some(r) => r,
+        };
+
+        match ctx.data_opt::<RoleCache>() {
+            Some(role_cache) => role_cache.update_rolecache(&user_id, &mode, &role).await,
+            _ => {}
+        }
+
         Ok(from_document(user)?)
     }
 }

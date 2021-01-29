@@ -1,4 +1,5 @@
 use async_graphql::{
+    guard::Guard,
     validators::{Email, StringMaxLength, StringMinLength},
     Context, Error, Object, Result,
 };
@@ -13,6 +14,7 @@ use crate::{
     models::{
         auth::LoginResult,
         merchandise::intern_merchandise::MerchandiseIntern,
+        roles::{Role, RoleGuard, Roles},
         user::{Claim, User, UserId},
         work_record::{workday::Workday, WorkAccount},
         work_report::{
@@ -25,8 +27,8 @@ use crate::{
 };
 
 use super::{
-    database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS,
-    MDB_COLL_WORK_REPORTS,
+    database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_ROLES,
+    MDB_COLL_WORK_ACCOUNTS, MDB_COLL_WORK_REPORTS,
 };
 pub struct RootQuery;
 
@@ -207,6 +209,28 @@ impl RootQuery {
         }
     }
 
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::WorkAccountModerator")
+    )))]
+    async fn get_workaccounts(
+        &self,
+        ctx: &Context<'_>,
+        user_ids: Vec<UserId>,
+    ) -> Result<Option<WorkAccount>> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_ACCOUNTS);
+        let filter = doc! { "user_id": {
+                "$in": bson::to_bson(&user_ids)?,
+            }
+        };
+        let wd = collection.find_one(filter, None).await?;
+        match wd {
+            Some(r) => Ok(Some(from_document(r)?)),
+            None => Ok(None),
+        }
+    }
+
     async fn get_workreport(
         &self,
         ctx: &Context<'_>,
@@ -250,6 +274,22 @@ impl RootQuery {
         match collection.find_one(filter, None).await? {
             Some(r) => Ok(Some(from_document(r)?)),
             None => Err(Error::new("customer not found")),
+        }
+    }
+
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::RoleModerator")
+    )))]
+    async fn list_roles(&self, ctx: &Context<'_>, user_id: UserId) -> Result<Option<Roles>> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_ROLES);
+        let filter = doc! {
+            "user_id": user_id
+        };
+        match collection.find_one(filter, None).await? {
+            Some(r) => Ok(Some(from_document(r)?)),
+            None => Err(Error::new("user in roles not found")),
         }
     }
 }

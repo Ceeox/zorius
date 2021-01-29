@@ -14,12 +14,11 @@ pub use crate::api::{mutations::RootMutation, querys::RootQuery};
 use crate::models::user::Claim;
 use crate::{config::CONFIG, models::user::UserId};
 
-static MDB_COLL_NAME_USERS: &str = "users";
-
-static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
-static MDB_COLL_WORK_REPORTS: &str = "work_reports";
-
-static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
+pub(crate) static MDB_COLL_NAME_USERS: &str = "users";
+pub(crate) static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
+pub(crate) static MDB_COLL_WORK_REPORTS: &str = "work_reports";
+pub(crate) static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
+pub(crate) static MDB_COLL_ROLES: &str = "roles";
 
 pub type RootSchema = Schema<RootQuery, RootMutation, EmptySubscription>;
 
