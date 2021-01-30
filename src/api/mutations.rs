@@ -1,25 +1,26 @@
 use async_graphql::{
     guard::Guard, validators::StringMaxLength, Context, Error, Object, Result, Upload,
 };
-use bson::{doc, from_document, to_document};
+use bson::{doc, from_document, to_document, Bson};
+use chrono::Utc;
+use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
 
 use crate::{
     helper::validators::Password,
     models::user::{NewUser, User, UserId},
     models::{
-        customer::Customer,
         merchandise::intern_merchandise::{MerchandiseIntern, NewMerchandiseIntern},
-        project::Project,
-        roles::{Role, RoleGuard},
+        roles::{Role, RoleCache, RoleGuard, RoleUpdateMode, Roles},
         upload::{FileInfo, Storage},
+        user::UserUpdate,
         work_record::{workday::Workday, WorkAccount},
-        work_report::{NewWorkReport, WorkReport},
+        work_report::{customer::Customer, project::Project, NewWorkReport, WorkReport},
     },
 };
 
 use super::{
-    database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_WORK_ACCOUNTS,
-    MDB_COLL_WORK_REPORTS,
+    database, is_autherized, MDB_COLL_INTERN_MERCH, MDB_COLL_NAME_USERS, MDB_COLL_ROLES,
+    MDB_COLL_WORK_ACCOUNTS, MDB_COLL_WORK_REPORTS,
 };
 
 pub struct RootMutation;
@@ -117,15 +118,6 @@ impl RootMutation {
         Ok(wr)
     }
 
-    async fn new_project(&self, ctx: &Context<'_>, name: String) -> Result<Project> {
-        let user_id = is_autherized(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
-        let project = Project::new(user_id, name);
-        let insert = to_document(&project)?;
-        let _ = collection.insert_one(insert, None).await?;
-        Ok(project)
-    }
-
     #[graphql(guard(race(
         RoleGuard(role = "Role::Admin"),
         RoleGuard(role = "Role::WorkReportModerator")
@@ -135,13 +127,33 @@ impl RootMutation {
         ctx: &Context<'_>,
         name: String,
         identifier: String,
+        note: Option<String>,
     ) -> Result<Customer> {
         let user_id = is_autherized(ctx)?;
         let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
-        let customer = Customer::new(user_id, name, identifier);
+        let customer = Customer::new(user_id, name, identifier, note);
         let insert = to_document(&customer)?;
         let _ = collection.insert_one(insert, None).await?;
         Ok(customer)
+    }
+
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::WorkReportModerator")
+    )))]
+    async fn new_project(
+        &self,
+        ctx: &Context<'_>,
+        name: String,
+        description: Option<String>,
+        note: Option<String>,
+    ) -> Result<Project> {
+        let user_id = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
+        let project = Project::new(user_id, name, description, note);
+        let insert = to_document(&project)?;
+        let _ = collection.insert_one(insert, None).await?;
+        Ok(project)
     }
 
     async fn upload(&self, ctx: &Context<'_>, files: Vec<Upload>) -> Result<Vec<FileInfo>> {
@@ -212,29 +224,77 @@ impl RootMutation {
 
         Ok(wd)
     }
-    /*
-    async fn update_user(&self, ctx: &Context<'_>, user_id: UserId, user_update: UpdateUser) -> Result<User> {
+
+    #[graphql(guard(RoleGuard(role = "Role::Admin")))]
+    async fn update_user(
+        &self,
+        ctx: &Context<'_>,
+        user_id: UserId,
+        user_update: UserUpdate,
+    ) -> Result<User> {
         let _ = is_autherized(ctx)?;
-        let collection = ctx.db.collection(MDB_COLL_NAME_USERS);
+        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
         let filter = doc! { "_id": user_id };
 
-        let mut replacement = to_document(&user_update)?.remove_null_keys();
-        replacement.push(doc! { "$set": {"last_updated": Bson::DateTime(Utc::now())}});
+        let mut update = User::update(&user_update)?;
+        update.insert("last_updated", Bson::DateTime(Utc::now()));
+        update = doc! { "$set" : update };
+        println!("{:#?}", update);
 
         let options = FindOneAndUpdateOptions::builder()
             .return_document(Some(ReturnDocument::After))
             .build();
 
-        let user: User = match collection
-            .find_one_and_update(filter, replacement, Some(options))
+        let user = match collection
+            .find_one_and_update(filter, update, Some(options))
             .await?
         {
-            None => {
-                return Err(Error::new("specified user not found")
-            }
-            Some(r) => from_document(r)?,
+            None => return Err(Error::new("specified user not found")),
+            Some(r) => r,
         };
-        Ok(user.into())
+        Ok(from_document(user)?)
     }
-    */
+
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::RoleModerator")
+    )))]
+    async fn update_role(
+        &self,
+        ctx: &Context<'_>,
+        user_id: UserId,
+        mode: RoleUpdateMode,
+        role: Role,
+    ) -> Result<Roles> {
+        let _ = is_autherized(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_ROLES);
+        let filter = doc! { "user_id": user_id.clone() };
+
+        let mut update = match mode {
+            RoleUpdateMode::Add => doc! {"$push": {"roles": role.to_string()}},
+            RoleUpdateMode::Remove => doc! {"$pull": {"roles": role.to_string()}},
+        };
+        update.insert("$setOnInsert", doc! { "user_id": user_id.clone() });
+        println!("{:#?}", update);
+
+        let options: FindOneAndUpdateOptions = FindOneAndUpdateOptions::builder()
+            .return_document(Some(ReturnDocument::After))
+            .upsert(Some(true))
+            .build();
+
+        let user = match collection
+            .find_one_and_update(filter, update, Some(options))
+            .await?
+        {
+            None => return Err(Error::new("user in roles not found")),
+            Some(r) => r,
+        };
+
+        match ctx.data_opt::<RoleCache>() {
+            Some(role_cache) => role_cache.update_rolecache(&user_id, &mode, &role).await,
+            _ => {}
+        }
+
+        Ok(from_document(user)?)
+    }
 }

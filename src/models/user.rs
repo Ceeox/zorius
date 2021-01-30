@@ -1,9 +1,9 @@
 use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
-    InputObject, SimpleObject,
+    InputObject, Result, SimpleObject,
 };
-use bson::oid::ObjectId;
-use bson::DateTime;
+use bson::{document, DateTime};
+use bson::{oid::ObjectId, to_document, Document};
 use chrono::Utc;
 use pwhash::sha512_crypt;
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,20 @@ pub struct User {
     deleted: bool,
 }
 
+#[derive(Deserialize, Serialize, Debug, InputObject)]
+pub struct UserUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    avatar_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    firstname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lastname: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, SimpleObject)]
 pub struct Claim {
     pub sub: String,
@@ -66,6 +80,10 @@ impl User {
             last_updated: Some(Utc::now().into()),
             avatar_url: None,
         }
+    }
+
+    pub fn update(update: &UserUpdate) -> Result<Document> {
+        Ok(to_document(update)?)
     }
 
     pub fn change_password(&mut self, new_password: &str) {

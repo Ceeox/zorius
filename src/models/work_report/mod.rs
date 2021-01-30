@@ -3,11 +3,18 @@ use bson::{oid::ObjectId, DateTime};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use super::{customer::CustomerId, project::ProjectId, user::UserId};
+use crate::models::{
+    user::UserId,
+    work_report::{customer::CustomerId, project::ProjectId},
+};
+
+pub(crate) mod customer;
+pub(crate) mod project;
 
 pub type WorkReportId = ObjectId;
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct WorkReport {
+    #[serde(rename = "_id")]
     id: ObjectId,
     user_id: UserId,
     customer_id: CustomerId,
@@ -29,6 +36,32 @@ pub struct NewWorkReport {
     pub from_customer_started: Option<DateTime>,
     pub from_customer_arrived: Option<DateTime>,
     pub description: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, InputObject, Clone)]
+pub struct WorkReportUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    customer_id: Option<CustomerId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_id: Option<ProjectId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to_customer_started: Option<DateTime>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    to_customer_arrived: Option<DateTime>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    from_customer_started: Option<DateTime>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    from_customer_arrived: Option<DateTime>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    started: Option<DateTime>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ended: Option<Option<DateTime>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<WorkReportStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    invoiced: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
