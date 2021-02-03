@@ -1,0 +1,17 @@
+debug = true
+domain = "localhost"
+
+[web]
+cert_path = "cert.pem"
+enable_ssl = true
+ip = "127.0.0.1"
+key_path = "key.pem"
+log_format = "IP:%a DATETIME:%t REQUEST:\"%r\" STATUS: %s DURATION: %D X-REQUEST-ID:%{x-request-id}o"
+port = 443
+
+[db]
+app_name = "zorius"
+db_name = "zorius"
+password = ""
+server_domain = ""
+username = "zorius"
