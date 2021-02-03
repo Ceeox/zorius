@@ -1,17 +1,16 @@
 use lazy_static::lazy_static;
-use std::io::{Result, Write};
-use std::net::IpAddr;
+use std::{env, net::IpAddr, result::Result};
 
+use config::{Config, ConfigError, Environment, File};
 use serde::{Deserialize, Serialize};
 
-const CONFIG_NAME: &str = "./config.ron";
-
 lazy_static! {
-    pub static ref CONFIG: Config = Config::new().unwrap();
+    pub static ref CONFIG: Settings = Settings::new().expect("Failed to load config");
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct Config {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Settings {
+    pub debug: bool,
     pub web: WebServerConfig,
     pub db: DbServerConfig,
     pub secret_key: String,
@@ -37,60 +36,21 @@ pub struct DbServerConfig {
     pub db_name: String,
 }
 
-impl Default for WebServerConfig {
-    fn default() -> Self {
-        Self {
-            ip: "127.0.0.1".parse::<IpAddr>().unwrap(),
-            port: 8080,
-            enable_ssl: true,
-            cert_path: Some("cert.pem".to_owned()),
-            key_path: Some("key.pem".to_owned()),
-            log_format: "IP:%a DATETIME:%t REQUEST:\"%r\" STATUS: %s DURATION: %D X-REQUEST-ID:%{x-request-id}o".to_owned(),
-        }
-    }
-}
+impl Settings {
+    pub fn new() -> Result<Self, ConfigError> {
+        let mut s = Config::new();
+        // Start off by merging in the "default" configuration file
+        s.merge(File::with_name("config/default"))?;
 
-impl Default for DbServerConfig {
-    fn default() -> Self {
-        Self {
-            server_domain: "localhost".to_owned(),
-            username: "".to_owned(),
-            password: "".to_owned(),
-            app_name: "zorius".to_owned(),
-            db_name: "zorius".to_owned(),
-        }
-    }
-}
+        // Add in the current environment file
+        // Default to 'development' env
+        // Note that this file is _optional_
+        let env = env::var("RUN_MODE").unwrap_or_else(|_| "dev".into());
+        s.merge(File::with_name(&format!("config/{}", env)).required(false))?;
+        s.merge(Environment::new())?;
 
-impl Config {
-    pub fn new() -> Result<Self> {
-        match Self::load_config() {
-            Ok(r) => Ok(r),
-            Err(_) => {
-                let conf = Self::default();
-                let _ = std::fs::File::create(CONFIG_NAME)?;
-                conf.save_config()?;
-                Ok(conf)
-            }
-        }
-    }
+        println!("debug: {:?}", s.get_bool("debug"));
 
-    pub fn load_config() -> Result<Self> {
-        let file = std::fs::File::open(CONFIG_NAME)?;
-        let buf = std::io::BufReader::new(file);
-        // TODO: replace expect with a ZoriusError enum
-        let res = ron::de::from_reader(buf).expect("ron: failed to read config file");
-        Ok(res)
-    }
-
-    pub fn save_config(&self) -> Result<()> {
-        let file = std::fs::File::create(CONFIG_NAME)?;
-        let mut buf = std::io::BufWriter::new(file);
-        // TODO: remove unwrap
-        let pretty_config = ron::ser::PrettyConfig::default();
-        let config = ron::ser::to_string_pretty(&self, pretty_config).unwrap();
-        let _ = buf.write_all(&mut (config.into_bytes()))?;
-        buf.flush()?;
-        Ok(())
+        s.try_into()
     }
 }
