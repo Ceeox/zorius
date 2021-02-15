@@ -1,0 +1,15 @@
+/target
+/files
+/static
+.vscode/
+
+cert.pem
+key.pem
+/config/prod.toml
+/config/dev.toml
+
+.env
+.idea
+.vscode
+
+**/*.rs.bk

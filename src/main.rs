@@ -15,7 +15,7 @@ use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
 
-use api::{gql_playgound, RootMutation, RootQuery};
+use api::{gql_playgound, querys::Query, RootMutation, RootQuery};
 use errors::ZoriusError;
 use models::{roles::RoleCache, upload::Storage};
 use uuid::Uuid;
@@ -33,7 +33,7 @@ const API_VERSION: &str = "v1";
 async fn setup_mongodb() -> Result<Client, ZoriusError> {
     let url = format!(
         "mongodb+srv://{}:{}@{}/{}",
-        CONFIG.db.username, CONFIG.db.password, CONFIG.db.server_domain, CONFIG.db.db_name
+        CONFIG.db.username, CONFIG.db.password, CONFIG.db.server, CONFIG.db.name
     );
 
     // Use to cloudflare resolver to work around a mongodb dns resolver issue.
@@ -46,12 +46,13 @@ async fn setup_mongodb() -> Result<Client, ZoriusError> {
 }
 
 fn setup_log() {
-    if cfg!(debug_assertions) {
+    if CONFIG.debug {
         std::env::set_var("RUST_LOG", "actix_web=debug");
+        println!("Running in DEBUG MODE...");
     } else {
         std::env::set_var("RUST_LOG", "actix_web=info");
     }
-    println!("{:#?}", std::env::var("RUST_LOG"));
+
     env_logger::init();
 }
 
@@ -69,10 +70,11 @@ fn setup_tls() -> ServerConfig {
 
 fn check_folders() -> Result<(), ZoriusError> {
     use std::path::Path;
-
-    if !Path::new("static").exists() {
-        panic!("missing frondend files folder");
-    }
+    /*
+        if !Path::new("static").exists() {
+            panic!("missing frondend files folder");
+        }
+    */
 
     if !Path::new("files").exists() {
         std::fs::create_dir("files")?;
@@ -86,7 +88,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
     check_folders()?;
 
     let client = setup_mongodb().await?;
-    let db = client.database(&CONFIG.db.db_name);
+    let db = client.database(&CONFIG.db.name);
     let role_cache = RoleCache::new();
 
     let schema = Schema::build(RootQuery, RootMutation, EmptySubscription)

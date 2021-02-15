@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use std::{env, net::IpAddr, result::Result};
+use std::{env, net::IpAddr, result::Result, usize};
 
 use config::{Config, ConfigError, Environment, File};
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,7 @@ pub struct Settings {
     pub db: DbServerConfig,
     pub secret_key: String,
     pub domain: String,
+    pub token_lifetime: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,11 +30,11 @@ pub struct WebServerConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DbServerConfig {
-    pub server_domain: String,
+    pub server: String,
     pub username: String,
     pub password: String,
     pub app_name: String,
-    pub db_name: String,
+    pub name: String,
 }
 
 impl Settings {
@@ -47,7 +48,7 @@ impl Settings {
         // Note that this file is _optional_
         let env = env::var("RUN_MODE").unwrap_or_else(|_| "dev".into());
         s.merge(File::with_name(&format!("config/{}", env)).required(false))?;
-        s.merge(Environment::new())?;
+        s.merge(Environment::new().separator("_").ignore_empty(true))?;
 
         println!("debug: {:?}", s.get_bool("debug"));
 

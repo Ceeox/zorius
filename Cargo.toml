@@ -11,7 +11,7 @@ actix-cors = "0.5"
 actix-files = "0.5"
 actix-multipart = "0.3"
 actix-ratelimit = "0.3"
-actix-rt = "1.1"
+actix-rt = "2.0"
 actix-web = {version = "3.3", features = ["rustls"]}
 async-graphql = {version = "2.5", features = ["bson", "multipart", "chrono"]}
 async-graphql-actix-web = "2.5"
