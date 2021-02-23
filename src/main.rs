@@ -1,4 +1,4 @@
-use std::io::BufReader;
+use std::{alloc::System, io::BufReader};
 use std::{fs::File, time::Duration};
 
 use actix_cors::Cors;
@@ -15,7 +15,7 @@ use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
 
-use api::{gql_playgound, querys::Query, RootMutation, RootQuery};
+use api::{gql_playgound, Mutation, Query};
 use errors::ZoriusError;
 use models::{roles::RoleCache, upload::Storage};
 use uuid::Uuid;
@@ -88,10 +88,11 @@ async fn main() -> Result<(), errors::ZoriusError> {
     check_folders()?;
 
     let client = setup_mongodb().await?;
-    let db = client.database(&CONFIG.db.name);
     let role_cache = RoleCache::new();
+    let client = mongod::Client::from_client(client, &CONFIG.db.name);
+    let db = client.database();
 
-    let schema = Schema::build(RootQuery, RootMutation, EmptySubscription)
+    let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
         .data(db)
         .data(client)
         .data(role_cache)
@@ -140,6 +141,5 @@ async fn main() -> Result<(), errors::ZoriusError> {
     } else {
         http_server.bind(webserver_url)?.run().await?
     };
-
     Ok(res)
 }

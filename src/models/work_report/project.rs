@@ -44,23 +44,6 @@ impl Project {
         }
     }
 
-    /// This creates a new projectt without an id.
-    /// Can use for embeded usage.
-    pub fn new_without_id(
-        creator: UserId,
-        name: String,
-        description: Option<String>,
-        note: Option<String>,
-    ) -> Self {
-        Self {
-            id: None,
-            creator,
-            name,
-            description,
-            note,
-        }
-    }
-
     pub fn update(update: ProjectUpdate) -> Result<Document> {
         Ok(to_document(&update)?)
     }

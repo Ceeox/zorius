@@ -1,6 +1,6 @@
-use async_graphql::{Enum, InputObject, SimpleObject};
-use bson::{oid::ObjectId, DateTime};
-use chrono::Utc;
+use async_graphql::{Enum, InputObject, Result, SimpleObject};
+use bson::{doc, oid::ObjectId, to_document, DateTime, Document};
+
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
@@ -15,22 +15,29 @@ pub type WorkReportId = ObjectId;
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct WorkReport {
     #[serde(rename = "_id")]
-    id: ObjectId,
+    id: WorkReportId,
     user_id: UserId,
     customer_id: CustomerId,
-    project_id: ProjectId,
+    project_id: Option<ProjectId>,
     trip_info: TripInfo,
     description: String,
-    started: DateTime,
-    ended: Option<DateTime>,
+    times: Vec<WorkReportTimes>,
     status: WorkReportStatus,
     invoiced: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
+pub struct WorkReportTimes {
+    #[serde(rename = "_id")]
+    id: ObjectId,
+    started: DateTime,
+    ended: Option<DateTime>,
 }
 
 #[derive(Deserialize, Debug, InputObject)]
 pub struct NewWorkReport {
     pub customer_id: CustomerId,
-    pub project_id: ProjectId,
+    pub project_id: Option<ProjectId>,
     pub to_customer_started: Option<DateTime>,
     pub to_customer_arrived: Option<DateTime>,
     pub from_customer_started: Option<DateTime>,
@@ -64,6 +71,22 @@ pub struct WorkReportUpdate {
     invoiced: Option<bool>,
 }
 
+#[derive(Serialize, Deserialize, Debug, InputObject, Clone)]
+pub struct WorkReportTimeUpdate {
+    pub mode: ArrayUpdateMode,
+    pub id: ObjectId,
+    pub work_report_id: WorkReportId,
+    pub started: DateTime,
+    pub ended: Option<DateTime>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Enum, PartialEq, Eq, Clone, Copy)]
+pub enum ArrayUpdateMode {
+    Add,
+    Remove,
+    Update,
+}
+
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct TripInfo {
     to_customer_started: Option<DateTime>,
@@ -94,10 +117,22 @@ impl WorkReport {
                 from_customer_arrived: new_wr.from_customer_arrived,
             },
             description: new_wr.description,
-            started: Utc::now().into(),
-            ended: None,
+            times: vec![],
             status: WorkReportStatus::Running,
             invoiced: true,
         }
     }
+
+    pub fn update(wr_update: WorkReportUpdate) -> Result<Document> {
+        Ok(doc! { "$set": to_document(&wr_update)? })
+    }
+
+    /*
+    pub fn update_work_report(time_update: WorkReportTimeUpdate) -> Result<Vec<Document>> {
+        match time_update.mode {
+            ArrayUpdateMode::Add => Ok(doc! {"$push": &format!("")}),
+            ArrayUpdateMode::Remove => Ok(doc! {"$push": &format!("")}),
+        }
+    }
+    */
 }

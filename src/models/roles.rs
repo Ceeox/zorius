@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::api::{database, is_autherized};
+use crate::api::{claim::Claim, database};
 use async_graphql::{guard::Guard, Context, Enum, Result, SimpleObject};
 use bson::{doc, from_document, oid::ObjectId};
 use futures::lock::Mutex;
@@ -53,7 +53,9 @@ pub struct RoleGuard {
 #[async_trait::async_trait]
 impl Guard for RoleGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let user_id = is_autherized(ctx)?;
+        let claim = Claim::from_ctx(ctx)?;
+        let user_id = claim.user_id();
+
         match ctx.data_opt::<RoleCache>() {
             Some(role_cache) if role_cache.has_role(ctx, &user_id, &self.role).await? => Ok(()),
             _ => Err("Forbidden".into()),

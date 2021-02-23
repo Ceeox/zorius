@@ -1,5 +1,7 @@
 debug = true
 domain = "localhost"
+registration_enabled = true
+token_lifetime = 86400
 
 [web]
 cert_path = "cert.pem"
@@ -11,7 +13,7 @@ port = 443
 
 [db]
 app_name = "zorius"
-db_name = "zorius"
+name = "zorius"
 password = ""
 server_domain = ""
 username = "zorius"
