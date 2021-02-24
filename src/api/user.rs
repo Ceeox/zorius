@@ -1,15 +1,13 @@
-use std::convert::{TryFrom, TryInto};
-
 use async_graphql::{
     guard::Guard,
     validators::{Email, StringMaxLength, StringMinLength},
     Context, Error, Object, Result, Upload,
 };
-use bson::{doc, from_document, oid::ObjectId, to_document, Bson};
+use bson::{doc, from_document, to_document, Bson};
 use chrono::{Duration, Utc};
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
-use mongod::{AsFilter, Client, Comparator};
+use mongod::{AsFilter, Client};
 use mongodb::{
     options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument},
     Cursor,
@@ -22,7 +20,7 @@ use crate::{
         auth::LoginResult,
         roles::{Role, RoleGuard},
         upload::{FileInfo, Storage},
-        user::{DbUser, NewUser, User, UserFilter, UserId, UserUpdate},
+        user::{NewUser, SingleUserFilter, User, UserId, UserUpdate},
     },
 };
 
@@ -79,17 +77,15 @@ impl UserQuery {
         }
     */
 
-    async fn get_user(&self, ctx: &Context<'_>, user_id: UserId) -> Result<User> {
+    async fn get_user(&self, ctx: &Context<'_>, filter: SingleUserFilter) -> Result<Option<User>> {
         let _ = Claim::from_ctx(ctx)?;
         let client = ctx.data::<Client>()?;
-        let mut filter = DbUser::filter();
-        filter.id = Some(Comparator::Eq(user_id));
-        let user = client.find_one::<DbUser, _>(filter).await?.unwrap();
-        println!("{:#?}", user);
-        Ok(user.into())
+        let filter = filter.into_filter();
+        let user = client.find_one::<User, _>(filter).await?;
+        Ok(user)
     }
 
-    async fn get_users(&self, ctx: &Context<'_>, user_ids: Vec<UserId>) -> Result<Vec<User>> {
+    /*     async fn get_users(&self, ctx: &Context<'_>, user_ids: Vec<UserId>) -> Result<Vec<User>> {
         let _ = Claim::from_ctx(ctx)?;
         let client = ctx.data::<Client>()?;
         let mut filter = DbUser::filter();
@@ -109,7 +105,7 @@ impl UserQuery {
             .await;
         println!("{:#?}", users);
         Ok(users)
-    }
+    } */
 
     async fn list_users(&self, ctx: &Context<'_>) -> Result<Vec<User>> {
         let _ = Claim::from_ctx(ctx)?;

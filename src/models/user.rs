@@ -1,108 +1,18 @@
+use std::convert::TryFrom;
+
 use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
     InputObject, Result, SimpleObject,
 };
 use bson::{oid::ObjectId, to_document, DateTime, Document};
 use chrono::Utc;
-use mongod::Bson;
-use mongod::Mongo;
-use mongod::{AsFilter, AsUpdate, Collection, Comparator, Updates};
+use mongod::{AsFilter, Collection, Comparator, Filter, Update};
 use pwhash::sha512_crypt;
 use serde::{Deserialize, Serialize};
 
 use crate::helper::validators::Password;
 
 pub type UserId = ObjectId;
-
-#[derive(Deserialize, Debug, InputObject)]
-pub struct NewUser {
-    #[graphql(validator(Email))]
-    pub email: String,
-    #[graphql(validator(and(StringMinLength(length = "4"), StringMaxLength(length = "64"))))]
-    pub username: String,
-    #[graphql(validator(Password))]
-    pub password: String,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
-}
-
-#[derive(Mongo, Debug, Deserialize, Serialize)]
-#[mongo(bson = "serde", collection = "users", field, update)]
-pub struct DbUser {
-    #[serde(rename = "_id")]
-    id: UserId,
-    email: String,
-    password_hash: String,
-    username: String,
-    created_at: DateTime,
-    invitation_pending: bool,
-    avatar_url: Option<String>,
-    firstname: Option<String>,
-    lastname: Option<String>,
-    updated: DateTime,
-    deleted: bool,
-}
-
-impl From<DbUser> for User {
-    fn from(db_user: DbUser) -> User {
-        User {
-            id: db_user.id,
-            email: db_user.email,
-            username: db_user.username,
-            created_at: db_user.created_at,
-            invitation_pending: db_user.invitation_pending,
-            avatar_url: db_user.avatar_url,
-            firstname: db_user.firstname,
-            lastname: db_user.lastname,
-            updated: db_user.updated,
-            deleted: db_user.deleted,
-            password_hash: db_user.password_hash,
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct UserFilter {
-    pub id: Option<Comparator<ObjectId>>,
-    pub email: Option<Comparator<String>>,
-    pub ids: Option<Comparator<Vec<UserId>>>,
-}
-
-impl mongod::Filter for UserFilter {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn into_document(self) -> Result<Document, mongod::Error> {
-        use std::convert::TryFrom;
-
-        let mut doc = Document::new();
-        if let Some(value) = self.email {
-            doc.insert("email", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        if let Some(value) = self.id {
-            doc.insert("_id", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        if let Some(value) = self.ids {
-            doc.insert("_id", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        Ok(doc)
-    }
-}
-
-impl AsFilter<UserFilter> for DbUser {
-    fn filter() -> UserFilter {
-        UserFilter::default()
-    }
-
-    fn into_filter(self) -> UserFilter {
-        UserFilter {
-            email: Some(Comparator::Eq(self.email)),
-            id: Some(Comparator::Eq(self.id)),
-            ids: None,
-        }
-    }
-}
 
 #[derive(SimpleObject, Debug, Deserialize, Serialize)]
 pub struct User {
@@ -161,21 +71,140 @@ impl User {
     pub fn is_password_correct(&self, password: &str) -> bool {
         sha512_crypt::verify(password.as_bytes(), &self.password_hash)
     }
-    pub fn is_deleted(&self) -> bool {
-        self.deleted
+}
+
+impl Collection for User {
+    const COLLECTION: &'static str = "users";
+
+    fn from_document(document: Document) -> Result<Self, mongod::Error> {
+        match bson::from_document::<Self>(document) {
+            Ok(user) => Ok(user),
+            Err(_) => Err(mongod::Error::invalid_document("missing required fields")),
+        }
+    }
+
+    fn into_document(self) -> Result<Document, mongod::Error> {
+        match bson::to_document::<Self>(&self) {
+            Ok(doc) => Ok(doc),
+            Err(_) => Err(mongod::Error::invalid_document("missing required fields")),
+        }
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, InputObject)]
+impl AsFilter<UserFilter> for User {
+    fn filter() -> UserFilter {
+        UserFilter::default()
+    }
+
+    fn into_filter(self) -> UserFilter {
+        UserFilter {
+            email: Some(Comparator::Eq(self.email)),
+            id: Some(Comparator::Eq(self.id)),
+            username: Some(Comparator::Eq(self.username)),
+            lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
+            firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, InputObject)]
+pub struct NewUser {
+    #[graphql(validator(Email))]
+    pub email: String,
+    #[graphql(validator(and(StringMinLength(length = "4"), StringMaxLength(length = "64"))))]
+    pub username: String,
+    #[graphql(validator(Password))]
+    pub password: String,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+}
+
+#[derive(Default)]
+pub struct UserFilter {
+    pub id: Option<Comparator<ObjectId>>,
+    pub email: Option<Comparator<String>>,
+    pub firstname: Option<Comparator<String>>,
+    pub lastname: Option<Comparator<String>>,
+    pub username: Option<Comparator<String>>,
+}
+
+impl Filter for UserFilter {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn into_document(self) -> Result<Document, mongod::Error> {
+        let mut doc = Document::new();
+        if let Some(value) = self.email {
+            doc.insert("email", mongod::ext::bson::Bson::try_from(value)?.0);
+        }
+        if let Some(value) = self.id {
+            doc.insert("_id", mongod::ext::bson::Bson::try_from(value)?.0);
+        }
+        if let Some(value) = self.lastname {
+            doc.insert("lastname", mongod::ext::bson::Bson::try_from(value)?.0);
+        }
+        if let Some(value) = self.firstname {
+            doc.insert("firstname", mongod::ext::bson::Bson::try_from(value)?.0);
+        }
+        if let Some(value) = self.username {
+            doc.insert("username", mongod::ext::bson::Bson::try_from(value)?.0);
+        }
+        Ok(doc)
+    }
+}
+
+#[derive(Default, InputObject)]
+pub struct SingleUserFilter {
+    pub id: Option<UserId>,
+    pub email: Option<String>,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+    pub username: Option<String>,
+}
+
+impl AsFilter<UserFilter> for SingleUserFilter {
+    fn filter() -> UserFilter {
+        UserFilter::default()
+    }
+
+    fn into_filter(self) -> UserFilter {
+        UserFilter {
+            email: self.email.map_or(None, |v| Some(Comparator::Eq(v))),
+            id: self.id.map_or(None, |v| Some(Comparator::Eq(v))),
+            username: self.username.map_or(None, |v| Some(Comparator::Eq(v))),
+            lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
+            firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, InputObject, Default)]
 pub struct UserUpdate {
-    #[serde(skip_serializing_if = "Option::is_none")]
     email: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     username: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    avatar_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     firstname: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     lastname: Option<String>,
+}
+
+impl Update for UserUpdate {
+    fn new() -> Self {
+        UserUpdate::default()
+    }
+    fn into_document(self) -> Result<Document, mongod::Error> {
+        let mut doc = Document::new();
+        if let Some(value) = self.email {
+            doc.insert("email", value);
+        }
+        if let Some(value) = self.username {
+            doc.insert("username", value);
+        }
+        if let Some(value) = self.firstname {
+            doc.insert("firstname", value);
+        }
+        if let Some(value) = self.lastname {
+            doc.insert("lastname", value);
+        }
+        Ok(doc)
+    }
 }
