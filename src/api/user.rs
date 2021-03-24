@@ -7,7 +7,7 @@ use bson::{doc, from_document, to_document, Bson};
 use chrono::{Duration, Utc};
 use futures::{StreamExt, TryStreamExt};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
-use mongod::{AsFilter, Client};
+use mongod::{AsFilter, Client, Comparator};
 use mongodb::{
     options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument},
     Cursor,
@@ -20,7 +20,7 @@ use crate::{
         auth::LoginResult,
         roles::{Role, RoleGuard},
         upload::{FileInfo, Storage},
-        user::{NewUser, SingleUserFilter, User, UserId, UserUpdate},
+        user::{NewUser, SingleUserFilter, User, UserFilter, UserId, UserUpdate, UsersFilter},
     },
 };
 
@@ -65,36 +65,23 @@ impl UserQuery {
             user_id: user.get_id().to_owned(),
         })
     }
-    /*
-        async fn get_user(&self, ctx: &Context<'_>, user_id: UserId) -> Result<User> {
-            let _ = Claim::from_ctx(ctx)?;
-            let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-            let filter = doc! { "_id": user_id };
-            match collection.find_one(filter, None).await? {
-                None => return Err(Error::new("specified user not found")),
-                Some(r) => Ok(from_document(r)?),
-            }
-        }
-    */
 
     async fn get_user(&self, ctx: &Context<'_>, filter: SingleUserFilter) -> Result<Option<User>> {
         let _ = Claim::from_ctx(ctx)?;
         let client = ctx.data::<Client>()?;
         let filter = filter.into_filter();
-        let user = client.find_one::<User, _>(filter).await?;
-        Ok(user)
+        Ok(client.find_one::<User, _>(filter).await?)
     }
 
-    /*     async fn get_users(&self, ctx: &Context<'_>, user_ids: Vec<UserId>) -> Result<Vec<User>> {
+    async fn get_users(&self, ctx: &Context<'_>, filter: UsersFilter) -> Result<Vec<User>> {
         let _ = Claim::from_ctx(ctx)?;
         let client = ctx.data::<Client>()?;
-        let mut filter = DbUser::filter();
-        filter.ids = Some(Comparator::In(vec![user_ids]));
-        let cursor: Cursor = client.find::<DbUser, _>(Some(filter)).await?;
+        let filter = filter.into_filter();
+        let cursor: Cursor = client.find::<User, _>(Some(filter)).await?;
         let users = cursor
             .filter_map(|docs| async move {
                 match docs {
-                    Ok(doc) => match from_document::<DbUser>(doc) {
+                    Ok(doc) => match from_document::<User>(doc) {
                         Ok(db_user) => Some(User::from(db_user)),
                         Err(_) => None,
                     },
@@ -103,26 +90,7 @@ impl UserQuery {
             })
             .collect::<Vec<_>>()
             .await;
-        println!("{:#?}", users);
         Ok(users)
-    } */
-
-    async fn list_users(&self, ctx: &Context<'_>) -> Result<Vec<User>> {
-        let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-        let find_opt = Some(FindOptions::builder().limit(50).build());
-        let cursor: Cursor = collection.find(None, find_opt).await?;
-        let res = cursor
-            .filter_map(|doc| async move {
-                match doc {
-                    Err(_) => None,
-                    Ok(r) => Some(from_document::<User>(r)),
-                }
-            })
-            .try_collect::<Vec<_>>()
-            .await?;
-
-        Ok(res)
     }
 }
 

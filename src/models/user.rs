@@ -4,7 +4,7 @@ use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
     InputObject, Result, SimpleObject,
 };
-use bson::{oid::ObjectId, to_document, DateTime, Document};
+use bson::{oid::ObjectId, to_document, Bson, DateTime, Document};
 use chrono::Utc;
 use mongod::{AsFilter, Collection, Comparator, Filter, Update};
 use pwhash::sha512_crypt;
@@ -91,22 +91,6 @@ impl Collection for User {
     }
 }
 
-impl AsFilter<UserFilter> for User {
-    fn filter() -> UserFilter {
-        UserFilter::default()
-    }
-
-    fn into_filter(self) -> UserFilter {
-        UserFilter {
-            email: Some(Comparator::Eq(self.email)),
-            id: Some(Comparator::Eq(self.id)),
-            username: Some(Comparator::Eq(self.username)),
-            lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
-            firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
-        }
-    }
-}
-
 #[derive(Deserialize, Debug, InputObject)]
 pub struct NewUser {
     #[graphql(validator(Email))]
@@ -122,6 +106,7 @@ pub struct NewUser {
 #[derive(Default)]
 pub struct UserFilter {
     pub id: Option<Comparator<ObjectId>>,
+    pub ids: Option<Comparator<ObjectId>>,
     pub email: Option<Comparator<String>>,
     pub firstname: Option<Comparator<String>>,
     pub lastname: Option<Comparator<String>>,
@@ -135,11 +120,14 @@ impl Filter for UserFilter {
 
     fn into_document(self) -> Result<Document, mongod::Error> {
         let mut doc = Document::new();
-        if let Some(value) = self.email {
-            doc.insert("email", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
         if let Some(value) = self.id {
             doc.insert("_id", mongod::ext::bson::Bson::try_from(value)?.0);
+        }
+        if let Some(value) = self.ids {
+            doc.insert("_id", mongod::ext::bson::Bson::try_from(value)?.0);
+        }
+        if let Some(value) = self.email {
+            doc.insert("email", mongod::ext::bson::Bson::try_from(value)?.0);
         }
         if let Some(value) = self.lastname {
             doc.insert("lastname", mongod::ext::bson::Bson::try_from(value)?.0);
@@ -151,6 +139,50 @@ impl Filter for UserFilter {
             doc.insert("username", mongod::ext::bson::Bson::try_from(value)?.0);
         }
         Ok(doc)
+    }
+}
+
+impl AsFilter<UserFilter> for User {
+    fn filter() -> UserFilter {
+        UserFilter::default()
+    }
+
+    fn into_filter(self) -> UserFilter {
+        UserFilter {
+            id: Some(Comparator::Eq(self.id)),
+            ids: None,
+            email: Some(Comparator::Eq(self.email)),
+            username: Some(Comparator::Eq(self.username)),
+            lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
+            firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
+        }
+    }
+}
+
+#[derive(Default, InputObject)]
+pub struct UsersFilter {
+    pub id: Option<ObjectId>,
+    pub ids: Option<Vec<ObjectId>>,
+    pub email: Option<String>,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+    pub username: Option<String>,
+}
+
+impl AsFilter<UserFilter> for UsersFilter {
+    fn filter() -> UserFilter {
+        UserFilter::default()
+    }
+
+    fn into_filter(self) -> UserFilter {
+        UserFilter {
+            id: self.id.map_or(None, |v| Some(Comparator::Eq(v))),
+            ids: self.ids.map_or(None, |v| Some(Comparator::In(v))),
+            email: self.email.map_or(None, |v| Some(Comparator::Eq(v))),
+            username: self.username.map_or(None, |v| Some(Comparator::Eq(v))),
+            lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
+            firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
+        }
     }
 }
 
@@ -170,8 +202,9 @@ impl AsFilter<UserFilter> for SingleUserFilter {
 
     fn into_filter(self) -> UserFilter {
         UserFilter {
-            email: self.email.map_or(None, |v| Some(Comparator::Eq(v))),
             id: self.id.map_or(None, |v| Some(Comparator::Eq(v))),
+            ids: None,
+            email: self.email.map_or(None, |v| Some(Comparator::Eq(v))),
             username: self.username.map_or(None, |v| Some(Comparator::Eq(v))),
             lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
             firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
