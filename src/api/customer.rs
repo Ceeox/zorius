@@ -9,8 +9,6 @@ use crate::{
     },
 };
 
-use super::project;
-
 #[derive(Default)]
 pub struct CustomerQuery;
 
