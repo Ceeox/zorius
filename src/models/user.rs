@@ -4,7 +4,7 @@ use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
     InputObject, Result, SimpleObject,
 };
-use bson::{oid::ObjectId, to_document, Bson, DateTime, Document};
+use bson::{oid::ObjectId, to_document, DateTime, Document};
 use chrono::Utc;
 use mongod::{AsFilter, Collection, Comparator, Filter, Update};
 use pwhash::sha512_crypt;

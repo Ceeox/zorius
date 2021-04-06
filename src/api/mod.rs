@@ -19,6 +19,7 @@ use crate::{config::CONFIG, API_VERSION};
 use self::{
     claim::Token,
     customer::{CustomerMutation, CustomerQuery},
+    intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
     project::{ProjectMutation, ProjectQuery},
     role::{RoleMutation, RoleQuery},
     user::{UserMutation, UserQuery},
@@ -39,6 +40,7 @@ pub struct Query(
     RoleQuery,
     CustomerQuery,
     ProjectQuery,
+    InternMerchandiseQuery,
 );
 
 #[derive(Default, MergedObject)]
@@ -47,6 +49,7 @@ pub struct Mutation(
     RoleMutation,
     CustomerMutation,
     ProjectMutation,
+    InternMerchandiseMutation,
 );
 
 #[derive(Default)]
