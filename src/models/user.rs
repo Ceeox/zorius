@@ -4,9 +4,8 @@ use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
     InputObject, Result, SimpleObject,
 };
-use bson::{oid::ObjectId, to_document, DateTime, Document};
+use bson::{oid::ObjectId, to_bson, to_document, DateTime, Document};
 use chrono::Utc;
-use mongod::{AsFilter, Collection, Comparator, Filter, Update};
 use pwhash::sha512_crypt;
 use serde::{Deserialize, Serialize};
 
@@ -51,10 +50,6 @@ impl User {
         }
     }
 
-    pub fn update(update: &UserUpdate) -> Result<Document> {
-        Ok(to_document(update)?)
-    }
-
     pub fn change_password(&mut self, new_password: &str) {
         self.password_hash = User::hash_password(new_password);
     }
@@ -73,24 +68,6 @@ impl User {
     }
 }
 
-impl Collection for User {
-    const COLLECTION: &'static str = "users";
-
-    fn from_document(document: Document) -> Result<Self, mongod::Error> {
-        match bson::from_document::<Self>(document) {
-            Ok(user) => Ok(user),
-            Err(_) => Err(mongod::Error::invalid_document("missing required fields")),
-        }
-    }
-
-    fn into_document(self) -> Result<Document, mongod::Error> {
-        match bson::to_document::<Self>(&self) {
-            Ok(doc) => Ok(doc),
-            Err(_) => Err(mongod::Error::invalid_document("missing required fields")),
-        }
-    }
-}
-
 #[derive(Deserialize, Debug, InputObject)]
 pub struct NewUser {
     #[graphql(validator(Email))]
@@ -103,141 +80,16 @@ pub struct NewUser {
     pub lastname: Option<String>,
 }
 
-#[derive(Default)]
-pub struct UserFilter {
-    pub id: Option<Comparator<ObjectId>>,
-    pub ids: Option<Comparator<ObjectId>>,
-    pub email: Option<Comparator<String>>,
-    pub firstname: Option<Comparator<String>>,
-    pub lastname: Option<Comparator<String>>,
-    pub username: Option<Comparator<String>>,
-}
-
-impl Filter for UserFilter {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn into_document(self) -> Result<Document, mongod::Error> {
-        let mut doc = Document::new();
-        if let Some(value) = self.id {
-            doc.insert("_id", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        if let Some(value) = self.ids {
-            doc.insert("_id", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        if let Some(value) = self.email {
-            doc.insert("email", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        if let Some(value) = self.lastname {
-            doc.insert("lastname", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        if let Some(value) = self.firstname {
-            doc.insert("firstname", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        if let Some(value) = self.username {
-            doc.insert("username", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        Ok(doc)
-    }
-}
-
-impl AsFilter<UserFilter> for User {
-    fn filter() -> UserFilter {
-        UserFilter::default()
-    }
-
-    fn into_filter(self) -> UserFilter {
-        UserFilter {
-            id: Some(Comparator::Eq(self.id)),
-            ids: None,
-            email: Some(Comparator::Eq(self.email)),
-            username: Some(Comparator::Eq(self.username)),
-            lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
-            firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
-        }
-    }
-}
-
-#[derive(Default, InputObject)]
-pub struct UsersFilter {
-    pub id: Option<ObjectId>,
-    pub ids: Option<Vec<ObjectId>>,
-    pub email: Option<String>,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
-    pub username: Option<String>,
-}
-
-impl AsFilter<UserFilter> for UsersFilter {
-    fn filter() -> UserFilter {
-        UserFilter::default()
-    }
-
-    fn into_filter(self) -> UserFilter {
-        UserFilter {
-            id: self.id.map_or(None, |v| Some(Comparator::Eq(v))),
-            ids: self.ids.map_or(None, |v| Some(Comparator::In(v))),
-            email: self.email.map_or(None, |v| Some(Comparator::Eq(v))),
-            username: self.username.map_or(None, |v| Some(Comparator::Eq(v))),
-            lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
-            firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
-        }
-    }
-}
-
-#[derive(Default, InputObject)]
-pub struct SingleUserFilter {
-    pub id: Option<UserId>,
-    pub email: Option<String>,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
-    pub username: Option<String>,
-}
-
-impl AsFilter<UserFilter> for SingleUserFilter {
-    fn filter() -> UserFilter {
-        UserFilter::default()
-    }
-
-    fn into_filter(self) -> UserFilter {
-        UserFilter {
-            id: self.id.map_or(None, |v| Some(Comparator::Eq(v))),
-            ids: None,
-            email: self.email.map_or(None, |v| Some(Comparator::Eq(v))),
-            username: self.username.map_or(None, |v| Some(Comparator::Eq(v))),
-            lastname: self.lastname.map_or(None, |v| Some(Comparator::Eq(v))),
-            firstname: self.firstname.map_or(None, |v| Some(Comparator::Eq(v))),
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, InputObject, Default)]
+#[derive(InputObject, Debug, Deserialize, Serialize)]
 pub struct UserUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    avatar_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     firstname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     lastname: Option<String>,
-}
-
-impl Update for UserUpdate {
-    fn new() -> Self {
-        UserUpdate::default()
-    }
-    fn into_document(self) -> Result<Document, mongod::Error> {
-        let mut doc = Document::new();
-        if let Some(value) = self.email {
-            doc.insert("email", value);
-        }
-        if let Some(value) = self.username {
-            doc.insert("username", value);
-        }
-        if let Some(value) = self.firstname {
-            doc.insert("firstname", value);
-        }
-        if let Some(value) = self.lastname {
-            doc.insert("lastname", value);
-        }
-        Ok(doc)
-    }
 }

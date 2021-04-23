@@ -1,9 +1,8 @@
-use std::{convert::TryFrom, fmt::Display};
+use std::fmt::Display;
 
 use async_graphql::{validators::IntGreaterThan, Enum, InputObject, SimpleObject};
-use bson::{oid::ObjectId, DateTime, Document};
+use bson::{oid::ObjectId, DateTime};
 use chrono::Utc;
-use mongod::{AsFilter, AsUpdate, Collection, Comparator, Filter, Update};
 use serde::{Deserialize, Serialize};
 
 use crate::{helper::validators::Url, models::user::UserId};
@@ -104,187 +103,40 @@ impl InternMerchandise {
     }
 }
 
-impl Collection for InternMerchandise {
-    const COLLECTION: &'static str = "intern_merchandise";
-
-    fn from_document(document: Document) -> Result<Self, mongod::Error> {
-        match bson::from_document::<Self>(document) {
-            Ok(user) => Ok(user),
-            Err(_) => Err(mongod::Error::invalid_document("missing required fields")),
-        }
-    }
-
-    fn into_document(self) -> Result<Document, mongod::Error> {
-        match bson::to_document::<Self>(&self) {
-            Ok(doc) => Ok(doc),
-            Err(_) => Err(mongod::Error::invalid_document("missing required fields")),
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct InternMerchandiseFilter {
-    pub id: Option<Comparator<ObjectId>>,
-}
-
-impl Filter for InternMerchandiseFilter {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn into_document(self) -> Result<Document, mongod::Error> {
-        let mut doc = Document::new();
-        if let Some(value) = self.id {
-            doc.insert("_id", mongod::ext::bson::Bson::try_from(value)?.0);
-        }
-        Ok(doc)
-    }
-}
-
-impl AsFilter<InternMerchandiseFilter> for ObjectId {
-    fn filter() -> InternMerchandiseFilter {
-        InternMerchandiseFilter::default()
-    }
-
-    fn into_filter(self) -> InternMerchandiseFilter {
-        InternMerchandiseFilter {
-            id: Some(Comparator::Eq(self)),
-        }
-    }
-}
-
-impl AsFilter<InternMerchandiseFilter> for InternMerchandise {
-    fn filter() -> InternMerchandiseFilter {
-        InternMerchandiseFilter::default()
-    }
-
-    fn into_filter(self) -> InternMerchandiseFilter {
-        InternMerchandiseFilter {
-            id: Some(Comparator::Eq(self.id)),
-        }
-    }
-}
-
 #[derive(Deserialize, Serialize, Debug, InputObject, Default)]
 pub struct InternMerchandiseUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub merchandise_id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub orderer: Option<UserId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub project_leader: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub purchased_on: Option<DateTime>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub merchandise_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub use_case: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub article_number: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shop: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cost: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub serial_number: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub arived_on: Option<DateTime>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<InternMerchandiseStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub postage: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub invoice_number: Option<i32>,
-    pub created_date: Option<DateTime>,
-}
-
-impl Update for InternMerchandiseUpdate {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn into_document(self) -> Result<Document, mongod::Error> {
-        let mut doc = Document::new();
-        if let Some(value) = self.merchandise_id {
-            doc.insert("merchandise_id", value);
-        }
-        if let Some(value) = self.orderer {
-            doc.insert("orderer", value);
-        }
-        if let Some(value) = self.project_leader {
-            doc.insert("project_leader", value);
-        }
-        if let Some(value) = self.count {
-            doc.insert("count", value);
-        }
-        if let Some(value) = self.merchandise_name {
-            doc.insert("merchandise_name", value);
-        }
-        if let Some(value) = self.use_case {
-            doc.insert("use_case", value);
-        }
-        if let Some(value) = self.location {
-            doc.insert("location", value);
-        }
-        if let Some(value) = self.article_number {
-            doc.insert("article_number", value);
-        }
-        if let Some(value) = self.shop {
-            doc.insert("shop", value);
-        }
-        if let Some(value) = self.cost {
-            doc.insert("cost", value);
-        }
-        if let Some(value) = self.serial_number {
-            doc.insert("serial_number", value);
-        }
-        if let Some(value) = self.arived_on {
-            doc.insert("arived_on", bson::Bson::DateTime(value.into()));
-        }
-        if let Some(value) = self.status {
-            doc.insert("status", value.to_string());
-        }
-        if let Some(value) = self.url {
-            doc.insert("url", value);
-        }
-        if let Some(value) = self.postage {
-            doc.insert("postage", value);
-        }
-        if let Some(value) = self.invoice_number {
-            doc.insert("invoice_number", value);
-        }
-        if let Some(value) = self.created_date {
-            doc.insert("created_date", bson::Bson::DateTime(value.into()));
-        }
-        doc.insert("updated_date", Utc::now());
-        Ok(doc)
-    }
-}
-
-impl AsUpdate<InternMerchandiseUpdate> for InternMerchandiseUpdate {
-    fn update() -> InternMerchandiseUpdate {
-        InternMerchandiseUpdate::default()
-    }
-
-    fn into_update(self) -> InternMerchandiseUpdate {
-        self
-    }
-}
-
-impl AsUpdate<InternMerchandiseUpdate> for InternMerchandise {
-    fn update() -> InternMerchandiseUpdate {
-        InternMerchandiseUpdate::default()
-    }
-
-    fn into_update(self) -> InternMerchandiseUpdate {
-        InternMerchandiseUpdate {
-            merchandise_id: self.merchandise_id,
-            orderer: Some(self.orderer),
-            project_leader: self.project_leader,
-            purchased_on: Some(self.purchased_on),
-            count: Some(self.count),
-            merchandise_name: Some(self.merchandise_name),
-            use_case: self.use_case,
-            location: self.location,
-            article_number: self.article_number,
-            shop: self.shop,
-            cost: Some(self.cost),
-            serial_number: self.serial_number,
-            arived_on: self.arived_on,
-            status: Some(self.status),
-            url: self.url,
-            postage: self.postage,
-            invoice_number: self.invoice_number,
-            created_date: Some(self.created_date),
-        }
-    }
 }

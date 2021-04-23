@@ -89,8 +89,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
 
     let client = setup_mongodb().await?;
     let role_cache = RoleCache::new();
-    let client = mongod::Client::from_client(client, &CONFIG.db.name);
-    let db = client.database();
+    let db = client.database(&CONFIG.db.name);
 
     let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
         .data(db)

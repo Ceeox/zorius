@@ -1,8 +1,6 @@
 use async_graphql::{Context, MergedObject, Result};
-use bson::{oid::ObjectId, DateTime};
-use chrono::Utc;
 
-use crate::models::{company::Company, user::UserId};
+use crate::models::company::Company;
 
 #[derive(Default, MergedObject)]
 pub struct CompanyQuery;

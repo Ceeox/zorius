@@ -30,6 +30,7 @@ pub enum Role {
     WorkReportModerator,
     WorkAccountModerator,
     RoleModerator,
+    MerchandiseModerator,
     Admin,
     NoRole,
 }
@@ -42,6 +43,9 @@ impl Display for Role {
             Role::RoleModerator => write!(f, "RoleModerator"),
             Role::Admin => write!(f, "Admin"),
             Role::NoRole => write!(f, "NoRole"),
+            Role::MerchandiseModerator => {
+                write!(f, "MerchandiseModerator")
+            }
         }
     }
 }
