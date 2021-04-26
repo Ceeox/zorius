@@ -1,16 +1,19 @@
 use std::fmt::Display;
 
+use askama::Template;
 use async_graphql::{validators::IntGreaterThan, Enum, InputObject, SimpleObject};
 use bson::{oid::ObjectId, DateTime};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::{helper::validators::Url, models::user::UserId};
+use crate::{helper::validators::Url, mailer::mailer, models::user::UserId};
+
+pub type InternMerchandiseId = ObjectId;
 
 #[derive(InputObject, Deserialize, Serialize)]
 pub struct NewMerchandiseIntern {
     pub merchandise_name: String,
-    #[graphql(validator(IntGreaterThan(value = "1")))]
+    #[graphql(validator(IntGreaterThan(value = "0")))]
     pub count: i32,
     #[graphql(validator(Url))]
     pub url: Option<String>,
@@ -27,7 +30,7 @@ pub struct NewMerchandiseIntern {
 #[derive(Deserialize, Serialize, Debug, SimpleObject, Clone)]
 pub struct InternMerchandise {
     #[serde(rename = "_id")]
-    pub id: ObjectId,
+    pub id: InternMerchandiseId,
     pub merchandise_id: Option<i32>,
     pub orderer: UserId,
     pub project_leader: Option<String>,
@@ -101,6 +104,24 @@ impl InternMerchandise {
             updated_date: Utc::now().into(),
         }
     }
+
+    pub fn change_status(&mut self, new_status: InternMerchandiseStatus) {
+        self.status = new_status;
+        self.updated_date = Utc::now().into();
+        let template: StatusTemplate = self.clone().into();
+        let body = template.render().unwrap();
+        println!("{}", body);
+        /*
+        mailer(
+            &format!(
+                "Intern Merchandise Staus Change to {} for {}",
+                new_status.to_string(),
+                self.merchandise_name,
+            ),
+            &body,
+        );
+        */
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, InputObject, Default)]
@@ -132,11 +153,35 @@ pub struct InternMerchandiseUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arived_on: Option<DateTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<InternMerchandiseStatus>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub postage: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub invoice_number: Option<i32>,
+}
+
+#[derive(Template)]
+#[template(path = "intern_merch_used.html")]
+pub struct StatusTemplate {
+    pub(crate) id: InternMerchandiseId,
+    pub(crate) merchandise_id: Option<i32>,
+    pub(crate) orderer: UserId,
+    pub(crate) count: i32,
+    pub(crate) merchandise_name: String,
+    pub(crate) cost: f64,
+    pub(crate) status: InternMerchandiseStatus,
+}
+
+impl Into<StatusTemplate> for InternMerchandise {
+    fn into(self) -> StatusTemplate {
+        StatusTemplate {
+            id: self.id,
+            merchandise_id: self.merchandise_id,
+            orderer: self.orderer,
+            count: self.count,
+            merchandise_name: self.merchandise_name,
+            cost: self.cost,
+            status: self.status,
+        }
+    }
 }

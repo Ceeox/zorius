@@ -1,3 +1,4 @@
+use askama::Template;
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
     guard::Guard,
@@ -8,11 +9,15 @@ use bson::{doc, to_document};
 use futures::stream::StreamExt;
 use mongodb::options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument};
 
-use crate::models::{
-    merchandise::intern_merchandise::{
-        InternMerchandise, InternMerchandiseUpdate, NewMerchandiseIntern,
+use crate::{
+    mailer::mailer,
+    models::{
+        merchandise::intern_merchandise::{
+            InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
+            InternMerchandiseUpdate, NewMerchandiseIntern, StatusTemplate,
+        },
+        roles::{Role, RoleGuard},
     },
-    roles::{Role, RoleGuard},
 };
 
 use super::{claim::Claim, database, MDB_COLL_INTERN_MERCH};
@@ -22,7 +27,7 @@ pub struct InternMerchandiseQuery;
 
 #[Object]
 impl InternMerchandiseQuery {
-    async fn get_intern_merchandise_by_id(
+    async fn get_by_id(
         &self,
         ctx: &Context<'_>,
         id: ObjectId,
@@ -36,7 +41,21 @@ impl InternMerchandiseQuery {
         }
     }
 
-    async fn list_intern_merchandise(
+    async fn get_by_merch_id(
+        &self,
+        ctx: &Context<'_>,
+        merchandise_id: i32,
+    ) -> Result<Option<InternMerchandise>> {
+        let _ = Claim::from_ctx(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
+        let filter = doc! {"merchandise_id": merchandise_id};
+        match collection.find_one(filter, None).await? {
+            None => Ok(None),
+            Some(doc) => Ok(Some(from_document::<InternMerchandise>(doc)?)),
+        }
+    }
+
+    async fn list(
         &self,
         ctx: &Context<'_>,
         after: Option<String>,
@@ -92,11 +111,7 @@ impl InternMerchandiseMutation {
         RoleGuard(role = "Role::Admin"),
         RoleGuard(role = "Role::MerchandiseModerator")
     )))]
-    async fn new_intern_merchandise(
-        &self,
-        ctx: &Context<'_>,
-        new: NewMerchandiseIntern,
-    ) -> Result<InternMerchandise> {
+    async fn new(&self, ctx: &Context<'_>, new: NewMerchandiseIntern) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
         let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
         let new_merch = InternMerchandise::new(new);
@@ -109,10 +124,10 @@ impl InternMerchandiseMutation {
         RoleGuard(role = "Role::Admin"),
         RoleGuard(role = "Role::MerchandiseModerator")
     )))]
-    async fn update_intern_merchandise_by_id(
+    async fn update_by_id(
         &self,
         ctx: &Context<'_>,
-        id: ObjectId,
+        id: InternMerchandiseId,
         update: InternMerchandiseUpdate,
     ) -> Result<Option<InternMerchandise>> {
         let _ = Claim::from_ctx(ctx)?;
@@ -129,5 +144,23 @@ impl InternMerchandiseMutation {
             None => Ok(None),
             Some(doc) => Ok(Some(from_document(doc)?)),
         }
+    }
+
+    async fn change_status(
+        &self,
+        ctx: &Context<'_>,
+        id: InternMerchandiseId,
+        new_status: InternMerchandiseStatus,
+    ) -> Result<Option<InternMerchandise>> {
+        let _ = Claim::from_ctx(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
+        let filter = doc! {"_id": id};
+        let mut merch = match collection.find_one(filter, None).await? {
+            None => return Ok(None),
+            Some(doc) => from_document::<InternMerchandise>(doc)?,
+        };
+        merch.change_status(new_status);
+
+        Ok(None)
     }
 }

@@ -17,6 +17,10 @@ pub struct Settings {
     pub domain: String,
     pub token_lifetime: i64,
     pub registration_enabled: bool,
+    pub smtp_address: String,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub email_send_to: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

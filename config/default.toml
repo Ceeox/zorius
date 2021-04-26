@@ -1,6 +1,10 @@
 debug = true
 domain = "localhost"
+email_send_to = ""
 registration_enabled = true
+smtp_address = ""
+smtp_password = ""
+smtp_username = ""
 token_lifetime = 86400
 
 [web]
@@ -8,7 +12,7 @@ cert_path = "cert.pem"
 enable_ssl = true
 ip = "127.0.0.1"
 key_path = "key.pem"
-log_format = "IP:%a DATETIME:%t REQUEST:\"%r\" STATUS: %s DURATION: %D X-REQUEST-ID:%{x-request-id}o"
+log_format = "IP:%a REQUEST:\"%r\" STATUS: %s DURATION: %Dms X-REQUEST-ID:%{x-request-id}o"
 port = 443
 
 [db]

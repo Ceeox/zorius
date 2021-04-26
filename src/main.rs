@@ -24,6 +24,7 @@ mod api;
 mod config;
 mod errors;
 mod helper;
+mod mailer;
 mod models;
 
 use crate::{api::graphql, config::CONFIG};
@@ -112,7 +113,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .wrap(
                 RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
                     .with_interval(Duration::from_secs(60))
-                    .with_max_requests(100),
+                    .with_max_requests(50),
             )
             // graphql api
             .service(graphql)
