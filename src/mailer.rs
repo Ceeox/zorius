@@ -1,21 +1,27 @@
-use lettre::smtp::authentication::IntoCredentials;
+use lettre::{smtp::authentication::IntoCredentials, EmailAddress, Envelope};
 use lettre::{SmtpClient, Transport};
 use lettre_email::EmailBuilder;
 
-use crate::config::{Settings, CONFIG};
+use crate::config::CONFIG;
 
+/// This function is used to send a mail with the given subject and body.
+///
+/// It always sends the body as html
+/// All SMTP Data is read from the config file.
+/// From header is created with the config domain like: zorius@`domain`
+// TODO:    1. return the result to report if the emails failed to send
+//          2. remove `unwraps` and `expects` and replace them
 pub fn mailer(subject: &str, body: &str) {
-    let to_email = CONFIG.email_send_to.as_ref();
     let smtp_address: &str = CONFIG.smtp_address.as_ref();
     let username: &str = CONFIG.smtp_username.as_ref();
     let password: &str = CONFIG.smtp_password.as_ref();
 
-    println!("smtp_address: {}, username: {}", smtp_address, username);
-    println!("sending email to: {}\nsubject: {}", to_email, subject);
+    let from = EmailAddress::new(format!("zorius@{}", CONFIG.domain)).unwrap();
+    let to = EmailAddress::new(CONFIG.email_send_to.clone()).unwrap();
+    let envelope = Envelope::new(Some(from), vec![to]).unwrap();
 
     let email = EmailBuilder::new()
-        .to(to_email)
-        .from(username)
+        .envelope(envelope)
         .subject(subject)
         .html(body)
         .build()

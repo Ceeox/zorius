@@ -22,12 +22,13 @@ use uuid::Uuid;
 
 mod api;
 mod config;
+mod database;
 mod errors;
 mod helper;
 mod mailer;
 mod models;
 
-use crate::{api::graphql, config::CONFIG};
+use crate::{api::graphql, config::CONFIG, database::Database};
 
 const API_VERSION: &str = "v1";
 
@@ -91,10 +92,11 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let client = setup_mongodb().await?;
     let role_cache = RoleCache::new();
     let db = client.database(&CONFIG.db.name);
+    let database = Database::new(client, db.clone());
 
     let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
+        .data(database)
         .data(db)
-        .data(client)
         .data(role_cache)
         .data(Storage::default())
         .finish();
@@ -125,7 +127,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
                     .index_file("index.html"),
             )
             .service(
-                Files::new("/files", "files")
+                Files::new("/files", "./files")
                     .prefer_utf8(true)
                     .show_files_listing(),
             )

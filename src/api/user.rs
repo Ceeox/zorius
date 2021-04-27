@@ -21,7 +21,7 @@ use crate::{
     },
 };
 
-use super::{claim::Claim, database, MDB_COLL_NAME_USERS};
+use super::{claim::Claim, database, database2, MDB_COLL_NAME_USERS};
 
 #[derive(Default)]
 pub struct UserQuery;
@@ -36,13 +36,9 @@ impl UserQuery {
         password: String,
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! { "email": email.clone() };
-        let user: User = match collection.find_one(filter, None).await? {
-            None => {
-                return Err(err);
-            }
-            Some(r) => from_document(r).unwrap(),
+        let user = match database2(ctx)?.get_user_by_email(email.clone()).await? {
+            Some(r) => r,
+            None => return Err(Error::new("user could not be found")),
         };
 
         if !user.is_password_correct(&password) {
@@ -65,11 +61,9 @@ impl UserQuery {
 
     async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<Option<User>> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! {"_id": id};
-        match collection.find_one(filter, None).await? {
-            None => Ok(None),
-            Some(doc) => Ok(Some(from_document::<User>(doc)?)),
+        match database2(ctx)?.get_user_by_id(id).await? {
+            Some(r) => Ok(Some(r)),
+            None => Err(Error::new("user could not be found")),
         }
     }
 
@@ -147,11 +141,9 @@ impl UserMutation {
         let auth_info = Claim::from_ctx(ctx)?;
         let user_id = auth_info.user_id();
 
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! { "_id": user_id };
-        let mut user: User = match collection.find_one(filter.clone(), None).await? {
-            None => return Err(Error::new("specified user not found".to_owned())),
-            Some(r) => from_document(r)?,
+        let mut user = match database2(ctx)?.get_user_by_id(user_id.clone()).await? {
+            Some(r) => r,
+            None => return Err(Error::new("user could not be found")),
         };
 
         if !user.is_password_correct(&old_password) {
@@ -161,6 +153,8 @@ impl UserMutation {
         }
 
         let update = to_document(&user)?;
+        let filter = doc! {"_id": user_id};
+        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
         let _ = collection.update_one(filter, update, None).await?;
 
         Ok(true)
@@ -177,8 +171,8 @@ impl UserMutation {
         let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
         let filter = doc! { "_id": user_id };
 
-        // TODO: add update document
-        let update = bson::Document::new();
+        let mut update = bson::Document::new();
+        update.insert("$set", bson::to_bson(&user_update)?);
 
         let options = FindOneAndUpdateOptions::builder()
             .return_document(Some(ReturnDocument::After))

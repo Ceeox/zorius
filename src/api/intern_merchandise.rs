@@ -1,8 +1,7 @@
-use askama::Template;
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
     guard::Guard,
-    Context, Object, Result,
+    Context, Error, Object, Result,
 };
 use bson::{de::from_document, oid::ObjectId};
 use bson::{doc, to_document};
@@ -10,11 +9,11 @@ use futures::stream::StreamExt;
 use mongodb::options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument};
 
 use crate::{
-    mailer::mailer,
+    api::database2,
     models::{
         merchandise::intern_merchandise::{
             InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
-            InternMerchandiseUpdate, NewMerchandiseIntern, StatusTemplate,
+            InternMerchandiseUpdate, NewMerchandiseIntern,
         },
         roles::{Role, RoleGuard},
     },
@@ -159,7 +158,14 @@ impl InternMerchandiseMutation {
             None => return Ok(None),
             Some(doc) => from_document::<InternMerchandise>(doc)?,
         };
-        merch.change_status(new_status);
+
+        let orderer_id = merch.orderer.clone();
+        let user = match database2(ctx)?.get_user_by_id(orderer_id).await? {
+            None => return Err(Error::new("the orderer could not be found")),
+            Some(r) => r,
+        };
+
+        merch.change_status(new_status, user);
 
         Ok(None)
     }

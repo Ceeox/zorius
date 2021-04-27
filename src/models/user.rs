@@ -1,10 +1,8 @@
-use std::convert::TryFrom;
-
 use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
-    InputObject, Result, SimpleObject,
+    InputObject, SimpleObject,
 };
-use bson::{oid::ObjectId, to_bson, to_document, DateTime, Document};
+use bson::{oid::ObjectId, DateTime};
 use chrono::Utc;
 use pwhash::sha512_crypt;
 use serde::{Deserialize, Serialize};
@@ -12,24 +10,24 @@ use serde::{Deserialize, Serialize};
 use crate::helper::validators::Password;
 
 pub type UserId = ObjectId;
+pub type UserEmail = String;
 
-#[derive(SimpleObject, Debug, Deserialize, Serialize)]
+#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone)]
 pub struct User {
     #[serde(rename = "_id")]
     id: UserId,
-    email: String,
+    pub email: UserEmail,
     #[graphql(skip)]
     password_hash: String,
-    username: String,
-    created_at: DateTime,
+    pub username: String,
+    pub created_at: DateTime,
     #[graphql(skip)]
     invitation_pending: bool,
-    avatar_url: Option<String>,
-    firstname: Option<String>,
-    lastname: Option<String>,
-    updated: DateTime,
-    #[graphql(skip)]
-    deleted: bool,
+    pub avatar_url: Option<String>,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+    pub updated: DateTime,
+    pub deleted: bool,
 }
 
 impl User {
@@ -44,9 +42,9 @@ impl User {
             lastname: new_user.lastname,
             created_at: Utc::now().into(),
             invitation_pending: true,
-            deleted: false,
             updated: Utc::now().into(),
             avatar_url: None,
+            deleted: false,
         }
     }
 
@@ -71,7 +69,7 @@ impl User {
 #[derive(Deserialize, Debug, InputObject)]
 pub struct NewUser {
     #[graphql(validator(Email))]
-    pub email: String,
+    pub email: UserEmail,
     #[graphql(validator(and(StringMinLength(length = "4"), StringMaxLength(length = "64"))))]
     pub username: String,
     #[graphql(validator(Password))]
@@ -83,13 +81,11 @@ pub struct NewUser {
 #[derive(InputObject, Debug, Deserialize, Serialize)]
 pub struct UserUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
-    email: Option<String>,
+    email: Option<UserEmail>,
     #[serde(skip_serializing_if = "Option::is_none")]
     username: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     avatar_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     firstname: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     lastname: Option<String>,
 }

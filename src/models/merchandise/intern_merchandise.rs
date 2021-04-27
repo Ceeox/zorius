@@ -6,7 +6,11 @@ use bson::{oid::ObjectId, DateTime};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::{helper::validators::Url, mailer::mailer, models::user::UserId};
+use crate::{
+    helper::validators::Url,
+    mailer::mailer,
+    models::user::{User, UserId},
+};
 
 pub type InternMerchandiseId = ObjectId;
 
@@ -105,13 +109,29 @@ impl InternMerchandise {
         }
     }
 
-    pub fn change_status(&mut self, new_status: InternMerchandiseStatus) {
+    pub fn change_status(&mut self, new_status: InternMerchandiseStatus, user: User) {
         self.status = new_status;
         self.updated_date = Utc::now().into();
-        let template: StatusTemplate = self.clone().into();
+        let orderer_name = if user.firstname.is_some() && user.lastname.is_some() {
+            format!(
+                "{} {}",
+                user.firstname.unwrap_or_default(),
+                user.lastname.unwrap_or_default()
+            )
+        } else {
+            user.username
+        };
+        let template: StatusTemplate = StatusTemplate {
+            id: self.id.clone(),
+            merchandise_id: self.merchandise_id,
+            orderer_name,
+            count: self.count,
+            merchandise_name: self.merchandise_name.clone(),
+            cost: self.cost,
+            status: new_status,
+        };
         let body = template.render().unwrap();
-        println!("{}", body);
-        /*
+
         mailer(
             &format!(
                 "Intern Merchandise Staus Change to {} for {}",
@@ -120,7 +140,6 @@ impl InternMerchandise {
             ),
             &body,
         );
-        */
     }
 }
 
@@ -165,23 +184,9 @@ pub struct InternMerchandiseUpdate {
 pub struct StatusTemplate {
     pub(crate) id: InternMerchandiseId,
     pub(crate) merchandise_id: Option<i32>,
-    pub(crate) orderer: UserId,
+    pub(crate) orderer_name: String,
     pub(crate) count: i32,
     pub(crate) merchandise_name: String,
     pub(crate) cost: f64,
     pub(crate) status: InternMerchandiseStatus,
-}
-
-impl Into<StatusTemplate> for InternMerchandise {
-    fn into(self) -> StatusTemplate {
-        StatusTemplate {
-            id: self.id,
-            merchandise_id: self.merchandise_id,
-            orderer: self.orderer,
-            count: self.count,
-            merchandise_name: self.merchandise_name,
-            cost: self.cost,
-            status: self.status,
-        }
-    }
 }

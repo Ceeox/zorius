@@ -13,7 +13,7 @@ actix-multipart = "0.3"
 actix-ratelimit = "0.3"
 actix-web = {version = "3.3", features = ["rustls"]}
 askama = "0.10.5"
-async-graphql = {version = "2.8", features = ["bson", "chrono"]}
+async-graphql = {version = "2.8", features = ["bson", "chrono", "dataloader"]}
 async-graphql-actix-web = "2.8"
 async-trait = "0.1"
 bson = "1.1"

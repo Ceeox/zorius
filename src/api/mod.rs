@@ -97,3 +97,10 @@ pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a Database> {
         Ok(r) => Ok(r),
     }
 }
+
+pub fn database2<'a>(ctx: &'a Context<'_>) -> Result<&'a crate::database::Database> {
+    match ctx.data::<crate::database::Database>() {
+        Err(_e) => Err(Error::new("missing Database in Context!")),
+        Ok(r) => Ok(r),
+    }
+}

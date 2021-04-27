@@ -94,7 +94,6 @@ impl RoleCache {
 
     pub async fn has_role(&self, ctx: &Context<'_>, user_id: &UserId, role: &Role) -> Result<bool> {
         let mut lock = self.user_roles.lock().await;
-        println!("user_id: {},\nroles: {:#?}", user_id, lock.get(user_id));
         match lock.get(user_id) {
             Some(roles) => Ok(roles.contains(&role)),
             None => match self.load_roles(ctx, user_id).await? {

@@ -1,10 +1,10 @@
-use async_graphql::{InputObject, Result, SimpleObject};
-use bson::{oid::ObjectId, to_document, Document};
+use async_graphql::{InputObject, SimpleObject};
+use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{user::UserId, work_report::project::Project};
 
-use super::project::{self, ProjectUpdate};
+use super::project::ProjectUpdate;
 
 pub type CustomerId = ObjectId;
 
