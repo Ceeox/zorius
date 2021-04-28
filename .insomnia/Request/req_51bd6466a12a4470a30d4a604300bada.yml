@@ -1,0 +1,28 @@
+_id: req_51bd6466a12a4470a30d4a604300bada
+type: Request
+parentId: fld_a285a9bb1a4c4901a6e0db0151841170
+modified: 1619644487445
+created: 1609416400110
+url: "{{ _.base_url }}"
+name: login
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query login($email: String!, $password: String!)
+    {\n  login(email: $email, password: $password)
+    {\n    token\n    expiresAt\n    userId\n  }\n}\n","variables":{"email":"{{
+    _.email }}","password":"{{ _.password }}"},"operationName":"login"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication: {}
+metaSortKey: -1609416400110
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

@@ -1,0 +1,30 @@
+_id: req_53166be4eede46dc93f35209b8dfcaa3
+type: Request
+parentId: fld_09bf02ae432e424bbe12e938aec94dec
+modified: 1619627934303
+created: 1607186626075
+url: "{{ _.base_url }}"
+name: getInternMerchanbdiseById
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query getOrder {\n  getInternMerchandiseById(id:
+    \"5ff0bd360023e99a0098eccc\")
+    {\n    id\n    arivedOn\n    projectLeader\n    url\n    createdDate\n    updatedDate\n    orderer\n    projectLeader\n    count\n    merchandiseId\n    merchandiseName\n    purchasedOn\n    serialNumber\n    invoiceNumber\n    shop\n    useCase\n    status\n  }\n}\n","operationName":"getOrder"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'when-expired', _.token_lifetime %}"
+metaSortKey: -1619215361642.25
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

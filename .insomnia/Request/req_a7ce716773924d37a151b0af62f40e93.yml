@@ -1,0 +1,29 @@
+_id: req_a7ce716773924d37a151b0af62f40e93
+type: Request
+parentId: fld_092428f87e0a48ce81b48819678fa5ef
+modified: 1619222052814
+created: 1609605284701
+url: "{{ _.base_url }}"
+name: resetPassword
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation resetPassword {\n  resetPassword(oldPassword:\"test\",
+    newPassword: \"Test123!\")\n}","operationName":"resetPassword"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1607191170541
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

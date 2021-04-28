@@ -1,0 +1,32 @@
+_id: req_3c79c4caa21c41659060eb445f873dc1
+type: Request
+parentId: fld_2e658fcc1f434e3ab10b24eb14f68bb7
+modified: 1619217326945
+created: 1612009691525
+url: "{{ _.base_url }}"
+name: getWorkreport
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query getWorkreport {\n  getWorkreport(workReportId:
+    \"601d50b7009fa5fb00db509e\")
+    {\n    id\n    userId\n    projectId\n    customerId\n    tripInfo
+    {\n      toCustomerStarted\n      toCustomerArrived\n      fromCustomerStarted\n      fromCustomerArrived\n    },\n     times
+    {\n      id\n      started\n      ended\n    }\n    status\n    invoiced\n    description\n  }\n}","operationName":"getWorkreport"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'when-expired', _.token_lifetime %}"
+metaSortKey: -1607186673387.5
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

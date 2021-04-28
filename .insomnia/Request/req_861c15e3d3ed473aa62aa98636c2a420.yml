@@ -1,0 +1,34 @@
+_id: req_861c15e3d3ed473aa62aa98636c2a420
+type: Request
+parentId: fld_3e66f39305c94329a852db8c9bb4d93c
+modified: 1619627936504
+created: 1612010028016
+url: "{{ _.base_url }}"
+name: updateWorkreport
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation updateWorkreport {\n  updateWorkreport(workreportId:
+    \"601d50b7009fa5fb00db509e\",\n    workreportUpdate: {\n      status:
+    RUNNING,\n      times: [{\n        id: 0,\n        mode:
+    ADD,\n        started: \"2021-02-05T14:06:38+00:00\",\n      }]\n    })
+    {\n    id\n    userId\n    projectId\n    customerId\n    tripInfo
+    {\n      toCustomerStarted\n      toCustomerArrived\n      fromCustomerStarted\n      fromCustomerArrived\n    }\n    times
+    {\n      started\n      ended\n      id\n    }\n    status\n    invoiced\n    description\n  }\n}\n","operationName":"updateWorkreport"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'no-history', _.token_lifetime %}"
+metaSortKey: -1607191170366
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

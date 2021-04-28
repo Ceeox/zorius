@@ -1,0 +1,30 @@
+_id: req_d11aea52dafa4e5fb9490d231d59f375
+type: Request
+parentId: fld_a285a9bb1a4c4901a6e0db0151841170
+modified: 1619627925867
+created: 1607186641376
+url: "{{ _.base_url }}"
+name: getUserById
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query getUserById {\n  getUserById(id:
+    \"5f6f5dce00e2cf1e00c310b6\")
+    {\n    id\n    email\n    username\n    firstname\n    lastname\n    updated\n    createdAt\n  }\n}\n","operationName":"getUserById"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'when-expired', _.token_lifetime %}"
+metaSortKey: -1609416400210
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

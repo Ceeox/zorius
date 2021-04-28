@@ -1,0 +1,31 @@
+_id: req_08d2147bf5c148cf890977420084f796
+type: Request
+parentId: fld_092428f87e0a48ce81b48819678fa5ef
+modified: 1619547494265
+created: 1607191170466
+url: "{{ _.base_url }}"
+name: updateUser
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation updateUser {\n  updateUser(\n    userId:
+    \"5f6f5dce00e2cf1e00c310b6\"\n    userUpdate: { firstname: null, lastname:
+    null }\n  )
+    {\n    id\n    email\n    username\n    firstname\n    lastname\n    createdAt\n  }\n}","operationName":"updateUser"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'no-history', _.token_lifetime %}"
+metaSortKey: -1607191170466
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

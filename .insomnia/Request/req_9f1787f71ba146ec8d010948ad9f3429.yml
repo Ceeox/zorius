@@ -1,0 +1,33 @@
+_id: req_9f1787f71ba146ec8d010948ad9f3429
+type: Request
+parentId: fld_3e66f39305c94329a852db8c9bb4d93c
+modified: 1619627939455
+created: 1612009267302
+url: "{{ _.base_url }}"
+name: newWorkreport
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation newWorkreport {\n  newWorkreport(newWorkreport:
+    {\n    customerId: \"600b2b4e008ba8d800dae896\"\n    description: \"das ist
+    ein test\"\n  })
+    {\n    id\n    userId\n    projectId\n    customerId\n    tripInfo
+    {\n      toCustomerStarted\n      toCustomerArrived\n      fromCustomerStarted\n      fromCustomerArrived\n    }\n    times
+    {\n      id\n      started\n      ended\n    }\n    status\n    invoiced\n    description\n  }\n}","operationName":"newWorkreport"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1608395832777.9375
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

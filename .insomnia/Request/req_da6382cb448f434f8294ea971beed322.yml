@@ -1,0 +1,31 @@
+_id: req_da6382cb448f434f8294ea971beed322
+type: Request
+parentId: fld_2e658fcc1f434e3ab10b24eb14f68bb7
+modified: 1619217327327
+created: 1610051880607
+url: "{{ _.base_url }}"
+name: getWorkdays
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query getWorkdays {\n  getWorkdays(startDate:\"2021-01-06\",
+    endDate:\"2021-01-08\")
+    {\n    date\n    worktimeSecs\n    absentReason\n    worktargetSecs\n    timeRecords
+    {\n      id\n      isRunning\n      started\n      ended\n      duration\n    }\n  }\n}","operationName":"getWorkdays"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'no-history', _.token_lifetime %}"
+metaSortKey: -1607186673375
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

@@ -1,0 +1,33 @@
+_id: req_340744a0c1c7454e9c1f1556b916855b
+type: Request
+parentId: fld_5a3b28a421074c939e87852c164cb530
+modified: 1619636164817
+created: 1607191191649
+url: "{{ _.base_url }}"
+name: updateInternOrder
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation updateInternOrder {\n  updateById(\n    id:
+    \"5f9ca565001ebde90030891f\"\n    update: { merchandiseName: \"Crucial
+    Internal Solid State Drive (SSD), Up To 2400 MB/s (3D NAND, NVMe, PCIe,
+    M.2)\",url: \"https://www.amazon.de/\", merchandiseId: 202138497, cost:
+    45.32, count: 2 }\n  )
+    {\n    id\n    arivedOn\n    projectLeader\n    url\n    createdDate\n    updatedDate\n    orderer\n    projectLeader\n    count\n    merchandiseId\n    merchandiseName\n    purchasedOn\n    serialNumber\n    invoiceNumber\n    shop\n    useCase\n  }\n}","operationName":"updateInternOrder"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1608395832854.5
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global
