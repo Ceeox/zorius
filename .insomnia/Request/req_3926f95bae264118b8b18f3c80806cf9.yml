@@ -1,0 +1,31 @@
+_id: req_3926f95bae264118b8b18f3c80806cf9
+type: Request
+parentId: fld_a285a9bb1a4c4901a6e0db0151841170
+modified: 1619627928173
+created: 1607186661336
+url: "{{ _.base_url }}"
+name: listUsers
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query listUsers {\n  listUsers(first: 10) {\n    edges
+    {\n      node
+    {\n        id\n        email\n        username\n        firstname\n        lastname\n        updated\n        createdAt\n      }\n      cursor\n    }\n    pageInfo
+    {\n      startCursor\n      endCursor\n      hasPreviousPage\n      hasNextPage\n    }\n  }\n}\n","operationName":"listUsers"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'when-expired', _.token_lifetime %}"
+metaSortKey: -1609416400160
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

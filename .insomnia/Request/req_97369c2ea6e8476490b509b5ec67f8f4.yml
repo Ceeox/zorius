@@ -1,0 +1,32 @@
+_id: req_97369c2ea6e8476490b509b5ec67f8f4
+type: Request
+parentId: fld_3e66f39305c94329a852db8c9bb4d93c
+modified: 1619219213488
+created: 1607191208952
+url: "{{ _.base_url }}"
+name: newOrder
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation newOrder {\n  newInternOrder(\n    newInternOrder:
+    {\n      merchandiseName: \"Test\"\n      count: 1\n      orderer:
+    \"mw\"\n      cost: 45.456\n      projectLeader: \"mw\"\n      location:
+    \"test\"\n      shop: \"amazon\"\n    }\n  )
+    {\n    id\n    arivedOn\n    projectLeader\n    url\n    createdDate\n    updatedDate\n    orderer\n    projectLeader\n    count\n    merchandiseId\n    merchandiseName\n    purchasedOn\n    serialNumber\n    invoiceNumber\n    shop\n    useCase\n  }\n}","operationName":"newOrder"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1608395832776.375
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

@@ -1,0 +1,30 @@
+_id: req_5bcc8a9d42494ed6b2b3820ddf6d61de
+type: Request
+parentId: fld_3e66f39305c94329a852db8c9bb4d93c
+modified: 1619627939072
+created: 1611343768330
+url: "{{ _.base_url }}"
+name: newCustomer
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation newCustomer {\n  newCustomer(name: \"K31\",
+    identifier: \"K34567\")
+    {\n    id\n    name\n    identifier\n  }\n}","operationName":"newCustomer"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1608395832771.6875
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

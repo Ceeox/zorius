@@ -1,0 +1,32 @@
+_id: req_2f7aab0b20ab4c1090ec925ec626d5de
+type: Request
+parentId: fld_3e66f39305c94329a852db8c9bb4d93c
+modified: 1619219207682
+created: 1608394603562
+url: "{{ _.base_url }}"
+name: newWorkAccount
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation newWorkAccount {\n  newWorkAccount(userId:
+    \"5fda65b40076a6c80029dff3\", defaultWorkTarget: 28800)
+    {\n    id\n    userId\n    worktimeSecs\n    workdays
+    {\n      date\n      worktimeSecs\n      absentReason\n      worktargetSecs\n      timeRecords
+    {\n        started\n        ended\n        duration\n      }\n    }\n    defaultWorkTarget\n    disabled\n  }\n}","operationName":"newWorkAccount"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1608395832779.5
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global
