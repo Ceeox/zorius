@@ -6,6 +6,7 @@ smtp_address = ""
 smtp_password = ""
 smtp_username = ""
 token_lifetime = 86400
+secret_key = ""
 
 [web]
 cert_path = "cert.pem"
@@ -19,5 +20,5 @@ port = 443
 app_name = "zorius"
 name = "zorius"
 password = ""
-server_domain = ""
+server = ""
 username = "zorius"
