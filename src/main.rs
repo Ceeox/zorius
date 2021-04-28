@@ -115,7 +115,12 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .wrap(
                 RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
                     .with_interval(Duration::from_secs(60))
-                    .with_max_requests(50),
+                    .with_max_requests(50)
+                    .with_identifier(|req| {
+                        let key = req.headers().get("x-request-id").unwrap();
+                        let key = key.to_str().unwrap();
+                        Ok(key.to_string())
+                    }),
             )
             // graphql api
             .service(graphql)
