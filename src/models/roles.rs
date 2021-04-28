@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::api::{database, is_autherized};
+use crate::api::{claim::Claim, database};
 use async_graphql::{guard::Guard, Context, Enum, Result, SimpleObject};
 use bson::{doc, from_document, oid::ObjectId};
 use futures::lock::Mutex;
@@ -30,6 +30,7 @@ pub enum Role {
     WorkReportModerator,
     WorkAccountModerator,
     RoleModerator,
+    MerchandiseModerator,
     Admin,
     NoRole,
 }
@@ -42,6 +43,9 @@ impl Display for Role {
             Role::RoleModerator => write!(f, "RoleModerator"),
             Role::Admin => write!(f, "Admin"),
             Role::NoRole => write!(f, "NoRole"),
+            Role::MerchandiseModerator => {
+                write!(f, "MerchandiseModerator")
+            }
         }
     }
 }
@@ -53,7 +57,9 @@ pub struct RoleGuard {
 #[async_trait::async_trait]
 impl Guard for RoleGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let user_id = is_autherized(ctx)?;
+        let claim = Claim::from_ctx(ctx)?;
+        let user_id = claim.user_id();
+
         match ctx.data_opt::<RoleCache>() {
             Some(role_cache) if role_cache.has_role(ctx, &user_id, &self.role).await? => Ok(()),
             _ => Err("Forbidden".into()),
@@ -88,7 +94,6 @@ impl RoleCache {
 
     pub async fn has_role(&self, ctx: &Context<'_>, user_id: &UserId, role: &Role) -> Result<bool> {
         let mut lock = self.user_roles.lock().await;
-        println!("user_id: {},\nroles: {:#?}", user_id, lock.get(user_id));
         match lock.get(user_id) {
             Some(roles) => Ok(roles.contains(&role)),
             None => match self.load_roles(ctx, user_id).await? {

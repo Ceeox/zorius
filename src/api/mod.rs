@@ -1,18 +1,29 @@
 use actix_web::{get, post, web::Data, HttpRequest, HttpResponse};
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
-    Context, EmptySubscription, Error, Result, Schema,
+    Context, EmptySubscription, Error, MergedObject, Object, Result, Schema,
 };
 use async_graphql_actix_web::{Request, Response};
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use mongodb::Database;
 
-pub mod mutations;
-pub mod querys;
+pub mod claim;
+pub mod company;
+pub mod customer;
+pub mod intern_merchandise;
+pub mod project;
+pub mod role;
+pub mod user;
 
-pub use crate::api::{mutations::RootMutation, querys::RootQuery};
-use crate::models::user::Claim;
-use crate::{config::CONFIG, models::user::UserId};
+use crate::{config::CONFIG, API_VERSION};
+
+use self::{
+    claim::Token,
+    customer::{CustomerMutation, CustomerQuery},
+    intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
+    project::{ProjectMutation, ProjectQuery},
+    role::{RoleMutation, RoleQuery},
+    user::{UserMutation, UserQuery},
+};
 
 pub(crate) static MDB_COLL_NAME_USERS: &str = "users";
 pub(crate) static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
@@ -20,9 +31,40 @@ pub(crate) static MDB_COLL_WORK_REPORTS: &str = "work_reports";
 pub(crate) static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
 pub(crate) static MDB_COLL_ROLES: &str = "roles";
 
-pub type RootSchema = Schema<RootQuery, RootMutation, EmptySubscription>;
+pub type RootSchema = Schema<Query, Mutation, EmptySubscription>;
 
-struct MyToken(String);
+#[derive(MergedObject, Default)]
+pub struct Query(
+    ServerQuery,
+    UserQuery,
+    RoleQuery,
+    CustomerQuery,
+    ProjectQuery,
+    InternMerchandiseQuery,
+);
+
+#[derive(Default, MergedObject)]
+pub struct Mutation(
+    UserMutation,
+    RoleMutation,
+    CustomerMutation,
+    ProjectMutation,
+    InternMerchandiseMutation,
+);
+
+#[derive(Default)]
+pub struct ServerQuery;
+
+#[Object]
+impl ServerQuery {
+    async fn api_version(&self) -> &str {
+        API_VERSION
+    }
+
+    async fn registration_enabled(&self) -> bool {
+        CONFIG.registration_enabled
+    }
+}
 
 #[post("/graphql")]
 pub async fn graphql(
@@ -33,7 +75,7 @@ pub async fn graphql(
     let token = http_request
         .headers()
         .get("authorization")
-        .and_then(|value| value.to_str().map(|s| MyToken(s.to_string())).ok());
+        .and_then(|value| value.to_str().map(|s| Token(s.to_string())).ok());
     let mut request = gql_request.into_inner();
     if let Some(token) = token {
         request = request.data(token);
@@ -42,7 +84,7 @@ pub async fn graphql(
 }
 
 // Enable only when we're running in debug mode
-#[get("/pg")]
+#[get("/playground")]
 pub async fn gql_playgound() -> HttpResponse {
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -56,20 +98,9 @@ pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a Database> {
     }
 }
 
-pub fn is_autherized(ctx: &Context<'_>) -> Result<UserId> {
-    let value: &MyToken = match ctx.data::<MyToken>() {
-        Err(_e) => return Err(Error::new("missing token")),
-        Ok(r) => r,
-    };
-    let _split: Vec<&str> = value.0.split("Bearer").collect();
-    let token = _split[1].trim();
-    let key = CONFIG.secret_key.as_bytes();
-    match decode::<Claim>(
-        token,
-        &DecodingKey::from_secret(key),
-        &Validation::new(Algorithm::HS512),
-    ) {
-        Ok(token) => Ok(token.claims.user_id),
-        Err(_e) => Err(Error::new("invalid token!")),
+pub fn database2<'a>(ctx: &'a Context<'_>) -> Result<&'a crate::database::Database> {
+    match ctx.data::<crate::database::Database>() {
+        Err(_e) => Err(Error::new("missing Database in Context!")),
+        Ok(r) => Ok(r),
     }
 }

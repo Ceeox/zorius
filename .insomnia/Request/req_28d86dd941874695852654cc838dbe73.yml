@@ -1,0 +1,33 @@
+_id: req_28d86dd941874695852654cc838dbe73
+type: Request
+parentId: fld_5a3b28a421074c939e87852c164cb530
+modified: 1619634782533
+created: 1609611997038
+url: "{{ _.base_url }}"
+name: newInternMerchandise
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation newMerchandiseIntern
+    {\n  newInternMerchandise(\n    new: {\n      merchandiseName:
+    \"Test\"\n      count: 1\n      orderer:
+    \"5f6f5dce00e2cf1e00c310b6\"\n      cost: 45.456\n      projectLeader:
+    \"mw\"\n      location: \"test\"\n      shop: \"amazon\",\n    }\n  )
+    {\n    id\n    arivedOn\n    projectLeader\n    url\n    createdDate\n    updatedDate\n    orderer\n    projectLeader\n    count\n    merchandiseId\n    merchandiseName\n    purchasedOn\n    serialNumber\n    invoiceNumber\n    shop\n    status\n    useCase\n  }\n}","operationName":"newMerchandiseIntern"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1608395832804.5
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

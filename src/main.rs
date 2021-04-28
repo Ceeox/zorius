@@ -15,18 +15,20 @@ use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
 
-use api::{gql_playgound, querys::Query, RootMutation, RootQuery};
+use api::{gql_playgound, Mutation, Query};
 use errors::ZoriusError;
 use models::{roles::RoleCache, upload::Storage};
 use uuid::Uuid;
 
 mod api;
 mod config;
+mod database;
 mod errors;
 mod helper;
+mod mailer;
 mod models;
 
-use crate::{api::graphql, config::CONFIG};
+use crate::{api::graphql, config::CONFIG, database::Database};
 
 const API_VERSION: &str = "v1";
 
@@ -88,12 +90,13 @@ async fn main() -> Result<(), errors::ZoriusError> {
     check_folders()?;
 
     let client = setup_mongodb().await?;
-    let db = client.database(&CONFIG.db.name);
     let role_cache = RoleCache::new();
+    let db = client.database(&CONFIG.db.name);
+    let database = Database::new(client, db.clone());
 
-    let schema = Schema::build(RootQuery, RootMutation, EmptySubscription)
+    let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
+        .data(database)
         .data(db)
-        .data(client)
         .data(role_cache)
         .data(Storage::default())
         .finish();
@@ -112,7 +115,12 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .wrap(
                 RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
                     .with_interval(Duration::from_secs(60))
-                    .with_max_requests(100),
+                    .with_max_requests(50)
+                    .with_identifier(|req| {
+                        let key = req.headers().get("x-request-id").unwrap();
+                        let key = key.to_str().unwrap();
+                        Ok(key.to_string())
+                    }),
             )
             // graphql api
             .service(graphql)
@@ -124,7 +132,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
                     .index_file("index.html"),
             )
             .service(
-                Files::new("/files", "files")
+                Files::new("/files", "./files")
                     .prefer_utf8(true)
                     .show_files_listing(),
             )
@@ -140,6 +148,5 @@ async fn main() -> Result<(), errors::ZoriusError> {
     } else {
         http_server.bind(webserver_url)?.run().await?
     };
-
     Ok(res)
 }

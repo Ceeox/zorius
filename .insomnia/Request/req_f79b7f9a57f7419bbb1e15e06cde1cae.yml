@@ -1,0 +1,31 @@
+_id: req_f79b7f9a57f7419bbb1e15e06cde1cae
+type: Request
+parentId: fld_2e658fcc1f434e3ab10b24eb14f68bb7
+modified: 1619217327671
+created: 1609732447745
+url: "{{ _.base_url }}"
+name: getWorkAccount
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query getWorkaccount
+    {\n  getWorkaccount{\n    id\n    userId\n    worktimeSecs\n    defaultWorkTarget\n    disabled\n    workdays
+    {\n      date\n      worktimeSecs\n      worktargetSecs\n      absentReason\n      timeRecords
+    {\n        id\n        isRunning\n        ended\n        duration\n        started\n      }\n    }\n  }\n}","operationName":"getWorkaccount"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'when-expired', _.token_lifetime %}"
+metaSortKey: -1607186673350
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

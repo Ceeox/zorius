@@ -1,9 +1,8 @@
 use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
-    InputObject, Result, SimpleObject,
+    InputObject, SimpleObject,
 };
-use bson::{document, DateTime};
-use bson::{oid::ObjectId, to_document, Document};
+use bson::{oid::ObjectId, DateTime};
 use chrono::Utc;
 use pwhash::sha512_crypt;
 use serde::{Deserialize, Serialize};
@@ -11,57 +10,24 @@ use serde::{Deserialize, Serialize};
 use crate::helper::validators::Password;
 
 pub type UserId = ObjectId;
+pub type UserEmail = String;
 
-#[derive(Deserialize, Debug, InputObject)]
-pub struct NewUser {
-    #[graphql(validator(Email))]
-    pub email: String,
-    #[graphql(validator(and(StringMinLength(length = "4"), StringMaxLength(length = "64"))))]
-    pub username: String,
-    #[graphql(validator(Password))]
-    pub password: String,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug, SimpleObject)]
+#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone)]
 pub struct User {
     #[serde(rename = "_id")]
     id: UserId,
-    email: String,
+    pub email: UserEmail,
     #[graphql(skip)]
     password_hash: String,
-    username: String,
-    created_at: DateTime,
-    #[graphql(visible = false)]
+    pub username: String,
+    pub created_at: DateTime,
+    #[graphql(skip)]
     invitation_pending: bool,
-    avatar_url: Option<String>,
-    firstname: Option<String>,
-    lastname: Option<String>,
-    last_updated: Option<DateTime>,
-    #[graphql(visible = false)]
-    deleted: bool,
-}
-
-#[derive(Deserialize, Serialize, Debug, InputObject)]
-pub struct UserUpdate {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    email: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    username: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    avatar_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    firstname: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    lastname: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
-pub struct Claim {
-    pub sub: String,
-    pub user_id: UserId,
-    pub exp: usize,
+    pub avatar_url: Option<String>,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+    pub updated: DateTime,
+    pub deleted: bool,
 }
 
 impl User {
@@ -76,14 +42,14 @@ impl User {
             lastname: new_user.lastname,
             created_at: Utc::now().into(),
             invitation_pending: true,
-            deleted: false,
-            last_updated: Some(Utc::now().into()),
+            updated: Utc::now().into(),
             avatar_url: None,
+            deleted: false,
         }
     }
 
-    pub fn update(update: &UserUpdate) -> Result<Document> {
-        Ok(to_document(update)?)
+    pub fn get_password_hash(&self) -> &str {
+        self.password_hash.as_ref()
     }
 
     pub fn change_password(&mut self, new_password: &str) {
@@ -102,7 +68,28 @@ impl User {
     pub fn is_password_correct(&self, password: &str) -> bool {
         sha512_crypt::verify(password.as_bytes(), &self.password_hash)
     }
-    pub fn is_deleted(&self) -> bool {
-        self.deleted
-    }
+}
+
+#[derive(Deserialize, Debug, InputObject)]
+pub struct NewUser {
+    #[graphql(validator(Email))]
+    pub email: UserEmail,
+    #[graphql(validator(and(StringMinLength(length = "4"), StringMaxLength(length = "64"))))]
+    pub username: String,
+    #[graphql(validator(Password))]
+    pub password: String,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+}
+
+#[derive(InputObject, Debug, Deserialize, Serialize)]
+pub struct UserUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    email: Option<UserEmail>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    avatar_url: Option<String>,
+    firstname: Option<String>,
+    lastname: Option<String>,
 }

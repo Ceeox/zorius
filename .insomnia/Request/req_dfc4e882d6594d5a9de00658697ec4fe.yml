@@ -1,0 +1,27 @@
+_id: req_dfc4e882d6594d5a9de00658697ec4fe
+type: Request
+parentId: fld_09bf02ae432e424bbe12e938aec94dec
+modified: 1619627933906
+created: 1619252272218
+url: ""
+name: getInternMerchanbdiseByMerchandiseId
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query getOrder
+    {\n  getInternMerchandiseByMerchandiseId(merchandiseId: )
+    {\n    id\n    arivedOn\n    projectLeader\n    url\n    createdDate\n    updatedDate\n    orderer\n    projectLeader\n    count\n    merchandiseId\n    merchandiseName\n    purchasedOn\n    serialNumber\n    invoiceNumber\n    shop\n    useCase\n  }\n}\n"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication: {}
+metaSortKey: -1619252272218
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

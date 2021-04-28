@@ -1,0 +1,30 @@
+_id: req_e6b21a739c31450eb53590379b735436
+type: Request
+parentId: fld_3e66f39305c94329a852db8c9bb4d93c
+modified: 1619218854721
+created: 1611946791378
+url: "{{ _.base_url }}"
+name: updateRole
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation updateRole {\n  updateRole(userId:
+    \"5fda65b40076a6c80029dff3\", mode: ADD, role: MERCHANDISE_MODERATOR)
+    {\n    userId\n    roles\n  }\n}","operationName":"updateRole"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'no-history', _.token_lifetime %}"
+metaSortKey: -1619217792004
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

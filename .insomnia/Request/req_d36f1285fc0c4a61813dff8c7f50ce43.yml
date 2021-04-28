@@ -1,0 +1,42 @@
+_id: req_d36f1285fc0c4a61813dff8c7f50ce43
+type: Request
+parentId: fld_092428f87e0a48ce81b48819678fa5ef
+modified: 1619217766478
+created: 1610630382061
+url: "{{ _.base_url }}"
+name: upload
+description: ""
+method: POST
+body:
+  mimeType: multipart/form-data
+  params:
+    - name: operations
+      value: '{ "query": "mutation ($files: [Upload!]) { upload(files: $files) { id
+        filename mimetype } }", "variables": { "files": null } }'
+      id: pair_f42d8c523fd64357be28fea4441e68a0
+    - name: map
+      value: '{ "0": ["variables.files"] }'
+      description: ""
+      id: pair_4848e69e4906468ea57392d3311b2e5f
+    - name: "0"
+      value: ""
+      description: ""
+      id: pair_4021aded872d46d79def51116c069d51
+      type: file
+      fileName: C:\Users\Manuel\Pictures\20201208_180532.jpg
+parameters: []
+headers:
+  - name: Content-Type
+    value: multipart/form-data
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1607191170566
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

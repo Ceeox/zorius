@@ -1,0 +1,34 @@
+_id: req_a1c44e87de5843698ed2203e11615349
+type: Request
+parentId: fld_092428f87e0a48ce81b48819678fa5ef
+modified: 1619222055969
+created: 1607191146774
+url: "{{ _.base_url }}"
+name: register
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation newUser {\n  register(\n    newUser: {\n      email:
+    \"test@example.com\"\n      username: \"helloWorld\"\n      password:
+    \"Test123!\"\n      firstname: \"Test\"\n      lastname:
+    \"Test\"\n    }\n  )
+    {\n    id\n    email\n    username\n    firstname\n    lastname\n    createdAt\n  }\n}","operationName":"newUser"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+  - name: Authorization
+    value: Bearer
+      eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0ZXN0QGNlb3guZGV2IiwiZXhwIjoxNjEwMzM2Nzg4fQ.5RJRfjPj3Y_ddKBKMa5gWXZX9uP9cG3cCA0U84jwBGV_LVHpDkFPX-fcS5DoFJcTQiH7QambzkMYFnuobES7Ow
+authentication:
+  type: bearer
+  token: ""
+metaSortKey: -1607191170516
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

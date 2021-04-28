@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+
+<head>
+    <title></title>
+</head>
+
+<body style="background-color:#FFFFFF;">
+    <h1>{{ merchandise_name }}{% if merchandise_id.is_some() %} ({{ merchandise_id.unwrap() }}) {% endif %}</h1>
+    <p>Changed status to {{ status }}</p>
+
+    <p>Id: {{ id }}</p>
+
+    <p>Orderer: {{ orderer_name }}</p>
+    <p>Count: {{ count }}</p>
+    <p>Cost: {{ cost }}</p>
+</body>
+
+</html>

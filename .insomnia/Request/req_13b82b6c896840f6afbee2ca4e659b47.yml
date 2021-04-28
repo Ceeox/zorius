@@ -1,0 +1,30 @@
+_id: req_13b82b6c896840f6afbee2ca4e659b47
+type: Request
+parentId: fld_3e66f39305c94329a852db8c9bb4d93c
+modified: 1619627937409
+created: 1608395785506
+url: "{{ _.base_url }}"
+name: workdayPause
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation workdayPause {\n  workdayPause
+    {\n    date\n    worktimeSecs\n    absentReason\n    worktargetSecs\n    timeRecords
+    {\n      id\n      isRunning\n      started\n      ended\n      duration\n    }\n  }\n}\n","operationName":"workdayPause"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1608395785506
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

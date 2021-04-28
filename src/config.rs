@@ -16,6 +16,11 @@ pub struct Settings {
     pub secret_key: String,
     pub domain: String,
     pub token_lifetime: i64,
+    pub registration_enabled: bool,
+    pub smtp_address: String,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub email_send_to: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,17 +45,14 @@ pub struct DbServerConfig {
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let mut s = Config::new();
-        // Start off by merging in the "default" configuration file
+        // load the default config
         s.merge(File::with_name("config/default"))?;
-
-        // Add in the current environment file
-        // Default to 'development' env
-        // Note that this file is _optional_
+        // check if we're running in debug mode
         let env = env::var("RUN_MODE").unwrap_or_else(|_| "dev".into());
+        // load the dev or prod config file
         s.merge(File::with_name(&format!("config/{}", env)).required(false))?;
+        // override config if values are present in env
         s.merge(Environment::new().separator("_").ignore_empty(true))?;
-
-        println!("debug: {:?}", s.get_bool("debug"));
 
         s.try_into()
     }

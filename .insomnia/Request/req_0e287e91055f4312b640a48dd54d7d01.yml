@@ -1,0 +1,30 @@
+_id: req_0e287e91055f4312b640a48dd54d7d01
+type: Request
+parentId: fld_5a3b28a421074c939e87852c164cb530
+modified: 1619635109993
+created: 1619261827644
+url: "{{ _.base_url }}"
+name: statusChange
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"mutation statusChange {\n  changeStatus(\n    id:
+    \"5f9ca565001ebde90030891f\"\n  newStatus: DELIVERED)
+    {\n    id\n    arivedOn\n    projectLeader\n    url\n    createdDate\n    updatedDate\n    orderer\n    projectLeader\n    count\n    merchandiseId\n    merchandiseName\n    purchasedOn\n    serialNumber\n    invoiceNumber\n    shop\n    useCase\n  }\n}","operationName":"statusChange"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'always', NaN %}"
+metaSortKey: -1619261827644
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

@@ -1,0 +1,30 @@
+_id: req_4f1a805d27874868a19a032692753b19
+type: Request
+parentId: fld_2e658fcc1f434e3ab10b24eb14f68bb7
+modified: 1619627920712
+created: 1611946629746
+url: "{{ _.base_url }}"
+name: listRoles
+description: ""
+method: POST
+body:
+  mimeType: application/graphql
+  text: '{"query":"query listRoles {\n  listRoles(userId:
+    \"5fda65b40076a6c80029dff3\")
+    {\n    userId\n    roles\n  }\n}","operationName":"listRoles"}'
+parameters: []
+headers:
+  - name: Content-Type
+    value: application/json
+authentication:
+  type: bearer
+  token: "{% response 'body', 'req_51bd6466a12a4470a30d4a604300bada',
+    'b64::JC5kYXRhLmxvZ2luLnRva2Vu::46b', 'when-expired', _.token_lifetime %}"
+metaSortKey: -1619217301348
+isPrivate: false
+settingStoreCookies: true
+settingSendCookies: true
+settingDisableRenderRequestBody: false
+settingEncodeUrl: true
+settingRebuildPath: true
+settingFollowRedirects: global

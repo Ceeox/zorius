@@ -1,104 +1,171 @@
-use async_graphql::{Context, Object};
-use bson::doc;
-use bson::{de::from_document, oid::ObjectId, to_document};
-use futures::stream::{StreamExt, TryStreamExt};
-use mongodb::options::FindOptions;
+use async_graphql::{
+    connection::{query, Connection, Edge, EmptyFields},
+    guard::Guard,
+    Context, Error, Object, Result,
+};
+use bson::{de::from_document, oid::ObjectId};
+use bson::{doc, to_document};
+use futures::stream::StreamExt;
+use mongodb::options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument};
 
 use crate::{
-    errors::ZoriusError,
-    models::merchandise::intern_merchandise::{
-        InternMerchandise, InternMerchandiseResponse, NewInternMerchandiseQuery,
-        UpdateInternMerchandiseQuery,
+    api::database2,
+    models::{
+        merchandise::intern_merchandise::{
+            InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
+            InternMerchandiseUpdate, NewMerchandiseIntern,
+        },
+        roles::{Role, RoleGuard},
     },
 };
 
+use super::{claim::Claim, database, MDB_COLL_INTERN_MERCH};
 
-
-// replace with gql query
-const MAX_TABLE_DATA_RESULTS: i64 = 50;
-
+#[derive(Default)]
 pub struct InternMerchandiseQuery;
 
 #[Object]
 impl InternMerchandiseQuery {
-    pub async fn table_data(
-        ctx: &Context<'_>,
-    ) -> Result<&'_ Vec<InternMerchandiseResponse>, ZoriusError> {
-        let collection = ctx.db.collection(MDB_COLL_NAME_INTERN);
-        let find_opt = Some(FindOptions::builder().limit(MAX_TABLE_DATA_RESULTS).build());
-        let cursor = collection.find(None, find_opt).await?;
-        let res = cursor
-            .filter_map(|doc| async move {
-                match doc {
-                    Err(_) => None,
-                    Ok(r) => Some(from_document::<InternMerchandiseResponse>(r)),
-                }
-            })
-            .try_collect::<Vec<InternMerchandiseResponse>>()
-            .await?;
-
-        Ok(res)
-    }
-    /*
-    pub async fn get_order(
+    async fn get_by_id(
         &self,
-        ctx: &Context,
-        order_id: ObjectId,
-    ) -> FieldResult<InternMerchandiseResponse> {
-        let collection = ctx.db.collection(MDB_COLL_NAME_INTERN);
-        let filter = doc! { "_id": order_id };
-        match collection.find_one(Some(filter), None).await? {
-            None => {
-                return Err(FieldError::new(
-                    "specified order not found",
-                    graphql_value!({ "error": "specified order not found" }),
-                ))
-            }
-            Some(r) => Ok(from_document(r)?),
+        ctx: &Context<'_>,
+        id: ObjectId,
+    ) -> Result<Option<InternMerchandise>> {
+        let _ = Claim::from_ctx(ctx)?;
+        match database2(ctx)?.get_intern_merch_by_id(id).await? {
+            Some(r) => Ok(Some(r)),
+            None => Err(Error::new("intern merch could not be found")),
         }
     }
-    */
+
+    async fn get_by_merch_id(
+        &self,
+        ctx: &Context<'_>,
+        merchandise_id: i32,
+    ) -> Result<Option<InternMerchandise>> {
+        let _ = Claim::from_ctx(ctx)?;
+        match database2(ctx)?
+            .get_intern_merch_by_merch_id(merchandise_id)
+            .await?
+        {
+            Some(r) => Ok(Some(r)),
+            None => Err(Error::new("intern merch could not be found")),
+        }
+    }
+
+    async fn list(
+        &self,
+        ctx: &Context<'_>,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> Result<Connection<usize, InternMerchandise, EmptyFields, EmptyFields>> {
+        let _ = Claim::from_ctx(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
+        let doc_count = collection.estimated_document_count(None).await? as usize;
+
+        query(
+            after,
+            before,
+            first,
+            last,
+            |after, before, first, last| async move {
+                let mut start = after.map(|after| after + 1).unwrap_or(0);
+                let mut end = before.unwrap_or(doc_count);
+
+                if let Some(first) = first {
+                    end = (start + first).min(end);
+                }
+                if let Some(last) = last {
+                    start = if last > end - start { end } else { end - last };
+                }
+                let options = FindOptions::builder()
+                    .skip(start as i64)
+                    .limit(end as i64)
+                    .build();
+                let cursor = collection.find(None, options).await?;
+
+                let mut connection = Connection::new(start > 0, end < doc_count);
+                connection
+                    .append_stream(cursor.enumerate().map(|(n, doc)| {
+                        let merch = from_document::<InternMerchandise>(doc.unwrap()).unwrap();
+                        Edge::with_additional_fields(n + start, merch, EmptyFields)
+                    }))
+                    .await;
+                Ok(connection)
+            },
+        )
+        .await
+    }
 }
 
+#[derive(Default)]
 pub struct InternMerchandiseMutation;
 
+#[Object]
 impl InternMerchandiseMutation {
-    /*
-    pub async fn new_intern_order(
-        ctx: &Context,
-        new_intern_merchandise: NewInternMerchandiseQuery,
-    ) -> FieldResult<InternMerchandiseResponse> {
-        let order = InternMerchandise::new(new_intern_merchandise);
-        let collection = ctx.db.collection(MDB_COLL_NAME_INTERN);
-        let doc = to_document(&order)?;
-        let _ = collection.insert_one(doc.clone(), None).await?;
-        Ok(order.into())
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::MerchandiseModerator")
+    )))]
+    async fn new(&self, ctx: &Context<'_>, new: NewMerchandiseIntern) -> Result<InternMerchandise> {
+        let _ = Claim::from_ctx(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
+        let new_merch = InternMerchandise::new(new);
+        let doc = to_document(&new_merch)?;
+        let _ = collection.insert_one(doc, None).await?;
+        Ok(new_merch)
     }
 
-    pub async fn update_intern_order(
-        ctx: &Context,
-        order_id: ObjectId,
-        update: UpdateInternMerchandiseQuery,
-    ) -> FieldResult<InternMerchandiseResponse> {
-        let collection = ctx.db.collection(MDB_COLL_NAME_INTERN);
-        let filter = doc! { "_id": order_id.clone() };
-        let mut order: InternMerchandise = match collection.find_one(Some(filter), None).await? {
-            None => {
-                return Err(FieldError::new(
-                    "specified order not found",
-                    graphql_value!({ "error": "specified order not found" }),
-                ))
-            }
-            Some(r) => from_document(r)?,
-        };
-        order.update(update);
-        let query = doc! {
-            "_id": order_id
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::MerchandiseModerator")
+    )))]
+    async fn update_by_id(
+        &self,
+        ctx: &Context<'_>,
+        id: InternMerchandiseId,
+        update: InternMerchandiseUpdate,
+    ) -> Result<Option<InternMerchandise>> {
+        let _ = Claim::from_ctx(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
+        let filter = doc! {"_id": id};
+        let update = doc! {"$set": bson::to_bson(&update)?};
+        let options = FindOneAndUpdateOptions::builder()
+            .return_document(Some(ReturnDocument::After))
+            .build();
+        match collection
+            .find_one_and_update(filter, update, Some(options))
+            .await?
+        {
+            None => Ok(None),
+            Some(doc) => Ok(Some(from_document(doc)?)),
+        }
+    }
+
+    async fn change_status(
+        &self,
+        ctx: &Context<'_>,
+        id: InternMerchandiseId,
+        new_status: InternMerchandiseStatus,
+    ) -> Result<Option<InternMerchandise>> {
+        let _ = Claim::from_ctx(ctx)?;
+        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
+        let filter = doc! {"_id": id};
+        let mut merch = match collection.find_one(filter, None).await? {
+            None => return Ok(None),
+            Some(doc) => from_document::<InternMerchandise>(doc)?,
         };
 
-        let update_doc = to_document(&order)?;
-        let _ = collection.update_one(query, update_doc, None).await?;
-        Ok(order.into())
+        let orderer_id = merch.orderer.clone();
+        let user = match database2(ctx)?.get_user_by_id(orderer_id).await? {
+            None => return Err(Error::new("the orderer could not be found")),
+            Some(r) => r,
+        };
+
+        merch.change_status(new_status, user);
+
+        Ok(None)
     }
-    */
 }
