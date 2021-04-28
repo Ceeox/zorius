@@ -48,6 +48,10 @@ impl User {
         }
     }
 
+    pub fn get_password_hash(&self) -> &str {
+        self.password_hash.as_ref()
+    }
+
     pub fn change_password(&mut self, new_password: &str) {
         self.password_hash = User::hash_password(new_password);
     }

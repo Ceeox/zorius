@@ -124,12 +124,7 @@ impl UserMutation {
         if !CONFIG.registration_enabled {
             return Err(Error::new("registration is not enabled"));
         }
-
-        let user = User::new(new_user);
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-        let doc = to_document(&user)?;
-        let _ = collection.insert_one(doc.clone(), None).await?;
-        Ok(user)
+        Ok(database2(ctx)?.new_user(new_user).await?)
     }
 
     async fn reset_password(
@@ -152,7 +147,7 @@ impl UserMutation {
             user.change_password(&new_password);
         }
 
-        let update = to_document(&user)?;
+        let update = doc! {"$set" : doc! {"password_hash": user.get_password_hash() }};
         let filter = doc! {"_id": user_id};
         let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
         let _ = collection.update_one(filter, update, None).await?;
@@ -168,24 +163,7 @@ impl UserMutation {
         user_update: UserUpdate,
     ) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! { "_id": user_id };
-
-        let mut update = bson::Document::new();
-        update.insert("$set", bson::to_bson(&user_update)?);
-
-        let options = FindOneAndUpdateOptions::builder()
-            .return_document(Some(ReturnDocument::After))
-            .build();
-
-        let user = match collection
-            .find_one_and_update(filter, update, Some(options))
-            .await?
-        {
-            None => return Err(Error::new("specified user not found")),
-            Some(r) => r,
-        };
-        Ok(from_document(user)?)
+        Ok(database2(ctx)?.update_user(user_id, user_update).await?)
     }
 
     async fn upload_avatar(&self, ctx: &Context<'_>, files: Vec<Upload>) -> Result<Vec<FileInfo>> {

@@ -32,11 +32,9 @@ impl InternMerchandiseQuery {
         id: ObjectId,
     ) -> Result<Option<InternMerchandise>> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
-        let filter = doc! {"_id": id};
-        match collection.find_one(filter, None).await? {
-            None => Ok(None),
-            Some(doc) => Ok(Some(from_document::<InternMerchandise>(doc)?)),
+        match database2(ctx)?.get_intern_merch_by_id(id).await? {
+            Some(r) => Ok(Some(r)),
+            None => Err(Error::new("intern merch could not be found")),
         }
     }
 
@@ -46,11 +44,12 @@ impl InternMerchandiseQuery {
         merchandise_id: i32,
     ) -> Result<Option<InternMerchandise>> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
-        let filter = doc! {"merchandise_id": merchandise_id};
-        match collection.find_one(filter, None).await? {
-            None => Ok(None),
-            Some(doc) => Ok(Some(from_document::<InternMerchandise>(doc)?)),
+        match database2(ctx)?
+            .get_intern_merch_by_merch_id(merchandise_id)
+            .await?
+        {
+            Some(r) => Ok(Some(r)),
+            None => Err(Error::new("intern merch could not be found")),
         }
     }
 
