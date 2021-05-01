@@ -2,13 +2,16 @@ use std::collections::HashMap;
 
 use async_graphql::{dataloader::Loader, Error, Result};
 use bson::{doc, from_document, to_document};
+use futures::{StreamExt, TryStreamExt};
 use mongodb::{
     options::{FindOneAndUpdateOptions, ReturnDocument},
-    Client, Database as MongoDB,
+    Client, Cursor, Database as MongoDB,
 };
 
 use crate::models::{
-    merchandise::intern_merchandise::{InternMerchandise, InternMerchandiseId},
+    merchandise::intern_merchandise::{
+        InternMerchResponse, InternMerchandise, InternMerchandiseId,
+    },
     user::{NewUser, User, UserEmail, UserId, UserUpdate},
 };
 
@@ -83,12 +86,27 @@ impl Database {
     pub async fn get_intern_merch_by_id(
         &self,
         id: InternMerchandiseId,
-    ) -> Result<Option<InternMerchandise>> {
+    ) -> Result<Option<InternMerchResponse>> {
         let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
-        let filter = doc! {"_id": id};
-        match collection.find_one(filter, None).await? {
+        let pipeline = vec![
+            doc! {"$match": {"_id": id}},
+            doc! {"$lookup": {
+                    "from": MDB_COLL_NAME_USERS,
+                    "localField": "orderer",
+                    "foreignField": "_id",
+                    "as": "orderer"
+                }
+            },
+            doc! {
+                "$unwind": {
+                    "path": "$orderer"
+                }
+            },
+        ];
+        let mut doc = collection.aggregate(pipeline, None).await?;
+        match doc.next().await {
+            Some(r) => Ok(Some(from_document(r?)?)),
             None => Ok(None),
-            Some(doc) => Ok(Some(from_document::<InternMerchandise>(doc)?)),
         }
     }
 
@@ -102,6 +120,11 @@ impl Database {
             None => Ok(None),
             Some(doc) => Ok(Some(from_document::<InternMerchandise>(doc)?)),
         }
+    }
+
+    pub async fn count_intern_merch(&self) -> Result<usize> {
+        let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
+        Ok(collection.estimated_document_count(None).await? as usize)
     }
 }
 

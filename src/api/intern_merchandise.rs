@@ -3,16 +3,16 @@ use async_graphql::{
     guard::Guard,
     Context, Error, Object, Result,
 };
-use bson::{de::from_document, oid::ObjectId};
+use bson::{de::from_document, oid::ObjectId, Document};
 use bson::{doc, to_document};
 use futures::stream::StreamExt;
 use mongodb::options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument};
 
 use crate::{
-    api::database2,
+    api::{database2, MDB_COLL_NAME_USERS},
     models::{
         merchandise::intern_merchandise::{
-            InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
+            InternMerchResponse, InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
             InternMerchandiseUpdate, NewMerchandiseIntern,
         },
         roles::{Role, RoleGuard},
@@ -26,11 +26,11 @@ pub struct InternMerchandiseQuery;
 
 #[Object]
 impl InternMerchandiseQuery {
-    async fn get_by_id(
+    async fn get_intern_merch_by_id(
         &self,
         ctx: &Context<'_>,
         id: ObjectId,
-    ) -> Result<Option<InternMerchandise>> {
+    ) -> Result<Option<InternMerchResponse>> {
         let _ = Claim::from_ctx(ctx)?;
         match database2(ctx)?.get_intern_merch_by_id(id).await? {
             Some(r) => Ok(Some(r)),
@@ -38,7 +38,7 @@ impl InternMerchandiseQuery {
         }
     }
 
-    async fn get_by_merch_id(
+    async fn get_intern_merch_by_merch_id(
         &self,
         ctx: &Context<'_>,
         merchandise_id: i32,
@@ -53,14 +53,14 @@ impl InternMerchandiseQuery {
         }
     }
 
-    async fn list(
+    async fn list_intern_merch(
         &self,
         ctx: &Context<'_>,
         after: Option<String>,
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
-    ) -> Result<Connection<usize, InternMerchandise, EmptyFields, EmptyFields>> {
+    ) -> Result<Connection<usize, InternMerchResponse, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
         let doc_count = collection.estimated_document_count(None).await? as usize;
@@ -71,7 +71,7 @@ impl InternMerchandiseQuery {
             first,
             last,
             |after, before, first, last| async move {
-                let mut start = after.map(|after| after + 1).unwrap_or(0);
+                let mut start = after.unwrap_or(0);
                 let mut end = before.unwrap_or(doc_count);
 
                 if let Some(first) = first {
@@ -80,16 +80,29 @@ impl InternMerchandiseQuery {
                 if let Some(last) = last {
                     start = if last > end - start { end } else { end - last };
                 }
-                let options = FindOptions::builder()
-                    .skip(start as i64)
-                    .limit(end as i64)
-                    .build();
-                let cursor = collection.find(None, options).await?;
+                let limit = (end - start) as i64;
+                let pipeline = vec![
+                    doc! {"$skip": start as i64},
+                    doc! {"$limit": limit},
+                    doc! {"$lookup": {
+                            "from": MDB_COLL_NAME_USERS,
+                            "localField": "orderer",
+                            "foreignField": "_id",
+                            "as": "orderer"
+                        }
+                    },
+                    doc! {
+                        "$unwind": {
+                            "path": "$orderer"
+                        }
+                    },
+                ];
+                let cursor = collection.aggregate(pipeline, None).await?;
 
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
                     .append_stream(cursor.enumerate().map(|(n, doc)| {
-                        let merch = from_document::<InternMerchandise>(doc.unwrap()).unwrap();
+                        let merch = from_document::<InternMerchResponse>(doc.unwrap()).unwrap();
                         Edge::with_additional_fields(n + start, merch, EmptyFields)
                     }))
                     .await;
@@ -97,6 +110,10 @@ impl InternMerchandiseQuery {
             },
         )
         .await
+    }
+
+    pub async fn count_intern_merch(&self, ctx: &Context<'_>) -> Result<usize> {
+        Ok(database2(ctx)?.count_intern_merch().await?)
     }
 }
 
