@@ -1,11 +1,11 @@
-use std::io::BufReader;
 use std::{fs::File, time::Duration};
+use std::{io::BufReader, str::FromStr};
 
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_ratelimit::{MemoryStore, MemoryStoreActor, RateLimiter};
+use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{
-    http::ContentEncoding,
+    http::{ContentEncoding, HeaderName, HeaderValue},
     middleware::{Compress, DefaultHeaders, Logger},
     App, HttpServer,
 };
@@ -115,12 +115,15 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .wrap(
                 RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
                     .with_interval(Duration::from_secs(60))
-                    .with_max_requests(50)
                     .with_identifier(|req| {
-                        let key = req.headers().get("x-request-id").unwrap();
-                        let key = key.to_str().unwrap();
-                        Ok(key.to_string())
-                    }),
+                        if let Some(key) = req.headers().get("x-request-id") {
+                            let key = key.to_str().unwrap();
+                            Ok(key.to_string())
+                        } else {
+                            Ok(String::new())
+                        }
+                    })
+                    .with_max_requests(50),
             )
             // graphql api
             .service(graphql)
