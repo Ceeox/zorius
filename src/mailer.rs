@@ -12,12 +12,16 @@ use crate::config::CONFIG;
 // TODO:    1. return the result to report if the emails failed to send
 //          2. remove `unwraps` and `expects` and replace them
 pub fn mailer(subject: &str, body: &str) {
-    let smtp_address: &str = CONFIG.smtp_address.as_ref();
-    let username: &str = CONFIG.smtp_username.as_ref();
-    let password: &str = CONFIG.smtp_password.as_ref();
+    if !CONFIG.mailer.enable_mailer {
+        return;
+    }
+
+    let smtp_address: &str = CONFIG.mailer.smtp_address.as_ref();
+    let username: &str = CONFIG.mailer.smtp_username.as_ref();
+    let password: &str = CONFIG.mailer.smtp_password.as_ref();
 
     let from = EmailAddress::new(format!("zorius@{}", CONFIG.domain)).unwrap();
-    let to = EmailAddress::new(CONFIG.email_send_to.clone()).unwrap();
+    let to = EmailAddress::new(CONFIG.mailer.email_send_to.clone()).unwrap();
     let envelope = Envelope::new(Some(from), vec![to]).unwrap();
 
     let email = EmailBuilder::new()

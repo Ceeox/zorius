@@ -1,12 +1,8 @@
 debug = true
 domain = "localhost"
-email_send_to = ""
-registration_enabled = true
-smtp_address = ""
-smtp_password = ""
-smtp_username = ""
-token_lifetime = 86400
+registration_enabled = false
 secret_key = ""
+token_lifetime = 86400
 
 [web]
 cert_path = "cert.pem"
@@ -22,3 +18,10 @@ name = "zorius"
 password = ""
 server = ""
 username = "zorius"
+
+[mailer]
+email_send_to = ""
+enable_mailer = false
+smtp_address = ""
+smtp_password = ""
+smtp_username = ""

@@ -1,14 +1,14 @@
 use lazy_static::lazy_static;
-use std::{env, net::IpAddr, result::Result, usize};
+use std::{env, net::IpAddr, result::Result};
 
 use config::{Config, ConfigError, Environment, File};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 lazy_static! {
     pub static ref CONFIG: Settings = Settings::new().expect("Failed to load config");
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Settings {
     pub debug: bool,
     pub web: WebServerConfig,
@@ -17,13 +17,10 @@ pub struct Settings {
     pub domain: String,
     pub token_lifetime: i64,
     pub registration_enabled: bool,
-    pub smtp_address: String,
-    pub smtp_username: String,
-    pub smtp_password: String,
-    pub email_send_to: String,
+    pub mailer: MailConfig,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct WebServerConfig {
     pub ip: IpAddr,
     pub port: u16,
@@ -33,13 +30,22 @@ pub struct WebServerConfig {
     pub log_format: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct DbServerConfig {
     pub server: String,
     pub username: String,
     pub password: String,
     pub app_name: String,
     pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MailConfig {
+    pub enable_mailer: bool,
+    pub smtp_address: String,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub email_send_to: String,
 }
 
 impl Settings {
