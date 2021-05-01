@@ -56,6 +56,31 @@ pub struct InternMerchandise {
     pub updated_date: DateTime,
 }
 
+#[derive(Deserialize, Serialize, Debug, SimpleObject, Clone)]
+pub struct InternMerchResponse {
+    #[serde(rename = "_id")]
+    pub id: InternMerchandiseId,
+    pub merchandise_id: Option<i32>,
+    pub orderer: User,
+    pub project_leader: Option<String>,
+    pub purchased_on: DateTime,
+    pub count: i32,
+    pub merchandise_name: String,
+    pub use_case: Option<String>,
+    pub location: Option<String>,
+    pub article_number: Option<String>,
+    pub shop: Option<String>,
+    pub cost: f64,
+    pub serial_number: Option<Vec<String>>,
+    pub arived_on: Option<DateTime>,
+    pub status: InternMerchandiseStatus,
+    pub url: Option<String>,
+    pub postage: Option<f64>,
+    pub invoice_number: Option<i32>,
+    pub created_date: DateTime,
+    pub updated_date: DateTime,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Enum)]
 pub enum InternMerchandiseStatus {
     Ordered,
