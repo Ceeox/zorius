@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-
 use async_graphql::{Error, Result};
 use bson::{doc, from_document, to_document};
 use futures::StreamExt;
 use mongodb::{
-    options::{FindOneAndUpdateOptions, InsertOneOptions, ReturnDocument},
+    options::{FindOneAndUpdateOptions, ReturnDocument},
     Client, Database as MongoDB,
 };
 
@@ -170,12 +168,12 @@ impl Database {
         &self,
         id: WorkReportId,
         user_id: UserId,
-        update: WorkReportUpdate,
+        work_report_update: WorkReportUpdate,
     ) -> Result<WorkReportResponse> {
         let col = self.database.collection(MDB_COLL_WORK_REPORTS);
         let filter = doc! { "_id": id , "user_id": user_id };
         let mut update = bson::Document::new();
-        update.insert("$set", bson::to_bson(&update)?);
+        update.insert("$set", bson::to_bson(&work_report_update)?);
 
         let options = FindOneAndUpdateOptions::builder()
             .return_document(Some(ReturnDocument::After))
