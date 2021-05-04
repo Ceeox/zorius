@@ -39,24 +39,33 @@ impl Claim {
         }
     }
 
-    /// Get the Claim from async_graphql context
-    /// `Token(Sting)` must be present in Context
+    /// Gets the Claim from async_graphql context
+    /// `Token(Sting)` must be present in context
     pub fn from_ctx(ctx: &Context<'_>) -> Result<Self> {
         let value: &Token = match ctx.data::<Token>() {
             Err(_e) => return Err(Error::new("missing token")),
             Ok(r) => r,
         };
-        Ok(Claim::try_from(value.0.clone())?)
+        let claim = Claim::try_from(value.0.to_owned())?;
+        if claim.token_expired() {
+            return Err(Error::new("Token expired!"));
+        }
+        Ok(claim)
     }
 
-    /// return a reference to the `user_id`
+    /// Return a reference to the `user_id`
     pub fn user_id(&self) -> &UserId {
         &self.id
     }
 
-    /// retruns the unix timestamp when the token expries.
+    /// Retruns the unix timestamp when the token expries.
     pub fn expires_at(&self) -> usize {
         self.exp
+    }
+
+    /// Retruns if the token is expired
+    pub fn token_expired(&self) -> bool {
+        (Local::now().timestamp() as usize) >= self.exp
     }
 }
 
