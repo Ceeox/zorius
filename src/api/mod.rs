@@ -13,6 +13,7 @@ pub mod intern_merchandise;
 pub mod project;
 pub mod role;
 pub mod user;
+pub mod work_report;
 
 use crate::{config::CONFIG, API_VERSION};
 
@@ -23,6 +24,7 @@ use self::{
     project::{ProjectMutation, ProjectQuery},
     role::{RoleMutation, RoleQuery},
     user::{UserMutation, UserQuery},
+    work_report::{WorkReportMutation, WorkReportQuery},
 };
 
 pub(crate) static MDB_COLL_NAME_USERS: &str = "users";
@@ -40,6 +42,7 @@ pub struct Query(
     RoleQuery,
     CustomerQuery,
     ProjectQuery,
+    WorkReportQuery,
     InternMerchandiseQuery,
 );
 
@@ -49,6 +52,7 @@ pub struct Mutation(
     RoleMutation,
     CustomerMutation,
     ProjectMutation,
+    WorkReportMutation,
     InternMerchandiseMutation,
 );
 

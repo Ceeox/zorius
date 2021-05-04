@@ -8,6 +8,10 @@ use crate::models::{
     work_report::{customer::CustomerId, project::ProjectId},
 };
 
+use self::{customer::Customer, project::Project};
+
+use super::user::User;
+
 pub(crate) mod customer;
 pub(crate) mod project;
 
@@ -32,6 +36,20 @@ pub struct WorkReportTimes {
     id: ObjectId,
     started: DateTime,
     ended: Option<DateTime>,
+}
+
+#[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
+pub struct WorkReportResponse {
+    #[serde(rename = "_id")]
+    id: WorkReportId,
+    user: User,
+    customer: Customer,
+    project: Option<Project>,
+    trip_info: TripInfo,
+    description: String,
+    times: Vec<WorkReportTimes>,
+    status: WorkReportStatus,
+    invoiced: bool,
 }
 
 #[derive(Deserialize, Debug, InputObject)]
