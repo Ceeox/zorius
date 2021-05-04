@@ -1,6 +1,7 @@
 use async_graphql::{Enum, InputObject, Result, SimpleObject};
 use bson::{doc, oid::ObjectId, to_document, DateTime, Document};
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
@@ -32,10 +33,8 @@ pub struct WorkReport {
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct WorkReportTimes {
-    #[serde(rename = "_id")]
-    id: ObjectId,
-    started: DateTime,
-    ended: Option<DateTime>,
+    pub started: DateTime,
+    pub ended: Option<DateTime>,
 }
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
@@ -52,7 +51,7 @@ pub struct WorkReportResponse {
     invoiced: bool,
 }
 
-#[derive(Deserialize, Debug, InputObject)]
+#[derive(Serialize, Debug, InputObject)]
 pub struct NewWorkReport {
     pub customer_id: CustomerId,
     pub project_id: Option<ProjectId>,
@@ -135,14 +134,17 @@ impl WorkReport {
                 from_customer_arrived: new_wr.from_customer_arrived,
             },
             description: new_wr.description,
-            times: vec![],
+            times: vec![WorkReportTimes {
+                started: Utc::now().into(),
+                ended: None,
+            }],
             status: WorkReportStatus::Running,
             invoiced: true,
         }
     }
 
-    pub fn update(wr_update: WorkReportUpdate) -> Result<Document> {
-        Ok(doc! { "$set": to_document(&wr_update)? })
+    pub fn get_id(&self) -> &WorkReportId {
+        &self.id
     }
 
     /*

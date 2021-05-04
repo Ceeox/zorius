@@ -24,7 +24,7 @@ pub struct WorkReportQuery;
 
 #[Object]
 impl WorkReportQuery {
-    async fn get_workreport(
+    async fn get_workreport_by_id(
         &self,
         ctx: &Context<'_>,
         id: WorkReportId,
@@ -37,7 +37,7 @@ impl WorkReportQuery {
             .await?
         {
             Some(r) => Ok(Some(r)),
-            None => Err(Error::new("work report could not be found")),
+            None => Err(Error::new("work report not found!")),
         }
     }
 
@@ -72,7 +72,7 @@ impl WorkReportQuery {
                 let limit = (end - start) as i64;
                 let pipeline = vec![
                     doc! {"$skip": start as i64},
-                    doc! {"$limit": limit},
+                    doc! {"$limit": limit },
                     doc! {"$match": {
                             "user_id": user_id
                     }},
@@ -92,6 +92,9 @@ impl WorkReportQuery {
                     },
                     doc! {"$unwind": {
                             "path": "$user_id",
+                        }
+                    },
+                    doc! {"$unwind": {
                             "path": "$project_id"
                         }
                     },
@@ -117,46 +120,27 @@ pub struct WorkReportMutation;
 
 #[Object]
 impl WorkReportMutation {
-    async fn new_workreport(
-        &self,
-        ctx: &Context<'_>,
-        new_workreport: NewWorkReport,
-    ) -> Result<WorkReport> {
+    async fn new_work_report(&self, ctx: &Context<'_>, new: NewWorkReport) -> Result<WorkReport> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
         let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
-        let wr = WorkReport::new(user_id.clone(), new_workreport);
+        let wr = WorkReport::new(user_id.clone(), new);
         let insert = to_document(&wr)?;
         let _ = collection.insert_one(insert, None).await?;
         Ok(wr)
     }
 
-    #[graphql(guard(RoleGuard(role = "Role::Admin")))]
-    async fn update_workreport_for_user(
+    async fn update_work_report(
         &self,
         ctx: &Context<'_>,
-        workreport_id: WorkReportId,
-        workreport_update: WorkReportUpdate,
-    ) -> Result<WorkReport> {
+        id: WorkReportId,
+        update: WorkReportUpdate,
+    ) -> Result<WorkReportResponse> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
-        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
-        let filter = doc! { "_id": workreport_id, "user_id": user_id };
-
-        let update = WorkReport::update(workreport_update)?;
-
-        let options = FindOneAndUpdateOptions::builder()
-            .return_document(Some(ReturnDocument::After))
-            .build();
-
-        let wr = match collection
-            .find_one_and_update(filter, update, Some(options))
-            .await?
-        {
-            None => return Err(Error::new("specified workreport not found")),
-            Some(r) => r,
-        };
-        Ok(from_document(wr)?)
+        Ok(database2(ctx)?
+            .update_work_report(id, user_id.clone(), update)
+            .await?)
     }
 }
