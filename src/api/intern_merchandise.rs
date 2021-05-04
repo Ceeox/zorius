@@ -82,22 +82,12 @@ impl InternMerchandiseQuery {
                     start = if last > end - start { end } else { end - last };
                 }
                 let limit = (end - start) as i64;
-                let pipeline = vec![
-                    doc! {"$skip": start as i64},
-                    doc! {"$limit": limit},
-                    doc! {"$lookup": {
-                            "from": MDB_COLL_NAME_USERS,
-                            "localField": "orderer",
-                            "foreignField": "_id",
-                            "as": "orderer"
-                        }
-                    },
-                    doc! {
-                        "$unwind": {
-                            "path": "$orderer"
-                        }
-                    },
-                ];
+                let pipeline = AggregateBuilder::new()
+                    .skip(start as i64)
+                    .limit(limit)
+                    .lookup(MDB_COLL_NAME_USERS, "orderer", "_id", "orderer")
+                    .unwind("$orderer", None, None)
+                    .build();
                 let cursor = collection.aggregate(pipeline, None).await?;
 
                 let mut connection = Connection::new(start > 0, end < doc_count);
