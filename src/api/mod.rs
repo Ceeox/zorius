@@ -87,7 +87,6 @@ pub async fn graphql(
     schema.execute(request).await.into()
 }
 
-// Enable only when we're running in debug mode
 #[get("/playground")]
 pub async fn gql_playgound() -> HttpResponse {
     HttpResponse::Ok()

@@ -3,13 +3,14 @@ use async_graphql::{
     guard::Guard,
     Context, Error, Object, Result,
 };
-use bson::{de::from_document, oid::ObjectId, Document};
+use bson::{de::from_document, oid::ObjectId};
 use bson::{doc, to_document};
 use futures::stream::StreamExt;
-use mongodb::options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument};
+use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
 
 use crate::{
     api::{database2, MDB_COLL_NAME_USERS},
+    helper::AggregateBuilder,
     models::{
         merchandise::intern_merchandise::{
             InternMerchResponse, InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
