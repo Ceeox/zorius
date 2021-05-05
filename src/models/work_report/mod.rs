@@ -146,13 +146,4 @@ impl WorkReport {
     pub fn get_id(&self) -> &WorkReportId {
         &self.id
     }
-
-    /*
-    pub fn update_work_report(time_update: WorkReportTimeUpdate) -> Result<Vec<Document>> {
-        match time_update.mode {
-            ArrayUpdateMode::Add => Ok(doc! {"$push": &format!("")}),
-            ArrayUpdateMode::Remove => Ok(doc! {"$push": &format!("")}),
-        }
-    }
-    */
 }
