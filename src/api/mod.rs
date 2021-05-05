@@ -27,10 +27,6 @@ use self::{
     work_report::{WorkReportMutation, WorkReportQuery},
 };
 
-pub(crate) static MDB_COLL_NAME_USERS: &str = "users";
-pub(crate) static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
-pub(crate) static MDB_COLL_WORK_REPORTS: &str = "work_reports";
-pub(crate) static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
 pub(crate) static MDB_COLL_ROLES: &str = "roles";
 
 pub type RootSchema = Schema<Query, Mutation, EmptySubscription>;

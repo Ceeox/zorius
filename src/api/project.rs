@@ -1,12 +1,15 @@
 use async_graphql::{guard::Guard, Context, Error, Object, Result};
 use bson::{doc, from_document, to_document};
 
-use crate::models::{
-    roles::{Role, RoleGuard},
-    work_report::project::{Project, ProjectId},
+use crate::{
+    database::MDB_COLL_WORK_REPORTS,
+    models::{
+        roles::{Role, RoleGuard},
+        work_report::project::{Project, ProjectId},
+    },
 };
 
-use super::{claim::Claim, database, MDB_COLL_WORK_REPORTS};
+use super::{claim::Claim, database};
 
 #[derive(Default)]
 pub struct ProjectQuery;

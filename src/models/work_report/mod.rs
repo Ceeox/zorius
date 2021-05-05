@@ -1,5 +1,5 @@
-use async_graphql::{Enum, InputObject, Result, SimpleObject};
-use bson::{doc, oid::ObjectId, to_document, DateTime, Document};
+use async_graphql::{Enum, InputObject, SimpleObject};
+use bson::{doc, oid::ObjectId, DateTime};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

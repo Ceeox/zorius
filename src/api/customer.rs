@@ -2,7 +2,8 @@ use async_graphql::{guard::Guard, Context, Error, Object, Result};
 use bson::{doc, from_document, to_document};
 
 use crate::{
-    api::{claim::Claim, database, MDB_COLL_WORK_REPORTS},
+    api::{claim::Claim, database},
+    database::MDB_COLL_WORK_REPORTS,
     models::{
         roles::{Role, RoleGuard},
         work_report::customer::{Customer, CustomerAdd, CustomerId},

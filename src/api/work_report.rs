@@ -1,20 +1,13 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    guard::Guard,
     Context, Error, Object, Result,
 };
-use bson::{doc, from_document, to_document};
+use bson::from_document;
 use futures::StreamExt;
-use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
 
 use crate::{
-    api::{claim::Claim, database, MDB_COLL_NAME_USERS, MDB_COLL_WORK_REPORTS},
-    models::{
-        roles::{Role, RoleGuard},
-        work_report::{
-            NewWorkReport, WorkReport, WorkReportId, WorkReportResponse, WorkReportUpdate,
-        },
-    },
+    api::claim::Claim,
+    models::work_report::{NewWorkReport, WorkReportId, WorkReportResponse, WorkReportUpdate},
 };
 
 use super::database2;
@@ -51,8 +44,7 @@ impl WorkReportQuery {
     ) -> Result<Connection<usize, WorkReportResponse, EmptyFields, EmptyFields>> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
-        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
-        let doc_count = collection.estimated_document_count(None).await? as usize;
+        let doc_count = database2(ctx)?.count_work_reports().await?;
 
         query(
             after,
@@ -70,36 +62,10 @@ impl WorkReportQuery {
                     start = if last > end - start { end } else { end - last };
                 }
                 let limit = (end - start) as i64;
-                let pipeline = vec![
-                    doc! {"$skip": start as i64},
-                    doc! {"$limit": limit },
-                    doc! {"$match": {
-                            "user_id": user_id
-                    }},
-                    doc! {"$lookup": {
-                            "from": MDB_COLL_NAME_USERS,
-                            "localField": "user_id",
-                            "foreignField": "_id",
-                            "as": "user"
-                        }
-                    },
-                    doc! {"$lookup": {
-                            "from": MDB_COLL_WORK_REPORTS,
-                            "localField": "project_id",
-                            "foreignField": "_id",
-                            "as": "project"
-                        }
-                    },
-                    doc! {"$unwind": {
-                            "path": "$user_id",
-                        }
-                    },
-                    doc! {"$unwind": {
-                            "path": "$project_id"
-                        }
-                    },
-                ];
-                let cursor = collection.aggregate(pipeline, None).await?;
+
+                let cursor = database2(ctx)?
+                    .list_work_report(user_id.clone(), start as i64, limit)
+                    .await?;
 
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
@@ -120,15 +86,17 @@ pub struct WorkReportMutation;
 
 #[Object]
 impl WorkReportMutation {
-    async fn new_work_report(&self, ctx: &Context<'_>, new: NewWorkReport) -> Result<WorkReport> {
+    async fn new_work_report(
+        &self,
+        ctx: &Context<'_>,
+        new: NewWorkReport,
+    ) -> Result<WorkReportResponse> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
-        let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
-        let wr = WorkReport::new(user_id.clone(), new);
-        let insert = to_document(&wr)?;
-        let _ = collection.insert_one(insert, None).await?;
-        Ok(wr)
+        Ok(database2(ctx)?
+            .new_work_report(user_id.clone(), new)
+            .await?)
     }
 
     async fn update_work_report(

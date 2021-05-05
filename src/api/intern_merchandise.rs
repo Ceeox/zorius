@@ -3,24 +3,22 @@ use async_graphql::{
     guard::Guard,
     Context, Error, Object, Result,
 };
-use bson::{de::from_document, oid::ObjectId};
-use bson::{doc, to_document};
+use bson::{de::from_document, doc, oid::ObjectId};
 use futures::stream::StreamExt;
-use mongodb::options::{FindOneAndUpdateOptions, ReturnDocument};
 
 use crate::{
-    api::{database2, MDB_COLL_NAME_USERS},
-    helper::AggregateBuilder,
+    api::database2,
+    database::MDB_COLL_INTERN_MERCH,
     models::{
         merchandise::intern_merchandise::{
             InternMerchResponse, InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
-            InternMerchandiseUpdate, NewMerchandiseIntern,
+            InternMerchandiseUpdate, NewInternMerchandise,
         },
         roles::{Role, RoleGuard},
     },
 };
 
-use super::{claim::Claim, database, MDB_COLL_INTERN_MERCH};
+use super::{claim::Claim, database};
 
 #[derive(Default)]
 pub struct InternMerchandiseQuery;
@@ -63,8 +61,7 @@ impl InternMerchandiseQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, InternMerchResponse, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
-        let doc_count = collection.estimated_document_count(None).await? as usize;
+        let doc_count = database2(ctx)?.count_intern_merch().await?;
 
         query(
             after,
@@ -82,13 +79,10 @@ impl InternMerchandiseQuery {
                     start = if last > end - start { end } else { end - last };
                 }
                 let limit = (end - start) as i64;
-                let pipeline = AggregateBuilder::new()
-                    .skip(start as i64)
-                    .limit(limit)
-                    .lookup(MDB_COLL_NAME_USERS, "orderer", "_id", "orderer")
-                    .unwind("$orderer", None, None)
-                    .build();
-                let cursor = collection.aggregate(pipeline, None).await?;
+
+                let cursor = database2(ctx)?
+                    .list_intern_merch(start as i64, limit)
+                    .await?;
 
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
@@ -117,12 +111,10 @@ impl InternMerchandiseMutation {
         RoleGuard(role = "Role::Admin"),
         RoleGuard(role = "Role::MerchandiseModerator")
     )))]
-    async fn new(&self, ctx: &Context<'_>, new: NewMerchandiseIntern) -> Result<InternMerchandise> {
+    async fn new(&self, ctx: &Context<'_>, new: NewInternMerchandise) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
         let new_merch = InternMerchandise::new(new);
-        let doc = to_document(&new_merch)?;
-        let _ = collection.insert_one(doc, None).await?;
+        let _ = database2(ctx)?.new_intern_merch(new_merch.clone()).await?;
         Ok(new_merch)
     }
 
@@ -130,26 +122,14 @@ impl InternMerchandiseMutation {
         RoleGuard(role = "Role::Admin"),
         RoleGuard(role = "Role::MerchandiseModerator")
     )))]
-    async fn update_by_id(
+    async fn update_intern_merch(
         &self,
         ctx: &Context<'_>,
         id: InternMerchandiseId,
         update: InternMerchandiseUpdate,
-    ) -> Result<Option<InternMerchandise>> {
+    ) -> Result<Option<InternMerchResponse>> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
-        let filter = doc! {"_id": id};
-        let update = doc! {"$set": bson::to_bson(&update)?};
-        let options = FindOneAndUpdateOptions::builder()
-            .return_document(Some(ReturnDocument::After))
-            .build();
-        match collection
-            .find_one_and_update(filter, update, Some(options))
-            .await?
-        {
-            None => Ok(None),
-            Some(doc) => Ok(Some(from_document(doc)?)),
-        }
+        Ok(database2(ctx)?.update_intern_merch(id, update).await?)
     }
 
     async fn change_status(

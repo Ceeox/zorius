@@ -1,5 +1,5 @@
-use async_graphql::{InputObject, Result, SimpleObject};
-use bson::{doc, oid::ObjectId, to_document, Document};
+use async_graphql::{InputObject, SimpleObject};
+use bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 
 use crate::models::user::UserId;
@@ -42,9 +42,5 @@ impl Project {
             description,
             note,
         }
-    }
-
-    pub fn update(update: ProjectUpdate) -> Result<Document> {
-        Ok(to_document(&update)?)
     }
 }

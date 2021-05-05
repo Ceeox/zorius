@@ -4,11 +4,10 @@ use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
     Context, Error, Object, Result, Upload,
 };
-use bson::{doc, from_document, to_document};
+use bson::from_document;
 use chrono::{Duration, Utc};
 use futures::StreamExt;
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
-use mongodb::options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument};
 
 use crate::{
     config::CONFIG,
@@ -21,7 +20,7 @@ use crate::{
     },
 };
 
-use super::{claim::Claim, database, database2, MDB_COLL_NAME_USERS};
+use super::{claim::Claim, database2};
 
 #[derive(Default)]
 pub struct UserQuery;
@@ -77,8 +76,7 @@ impl UserQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, User, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-        let doc_count = collection.estimated_document_count(None).await? as usize;
+        let doc_count = database2(ctx)?.count_users().await?;
 
         query(
             after,
@@ -95,11 +93,9 @@ impl UserQuery {
                 if let Some(last) = last {
                     start = if last > end - start { end } else { end - last };
                 }
-                let options = FindOptions::builder()
-                    .skip(start as i64)
-                    .limit(end as i64)
-                    .build();
-                let cursor = collection.find(None, options).await?;
+                let limit = (end - start) as i64;
+
+                let cursor = database2(ctx)?.list_users(start as i64, limit).await?;
 
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
@@ -147,10 +143,7 @@ impl UserMutation {
             user.change_password(&new_password);
         }
 
-        let update = doc! {"$set" : doc! {"password_hash": user.get_password_hash() }};
-        let filter = doc! {"_id": user_id};
-        let collection = database(ctx)?.collection(MDB_COLL_NAME_USERS);
-        let _ = collection.update_one(filter, update, None).await?;
+        let _ = database2(ctx)?.reset_password(user.get_id().clone(), user.get_password_hash());
 
         Ok(true)
     }

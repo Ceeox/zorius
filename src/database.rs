@@ -1,16 +1,16 @@
 use async_graphql::{Error, Result};
-use bson::{doc, from_document, to_document};
+use bson::{doc, from_document, to_document, Document};
 use futures::StreamExt;
 use mongodb::{
-    options::{FindOneAndUpdateOptions, ReturnDocument},
-    Client, Database as MongoDB,
+    options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument},
+    Client, Cursor, Database as MongoDB,
 };
 
 use crate::{
     helper::AggregateBuilder,
     models::{
         merchandise::intern_merchandise::{
-            InternMerchResponse, InternMerchandise, InternMerchandiseId,
+            InternMerchResponse, InternMerchandise, InternMerchandiseId, InternMerchandiseUpdate,
         },
         user::{NewUser, User, UserId, UserUpdate},
         work_report::{
@@ -20,10 +20,8 @@ use crate::{
 };
 
 pub(crate) static MDB_COLL_NAME_USERS: &str = "users";
-pub(crate) static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
 pub(crate) static MDB_COLL_WORK_REPORTS: &str = "work_reports";
 pub(crate) static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
-pub(crate) static MDB_COLL_ROLES: &str = "roles";
 
 pub struct Database {
     _client: Client,
@@ -58,6 +56,20 @@ impl Database {
         Ok(Some(user))
     }
 
+    pub async fn list_users(&self, start: i64, limit: i64) -> Result<Cursor<Document>> {
+        let collection = self.database.collection(MDB_COLL_NAME_USERS);
+        let options = FindOptions::builder()
+            .skip(start as i64)
+            .limit(limit)
+            .build();
+        Ok(collection.find(None, options).await?)
+    }
+
+    pub async fn count_users(&self) -> Result<usize> {
+        let collection = self.database.collection(MDB_COLL_NAME_USERS);
+        Ok(collection.estimated_document_count(None).await? as usize)
+    }
+
     pub async fn new_user(&self, new_user: NewUser) -> Result<User> {
         let user = User::new(new_user);
         let col = self.database.collection(MDB_COLL_NAME_USERS);
@@ -85,6 +97,14 @@ impl Database {
             Some(r) => r,
         };
         Ok(from_document(user)?)
+    }
+
+    pub async fn reset_password(&self, user_id: UserId, password_hash: &str) -> Result<()> {
+        let update = doc! {"$set" : doc! {"password_hash": password_hash }};
+        let filter = doc! {"_id": user_id};
+        let collection = self.database.collection(MDB_COLL_NAME_USERS);
+        let _ = collection.update_one(filter, update, None).await?;
+        Ok(())
     }
 
     pub async fn get_intern_merch_by_id(
@@ -116,9 +136,47 @@ impl Database {
         }
     }
 
+    pub async fn list_intern_merch(&self, start: i64, limit: i64) -> Result<Cursor<Document>> {
+        let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
+        let pipeline = AggregateBuilder::new()
+            .skip(start as i64)
+            .limit(limit)
+            .lookup(MDB_COLL_NAME_USERS, "orderer", "_id", "orderer")
+            .unwind("$orderer", None, None)
+            .build();
+        Ok(collection.aggregate(pipeline, None).await?)
+    }
+
     pub async fn count_intern_merch(&self) -> Result<usize> {
         let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
         Ok(collection.estimated_document_count(None).await? as usize)
+    }
+
+    pub async fn new_intern_merch(&self, new_intern_merch: InternMerchandise) -> Result<()> {
+        let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
+        let doc = to_document(&new_intern_merch)?;
+        let _ = collection.insert_one(doc, None).await?;
+        Ok(())
+    }
+
+    pub async fn update_intern_merch(
+        &self,
+        id: InternMerchandiseId,
+        update: InternMerchandiseUpdate,
+    ) -> Result<Option<InternMerchResponse>> {
+        let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
+        let filter = doc! {"_id": id};
+        let update = doc! {"$set": bson::to_bson(&update)?};
+        let options = FindOneAndUpdateOptions::builder()
+            .return_document(Some(ReturnDocument::After))
+            .build();
+        match collection
+            .find_one_and_update(filter, update, Some(options))
+            .await?
+        {
+            None => Ok(None),
+            Some(doc) => Ok(Some(from_document(doc)?)),
+        }
     }
 
     pub async fn get_work_report_by_id(
@@ -140,12 +198,35 @@ impl Database {
         println!("{:?}", pipeline);
         let mut doc = collection.aggregate(pipeline, None).await?;
         match doc.next().await {
-            Some(r) => {
-                println!("\ndoc r:{:?}\n", r);
-                Ok(Some(from_document(r?)?))
-            }
+            Some(r) => Ok(Some(from_document(r?)?)),
             None => Ok(None),
         }
+    }
+
+    pub async fn list_work_report(
+        &self,
+        user_id: UserId,
+        start: i64,
+        limit: i64,
+    ) -> Result<Cursor<Document>> {
+        let collection = self.database.collection(MDB_COLL_WORK_REPORTS);
+        let pipeline = AggregateBuilder::new()
+            .skip(start)
+            .limit(limit)
+            .matching(("user_id", user_id))
+            .lookup(MDB_COLL_NAME_USERS, "user_id", "_id", "user")
+            .lookup(MDB_COLL_WORK_REPORTS, "project_id", "_id", "project")
+            .lookup(MDB_COLL_WORK_REPORTS, "customer_id", "_id", "customer")
+            .unwind("$user", None, None)
+            .unwind("$project", None, Some(true))
+            .unwind("$customer", None, None)
+            .build();
+        Ok(collection.aggregate(pipeline, None).await?)
+    }
+
+    pub async fn count_work_reports(&self) -> Result<usize> {
+        let collection = self.database.collection(MDB_COLL_WORK_REPORTS);
+        Ok(collection.estimated_document_count(None).await? as usize)
     }
 
     pub async fn new_work_report(
