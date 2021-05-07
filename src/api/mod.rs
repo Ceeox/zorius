@@ -14,16 +14,18 @@ pub mod role;
 pub mod user;
 pub mod work_report;
 
-use crate::{config::CONFIG, API_VERSION};
-
-use self::{
-    claim::Token,
-    customer::{CustomerMutation, CustomerQuery},
-    intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
-    project::{ProjectMutation, ProjectQuery},
-    role::{RoleMutation, RoleQuery},
-    user::{UserMutation, UserQuery},
-    work_report::{WorkReportMutation, WorkReportQuery},
+use crate::{
+    api::{
+        claim::Token,
+        customer::{CustomerMutation, CustomerQuery},
+        intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
+        project::{ProjectMutation, ProjectQuery},
+        role::{RoleMutation, RoleQuery},
+        user::{UserMutation, UserQuery},
+        work_report::{WorkReportMutation, WorkReportQuery},
+    },
+    config::CONFIG,
+    API_VERSION,
 };
 
 pub(crate) static MDB_COLL_ROLES: &str = "roles";

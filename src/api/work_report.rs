@@ -6,11 +6,9 @@ use bson::from_document;
 use futures::StreamExt;
 
 use crate::{
-    api::claim::Claim,
+    api::{claim::Claim, database2},
     models::work_report::{NewWorkReport, WorkReportId, WorkReportResponse, WorkReportUpdate},
 };
-
-use super::database2;
 
 #[derive(Default)]
 pub struct WorkReportQuery;
@@ -70,8 +68,8 @@ impl WorkReportQuery {
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
                     .append_stream(cursor.enumerate().map(|(n, doc)| {
-                        let merch = from_document::<WorkReportResponse>(doc.unwrap()).unwrap();
-                        Edge::with_additional_fields(n + start, merch, EmptyFields)
+                        let wr = from_document::<WorkReportResponse>(doc.unwrap()).unwrap();
+                        Edge::with_additional_fields(n + start, wr, EmptyFields)
                     }))
                     .await;
                 Ok(connection)
@@ -104,11 +102,14 @@ impl WorkReportMutation {
         ctx: &Context<'_>,
         id: WorkReportId,
         update: WorkReportUpdate,
-    ) -> Result<WorkReportResponse> {
+    ) -> Result<Option<WorkReportResponse>> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
+        let _ = database2(ctx)?
+            .update_work_report(id.clone(), user_id.clone(), update)
+            .await?;
         Ok(database2(ctx)?
-            .update_work_report(id, user_id.clone(), update)
+            .get_work_report_by_id(id, user_id.clone())
             .await?)
     }
 }

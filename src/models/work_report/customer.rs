@@ -2,9 +2,7 @@ use async_graphql::{InputObject, SimpleObject};
 use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{user::UserId, work_report::project::Project};
-
-use super::project::ProjectUpdate;
+use crate::models::user::{User, UserId};
 
 pub type CustomerId = ObjectId;
 
@@ -16,29 +14,38 @@ pub struct Customer {
     name: String,
     identifier: String,
     note: Option<String>,
-    projects: Option<Vec<Project>>,
+}
+
+impl Customer {
+    pub fn new(new: NewCustomer, creator: UserId) -> Self {
+        Self {
+            id: CustomerId::new(),
+            creator,
+            name: new.name,
+            identifier: new.identifier,
+            note: new.note,
+        }
+    }
+    pub fn get_id(&self) -> &CustomerId {
+        &self.id
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, SimpleObject)]
-pub struct CustomerAdd {
-    pub creator: UserId,
+pub struct CustomerResponse {
+    #[serde(rename = "_id")]
+    id: CustomerId,
+    creator: User,
+    name: String,
+    identifier: String,
+    note: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, InputObject)]
+pub struct NewCustomer {
     pub name: String,
     pub identifier: String,
     pub note: Option<String>,
-    pub projects: Option<Vec<Project>>,
-}
-
-impl Into<Customer> for CustomerAdd {
-    fn into(self) -> Customer {
-        Customer {
-            id: CustomerId::new(),
-            creator: self.creator,
-            name: self.name,
-            identifier: self.identifier,
-            note: self.note,
-            projects: None,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, InputObject)]
@@ -51,32 +58,4 @@ pub struct CustomerUpdate {
     identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     note: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    projects: Option<Vec<ProjectUpdate>>,
-}
-
-impl Customer {
-    pub fn new(add: CustomerAdd) -> Self {
-        add.into()
-    }
-}
-
-impl Update<Option<UserId>> for UserId {
-    fn update(&mut self, update: Option<UserId>) {
-        if update.is_some() {
-            *self = update.unwrap();
-        }
-    }
-}
-
-impl Update<Option<String>> for String {
-    fn update(&mut self, update: Option<String>) {
-        if update.is_some() {
-            *self = update.unwrap();
-        }
-    }
-}
-
-trait Update<T> {
-    fn update(&mut self, update: T);
 }

@@ -14,6 +14,7 @@ use crate::{
         },
         user::{NewUser, User, UserId, UserUpdate},
         work_report::{
+            customer::{Customer, CustomerId, CustomerResponse, CustomerUpdate, NewCustomer},
             NewWorkReport, WorkReport, WorkReportId, WorkReportResponse, WorkReportUpdate,
         },
     },
@@ -22,6 +23,7 @@ use crate::{
 pub(crate) static MDB_COLL_NAME_USERS: &str = "users";
 pub(crate) static MDB_COLL_WORK_REPORTS: &str = "work_reports";
 pub(crate) static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
+pub(crate) static MDB_COLL_CUSTOMERS: &str = "customers";
 
 pub struct Database {
     _client: Client,
@@ -195,7 +197,6 @@ impl Database {
             .unwind("$project", None, Some(true))
             .unwind("$customer", None, None)
             .build();
-        println!("{:?}", pipeline);
         let mut doc = collection.aggregate(pipeline, None).await?;
         match doc.next().await {
             Some(r) => Ok(Some(from_document(r?)?)),
@@ -216,7 +217,7 @@ impl Database {
             .matching(("user_id", user_id))
             .lookup(MDB_COLL_NAME_USERS, "user_id", "_id", "user")
             .lookup(MDB_COLL_WORK_REPORTS, "project_id", "_id", "project")
-            .lookup(MDB_COLL_WORK_REPORTS, "customer_id", "_id", "customer")
+            .lookup(MDB_COLL_CUSTOMERS, "customer_id", "_id", "customer")
             .unwind("$user", None, None)
             .unwind("$project", None, Some(true))
             .unwind("$customer", None, None)
@@ -250,23 +251,73 @@ impl Database {
         id: WorkReportId,
         user_id: UserId,
         work_report_update: WorkReportUpdate,
-    ) -> Result<WorkReportResponse> {
+    ) -> Result<bool> {
         let col = self.database.collection(MDB_COLL_WORK_REPORTS);
         let filter = doc! { "_id": id , "user_id": user_id };
         let mut update = bson::Document::new();
         update.insert("$set", bson::to_bson(&work_report_update)?);
 
-        let options = FindOneAndUpdateOptions::builder()
-            .return_document(Some(ReturnDocument::After))
-            .build();
+        let _ = col.update_one(filter, update, None).await?;
+        Ok(true)
+    }
 
-        let workreport = match col
-            .find_one_and_update(filter, update, Some(options))
+    pub async fn get_customer_by_id(&self, id: CustomerId) -> Result<Option<CustomerResponse>> {
+        let collection = self.database.collection(MDB_COLL_CUSTOMERS);
+        let pipeline = AggregateBuilder::new()
+            .matching(("_id", &id))
+            .lookup(MDB_COLL_NAME_USERS, "creator", "_id", "creator")
+            .unwind("$creator", None, None)
+            .build();
+        let mut doc = collection.aggregate(pipeline, None).await?;
+        match doc.next().await {
+            Some(r) => Ok(Some(from_document(r?)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn list_customer(&self, start: i64, limit: i64) -> Result<Cursor<Document>> {
+        let collection = self.database.collection(MDB_COLL_CUSTOMERS);
+        let pipeline = AggregateBuilder::new()
+            .skip(start)
+            .limit(limit)
+            .lookup(MDB_COLL_NAME_USERS, "creator", "_id", "creator")
+            .unwind("$creator", None, None)
+            .build();
+        Ok(collection.aggregate(pipeline, None).await?)
+    }
+
+    pub async fn count_customers(&self) -> Result<usize> {
+        let collection = self.database.collection(MDB_COLL_CUSTOMERS);
+        Ok(collection.estimated_document_count(None).await? as usize)
+    }
+
+    pub async fn new_customer(
+        &self,
+        user_id: UserId,
+        new: NewCustomer,
+    ) -> Result<CustomerResponse> {
+        let col = self.database.collection(MDB_COLL_CUSTOMERS);
+        let new_customer = Customer::new(new, user_id.clone());
+        let doc = to_document(&new_customer)?;
+
+        let _ = col.insert_one(doc, None).await?;
+        Ok(self
+            .get_customer_by_id(new_customer.get_id().clone())
             .await?
-        {
-            None => return Err(Error::new("specified work_report not found")),
-            Some(r) => r,
-        };
-        Ok(from_document(workreport)?)
+            .unwrap())
+    }
+
+    pub async fn update_customer(
+        &self,
+        id: CustomerId,
+        customer_update: CustomerUpdate,
+    ) -> Result<bool> {
+        let col = self.database.collection(MDB_COLL_CUSTOMERS);
+        let filter = doc! { "_id": id };
+        let mut update = bson::Document::new();
+        update.insert("$set", bson::to_bson(&customer_update)?);
+
+        let _ = col.update_one(filter, update, None).await?;
+        Ok(true)
     }
 }

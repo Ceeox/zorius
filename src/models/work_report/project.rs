@@ -2,14 +2,32 @@ use async_graphql::{InputObject, SimpleObject};
 use bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 
-use crate::models::user::UserId;
+use crate::models::user::{User, UserId};
 
 pub type ProjectId = ObjectId;
 
 #[derive(Serialize, Deserialize, Debug, Clone, SimpleObject)]
 pub struct Project {
-    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
-    pub id: Option<ProjectId>,
+    #[serde(rename = "_id")]
+    pub id: ProjectId,
+    pub creator: UserId,
+    pub name: String,
+    pub description: Option<String>,
+    pub note: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, SimpleObject)]
+pub struct ProjectResponse {
+    #[serde(rename = "_id")]
+    pub id: ProjectId,
+    pub creator: User,
+    pub name: String,
+    pub description: Option<String>,
+    pub note: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, InputObject)]
+pub struct NewProject {
     pub creator: UserId,
     pub name: String,
     pub description: Option<String>,
@@ -29,18 +47,13 @@ pub struct ProjectUpdate {
 }
 
 impl Project {
-    pub fn new(
-        creator: UserId,
-        name: String,
-        description: Option<String>,
-        note: Option<String>,
-    ) -> Self {
+    pub fn new(new: NewProject) -> Self {
         Self {
-            id: Some(ObjectId::new()),
-            creator,
-            name,
-            description,
-            note,
+            id: ProjectId::new(),
+            creator: new.creator,
+            name: new.name,
+            description: new.description,
+            note: new.note,
         }
     }
 }
