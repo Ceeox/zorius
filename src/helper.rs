@@ -63,7 +63,7 @@ impl AggregateBuilder {
     }
 
     pub fn limit(mut self, limit: i64) -> Self {
-        let doc = doc! { "$skip": limit };
+        let doc = doc! { "$limit": limit };
         self.docs.push(doc);
         self
     }
