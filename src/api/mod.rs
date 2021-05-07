@@ -7,7 +7,6 @@ use async_graphql_actix_web::{Request, Response};
 use mongodb::Database;
 
 pub mod claim;
-pub mod company;
 pub mod customer;
 pub mod intern_merchandise;
 pub mod project;

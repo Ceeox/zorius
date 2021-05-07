@@ -1,5 +1,4 @@
 pub(crate) mod auth;
-pub(crate) mod company;
 pub(crate) mod merchandise;
 pub(crate) mod roles;
 pub(crate) mod upload;
