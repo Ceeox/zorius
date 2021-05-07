@@ -88,22 +88,6 @@ pub struct WorkReportUpdate {
     invoiced: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug, InputObject, Clone)]
-pub struct WorkReportTimeUpdate {
-    pub mode: ArrayUpdateMode,
-    pub id: ObjectId,
-    pub work_report_id: WorkReportId,
-    pub started: DateTime,
-    pub ended: Option<DateTime>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Enum, PartialEq, Eq, Clone, Copy)]
-pub enum ArrayUpdateMode {
-    Add,
-    Remove,
-    Update,
-}
-
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct TripInfo {
     to_customer_started: Option<DateTime>,
