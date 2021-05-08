@@ -52,7 +52,7 @@ fn setup_log() {
         std::env::set_var("RUST_LOG", "actix_web=debug");
         println!("Running in DEBUG MODE...");
     } else {
-        std::env::set_var("RUST_LOG", "actix_web=info");
+        std::env::set_var("RUST_LOG", "actix_web=error");
     }
 
     env_logger::init();
