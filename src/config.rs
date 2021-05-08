@@ -4,6 +4,12 @@ use std::{env, net::IpAddr, result::Result};
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 
+pub static ENV_NAME: &str = "RUN_MODE";
+pub static DEFAULT_CONFIG_FOLDER: &str = "config";
+pub static DEFAULT_CONFIG_FILE: &str = "default";
+pub static DEVELOPMENT_CONFIG_FILE: &str = "dev";
+pub static PRODUCTION_CONFIG_FILE: &str = "prod";
+
 lazy_static! {
     pub static ref CONFIG: Settings = Settings::new().expect("Failed to load config");
 }
@@ -52,11 +58,19 @@ impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let mut s = Config::new();
         // load the default config
-        s.merge(File::with_name("config/default"))?;
-        // check if we're running in debug mode
-        let env = env::var("RUN_MODE").unwrap_or_else(|_| "dev".into());
-        // load the dev or prod config file
-        s.merge(File::with_name(&format!("config/{}", env)).required(false))?;
+        s.merge(File::with_name(&format!(
+            "{}/{}",
+            DEFAULT_CONFIG_FOLDER, DEFAULT_CONFIG_FILE
+        )))?;
+        // check if we're running in debug or prod mode
+        // if run mode is not present always use prod
+        let config_path = match env::var(ENV_NAME) {
+            Ok(mode) if mode.eq(PRODUCTION_CONFIG_FILE) || mode.eq(DEVELOPMENT_CONFIG_FILE) => {
+                format!("{}/{}", DEFAULT_CONFIG_FOLDER, mode)
+            }
+            _ => format!("{}/{}", DEFAULT_CONFIG_FOLDER, PRODUCTION_CONFIG_FILE),
+        };
+        s.merge(File::with_name(&config_path).required(true))?;
         // override config if values are present in env
         s.merge(Environment::new().separator("_").ignore_empty(true))?;
 
