@@ -98,7 +98,7 @@ pub mod validators {
         fn is_valid(&self, value: &Value) -> Result<(), String> {
             let mut res = Err("not a valid url".to_owned());
             if let Value::String(s) = value {
-                if let Ok(_) = CrateUrl::parse(s) {
+                if CrateUrl::parse(s).is_ok() {
                     res = Ok(());
                 }
             }

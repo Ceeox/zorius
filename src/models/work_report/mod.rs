@@ -108,7 +108,7 @@ impl WorkReport {
     pub fn new(user_id: UserId, new_wr: NewWorkReport) -> Self {
         Self {
             id: ObjectId::new(),
-            user_id: user_id,
+            user_id,
             customer_id: new_wr.customer_id,
             project_id: new_wr.project_id,
             trip_info: TripInfo {

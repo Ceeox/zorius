@@ -72,9 +72,8 @@ impl RoleMutation {
             Some(r) => r,
         };
 
-        match ctx.data_opt::<RoleCache>() {
-            Some(role_cache) => role_cache.update_rolecache(&user_id, &mode, &role).await,
-            _ => {}
+        if let Some(role_cache) = ctx.data_opt::<RoleCache>() {
+            role_cache.update_rolecache(&user_id, &mode, &role).await;
         }
 
         Ok(from_document(user)?)

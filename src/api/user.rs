@@ -52,7 +52,7 @@ impl UserQuery {
         let token = jsonwebtoken::encode(&Header::new(Algorithm::HS512), &claim, key)?;
 
         Ok(LoginResult {
-            token: token,
+            token,
             expires_at: claim.expires_at(),
             user_id: user.get_id().to_owned(),
         })

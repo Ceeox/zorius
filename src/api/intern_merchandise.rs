@@ -111,7 +111,11 @@ impl InternMerchandiseMutation {
         RoleGuard(role = "Role::Admin"),
         RoleGuard(role = "Role::MerchandiseModerator")
     )))]
-    async fn new(&self, ctx: &Context<'_>, new: NewInternMerchandise) -> Result<InternMerchandise> {
+    async fn new_intern_merch(
+        &self,
+        ctx: &Context<'_>,
+        new: NewInternMerchandise,
+    ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
         let new_merch = InternMerchandise::new(new);
         let _ = database2(ctx)?.new_intern_merch(new_merch.clone()).await?;
