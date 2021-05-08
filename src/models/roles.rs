@@ -81,14 +81,16 @@ impl RoleCache {
     pub async fn update_rolecache(&self, user_id: &UserId, mode: &RoleUpdateMode, role: &Role) {
         let mut lock = self.user_roles.lock().await;
         match mode {
-            RoleUpdateMode::Add => match lock.get_mut(user_id) {
-                Some(roles) => roles.push(*role),
-                None => {}
-            },
-            RoleUpdateMode::Remove => match lock.get_mut(user_id) {
-                Some(roles) => roles.retain(|r| !r.eq(role)),
-                None => {}
-            },
+            RoleUpdateMode::Add => {
+                if let Some(roles) = lock.get_mut(user_id) {
+                    roles.push(*role);
+                }
+            }
+            RoleUpdateMode::Remove => {
+                if let Some(roles) = lock.get_mut(user_id) {
+                    roles.retain(|r| !r.eq(role));
+                }
+            }
         }
     }
 

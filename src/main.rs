@@ -1,11 +1,11 @@
+use std::io::BufReader;
 use std::{fs::File, time::Duration};
-use std::{io::BufReader, str::FromStr};
 
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_ratelimit::{errors::ARError, MemoryStore, MemoryStoreActor, RateLimiter};
+use actix_ratelimit::{MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{
-    http::{ContentEncoding, HeaderName, HeaderValue},
+    http::ContentEncoding,
     middleware::{Compress, DefaultHeaders, Logger},
     App, HttpServer,
 };

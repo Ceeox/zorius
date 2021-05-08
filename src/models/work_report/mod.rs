@@ -1,12 +1,17 @@
-use async_graphql::{Enum, InputObject, Result, SimpleObject};
-use bson::{doc, oid::ObjectId, to_document, DateTime, Document};
+use async_graphql::{Enum, InputObject, SimpleObject};
+use bson::{doc, oid::ObjectId, DateTime};
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
     user::UserId,
     work_report::{customer::CustomerId, project::ProjectId},
 };
+
+use self::{customer::Customer, project::Project};
+
+use super::user::User;
 
 pub(crate) mod customer;
 pub(crate) mod project;
@@ -28,13 +33,25 @@ pub struct WorkReport {
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct WorkReportTimes {
-    #[serde(rename = "_id")]
-    id: ObjectId,
-    started: DateTime,
-    ended: Option<DateTime>,
+    pub started: DateTime,
+    pub ended: Option<DateTime>,
 }
 
-#[derive(Deserialize, Debug, InputObject)]
+#[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
+pub struct WorkReportResponse {
+    #[serde(rename = "_id")]
+    id: WorkReportId,
+    user: User,
+    customer: Customer,
+    project: Option<Project>,
+    trip_info: TripInfo,
+    description: String,
+    times: Vec<WorkReportTimes>,
+    status: WorkReportStatus,
+    invoiced: bool,
+}
+
+#[derive(Serialize, Debug, InputObject)]
 pub struct NewWorkReport {
     pub customer_id: CustomerId,
     pub project_id: Option<ProjectId>,
@@ -71,22 +88,6 @@ pub struct WorkReportUpdate {
     invoiced: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug, InputObject, Clone)]
-pub struct WorkReportTimeUpdate {
-    pub mode: ArrayUpdateMode,
-    pub id: ObjectId,
-    pub work_report_id: WorkReportId,
-    pub started: DateTime,
-    pub ended: Option<DateTime>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Enum, PartialEq, Eq, Clone, Copy)]
-pub enum ArrayUpdateMode {
-    Add,
-    Remove,
-    Update,
-}
-
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct TripInfo {
     to_customer_started: Option<DateTime>,
@@ -107,7 +108,7 @@ impl WorkReport {
     pub fn new(user_id: UserId, new_wr: NewWorkReport) -> Self {
         Self {
             id: ObjectId::new(),
-            user_id: user_id,
+            user_id,
             customer_id: new_wr.customer_id,
             project_id: new_wr.project_id,
             trip_info: TripInfo {
@@ -117,22 +118,16 @@ impl WorkReport {
                 from_customer_arrived: new_wr.from_customer_arrived,
             },
             description: new_wr.description,
-            times: vec![],
+            times: vec![WorkReportTimes {
+                started: Utc::now().into(),
+                ended: None,
+            }],
             status: WorkReportStatus::Running,
             invoiced: true,
         }
     }
 
-    pub fn update(wr_update: WorkReportUpdate) -> Result<Document> {
-        Ok(doc! { "$set": to_document(&wr_update)? })
+    pub fn get_id(&self) -> &WorkReportId {
+        &self.id
     }
-
-    /*
-    pub fn update_work_report(time_update: WorkReportTimeUpdate) -> Result<Vec<Document>> {
-        match time_update.mode {
-            ArrayUpdateMode::Add => Ok(doc! {"$push": &format!("")}),
-            ArrayUpdateMode::Remove => Ok(doc! {"$push": &format!("")}),
-        }
-    }
-    */
 }

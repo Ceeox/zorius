@@ -15,7 +15,7 @@ use crate::{
 pub type InternMerchandiseId = ObjectId;
 
 #[derive(InputObject, Deserialize, Serialize)]
-pub struct NewMerchandiseIntern {
+pub struct NewInternMerchandise {
     pub merchandise_name: String,
     #[graphql(validator(IntGreaterThan(value = "0")))]
     pub count: i32,
@@ -107,7 +107,7 @@ impl Default for InternMerchandiseStatus {
 }
 
 impl InternMerchandise {
-    pub fn new(new_intern_merchandise: NewMerchandiseIntern) -> Self {
+    pub fn new(new_intern_merchandise: NewInternMerchandise) -> Self {
         Self {
             id: ObjectId::new(),
             merchandise_name: new_intern_merchandise.merchandise_name,

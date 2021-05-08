@@ -7,28 +7,27 @@ use async_graphql_actix_web::{Request, Response};
 use mongodb::Database;
 
 pub mod claim;
-pub mod company;
 pub mod customer;
 pub mod intern_merchandise;
 pub mod project;
 pub mod role;
 pub mod user;
+pub mod work_report;
 
-use crate::{config::CONFIG, API_VERSION};
-
-use self::{
-    claim::Token,
-    customer::{CustomerMutation, CustomerQuery},
-    intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
-    project::{ProjectMutation, ProjectQuery},
-    role::{RoleMutation, RoleQuery},
-    user::{UserMutation, UserQuery},
+use crate::{
+    api::{
+        claim::Token,
+        customer::{CustomerMutation, CustomerQuery},
+        intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
+        project::{ProjectMutation, ProjectQuery},
+        role::{RoleMutation, RoleQuery},
+        user::{UserMutation, UserQuery},
+        work_report::{WorkReportMutation, WorkReportQuery},
+    },
+    config::CONFIG,
+    API_VERSION,
 };
 
-pub(crate) static MDB_COLL_NAME_USERS: &str = "users";
-pub(crate) static MDB_COLL_WORK_ACCOUNTS: &str = "workaccounts";
-pub(crate) static MDB_COLL_WORK_REPORTS: &str = "work_reports";
-pub(crate) static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
 pub(crate) static MDB_COLL_ROLES: &str = "roles";
 
 pub type RootSchema = Schema<Query, Mutation, EmptySubscription>;
@@ -40,6 +39,7 @@ pub struct Query(
     RoleQuery,
     CustomerQuery,
     ProjectQuery,
+    WorkReportQuery,
     InternMerchandiseQuery,
 );
 
@@ -49,6 +49,7 @@ pub struct Mutation(
     RoleMutation,
     CustomerMutation,
     ProjectMutation,
+    WorkReportMutation,
     InternMerchandiseMutation,
 );
 
@@ -83,7 +84,6 @@ pub async fn graphql(
     schema.execute(request).await.into()
 }
 
-// Enable only when we're running in debug mode
 #[get("/playground")]
 pub async fn gql_playgound() -> HttpResponse {
     HttpResponse::Ok()

@@ -21,8 +21,7 @@ pub struct User {
     password_hash: String,
     pub username: String,
     pub created_at: DateTime,
-    #[graphql(skip)]
-    invitation_pending: bool,
+    pub invitation_pending: bool,
     pub avatar_url: Option<String>,
     pub firstname: Option<String>,
     pub lastname: Option<String>,

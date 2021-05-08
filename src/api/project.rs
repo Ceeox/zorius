@@ -1,12 +1,14 @@
 use async_graphql::{guard::Guard, Context, Error, Object, Result};
 use bson::{doc, from_document, to_document};
 
-use crate::models::{
-    roles::{Role, RoleGuard},
-    work_report::project::{Project, ProjectId},
+use crate::{
+    api::{claim::Claim, database},
+    database::MDB_COLL_WORK_REPORTS,
+    models::{
+        roles::{Role, RoleGuard},
+        work_report::project::{NewProject, Project, ProjectId},
+    },
 };
-
-use super::{claim::Claim, database, MDB_COLL_WORK_REPORTS};
 
 #[derive(Default)]
 pub struct ProjectQuery;
@@ -39,18 +41,11 @@ impl ProjectMutation {
         RoleGuard(role = "Role::Admin"),
         RoleGuard(role = "Role::WorkReportModerator")
     )))]
-    async fn new_project(
-        &self,
-        ctx: &Context<'_>,
-        name: String,
-        description: Option<String>,
-        note: Option<String>,
-    ) -> Result<Project> {
-        let claim = Claim::from_ctx(ctx)?;
-        let user_id = claim.user_id();
+    async fn new_project(&self, ctx: &Context<'_>, new: NewProject) -> Result<Project> {
+        let _ = Claim::from_ctx(ctx)?;
 
         let collection = database(ctx)?.collection(MDB_COLL_WORK_REPORTS);
-        let project = Project::new(user_id.clone(), name, description, note);
+        let project = Project::new(new);
         let insert = to_document(&project)?;
         let _ = collection.insert_one(insert, None).await?;
         Ok(project)
