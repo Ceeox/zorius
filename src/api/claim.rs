@@ -2,20 +2,29 @@ use std::convert::TryFrom;
 
 use async_graphql::{Context, Error, Result};
 use chrono::Local;
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
 use crate::{config::CONFIG, models::user::UserId};
 
 pub struct Token(pub String);
 
+static ALGO: Algorithm = Algorithm::HS512;
+
+/// Claim caontains information about the JWT
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claim {
+    /// Issuer of the JWT
     iss: String,
+    /// Subject of the JWT (the user)
     sub: String,
+    /// Id of the User (not in JWT standard)
     id: UserId,
+    /// Time after which the JWT expires
     exp: usize,
+    /// Time before which the JWT must not be accepted for processing
     nbf: usize,
+    /// Time at which the JWT was issued; can be used to determine age of the JWT
     iat: usize,
 }
 
@@ -65,7 +74,15 @@ impl Claim {
 
     /// Retruns if the token is expired
     pub fn token_expired(&self) -> bool {
-        (Local::now().timestamp() as usize) >= self.exp
+        let now = Local::now().timestamp() as usize;
+        self.nbf >= now && self.exp <= now
+    }
+}
+
+impl ToString for Claim {
+    fn to_string(&self) -> String {
+        let key = &EncodingKey::from_secret(&CONFIG.secret_key.as_bytes());
+        jsonwebtoken::encode(&Header::new(ALGO), self, key).expect("failed jwt convert to string")
     }
 }
 
@@ -83,7 +100,7 @@ impl TryFrom<String> for Claim {
         match decode::<Claim>(
             token,
             &DecodingKey::from_secret(key),
-            &Validation::new(Algorithm::HS512),
+            &Validation::new(ALGO),
         ) {
             Ok(data) => Ok(data.claims),
             Err(e) => Err(Error::new(&e.to_string())),

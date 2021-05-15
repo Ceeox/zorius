@@ -1,29 +1,23 @@
 use async_graphql::{Enum, InputObject, SimpleObject};
 use bson::{doc, oid::ObjectId, DateTime};
-
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
-    user::UserId,
-    work_report::{customer::CustomerId, project::ProjectId},
+    customer::{CustomerId, CustomerResponse},
+    project::{ProjectId, ProjectResponse},
+    user::{User, UserId},
 };
 
-use self::{customer::Customer, project::Project};
-
-use super::user::User;
-
-pub(crate) mod customer;
-pub(crate) mod project;
-
 pub type WorkReportId = ObjectId;
+
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct WorkReport {
     #[serde(rename = "_id")]
     id: WorkReportId,
     user_id: UserId,
     customer_id: CustomerId,
-    project_id: Option<ProjectId>,
+    project_id: ProjectId,
     trip_info: TripInfo,
     description: String,
     times: Vec<WorkReportTimes>,
@@ -37,13 +31,13 @@ pub struct WorkReportTimes {
     pub ended: Option<DateTime>,
 }
 
-#[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
+#[derive(Deserialize, Debug, SimpleObject, Clone)]
 pub struct WorkReportResponse {
     #[serde(rename = "_id")]
     id: WorkReportId,
     user: User,
-    customer: Customer,
-    project: Option<Project>,
+    customer: CustomerResponse,
+    project: ProjectResponse,
     trip_info: TripInfo,
     description: String,
     times: Vec<WorkReportTimes>,
@@ -54,7 +48,7 @@ pub struct WorkReportResponse {
 #[derive(Serialize, Debug, InputObject)]
 pub struct NewWorkReport {
     pub customer_id: CustomerId,
-    pub project_id: Option<ProjectId>,
+    pub project_id: ProjectId,
     pub to_customer_started: Option<DateTime>,
     pub to_customer_arrived: Option<DateTime>,
     pub from_customer_started: Option<DateTime>,
@@ -62,7 +56,7 @@ pub struct NewWorkReport {
     pub description: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, InputObject, Clone)]
+#[derive(Serialize, Debug, InputObject, Clone)]
 pub struct WorkReportUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     customer_id: Option<CustomerId>,

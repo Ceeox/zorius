@@ -2,7 +2,11 @@
 authors = ["ceox <mizuo@pm.me>"]
 edition = "2018"
 name = "zorius"
+resolver = "2"
 version = "0.1.0"
+
+[profile.dev]
+# lto = "thin"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

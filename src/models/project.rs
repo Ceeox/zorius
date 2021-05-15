@@ -10,7 +10,7 @@ pub type ProjectId = ObjectId;
 pub struct Project {
     #[serde(rename = "_id")]
     pub id: ProjectId,
-    pub creator: UserId,
+    pub creator_id: UserId,
     pub name: String,
     pub description: Option<String>,
     pub note: Option<String>,
@@ -28,7 +28,6 @@ pub struct ProjectResponse {
 
 #[derive(Serialize, Deserialize, Debug, Clone, InputObject)]
 pub struct NewProject {
-    pub creator: UserId,
     pub name: String,
     pub description: Option<String>,
     pub note: Option<String>,
@@ -36,8 +35,6 @@ pub struct NewProject {
 
 #[derive(Serialize, Deserialize, InputObject)]
 pub struct ProjectUpdate {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub creator: Option<UserId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -47,13 +44,17 @@ pub struct ProjectUpdate {
 }
 
 impl Project {
-    pub fn new(new: NewProject) -> Self {
+    pub fn new(creator_id: UserId, new: NewProject) -> Self {
         Self {
             id: ProjectId::new(),
-            creator: new.creator,
+            creator_id,
             name: new.name,
             description: new.description,
             note: new.note,
         }
+    }
+
+    pub fn get_id(&self) -> &ProjectId {
+        &self.id
     }
 }

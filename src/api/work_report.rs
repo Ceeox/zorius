@@ -1,13 +1,17 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    Context, Error, Object, Result,
+    guard::Guard,
+    Context, Object, Result,
 };
 use bson::from_document;
 use futures::StreamExt;
 
 use crate::{
     api::{claim::Claim, database2},
-    models::work_report::{NewWorkReport, WorkReportId, WorkReportResponse, WorkReportUpdate},
+    models::{
+        roles::{Role, RoleGuard},
+        work_report::{NewWorkReport, WorkReportId, WorkReportResponse, WorkReportUpdate},
+    },
 };
 
 #[derive(Default)]
@@ -19,17 +23,13 @@ impl WorkReportQuery {
         &self,
         ctx: &Context<'_>,
         id: WorkReportId,
-    ) -> Result<Option<WorkReportResponse>> {
+    ) -> Result<WorkReportResponse> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
-        match database2(ctx)?
+        Ok(database2(ctx)?
             .get_work_report_by_id(id, user_id.clone())
-            .await?
-        {
-            Some(r) => Ok(Some(r)),
-            None => Err(Error::new("work report not found!")),
-        }
+            .await?)
     }
 
     async fn list_work_reports(
@@ -102,7 +102,7 @@ impl WorkReportMutation {
         ctx: &Context<'_>,
         id: WorkReportId,
         update: WorkReportUpdate,
-    ) -> Result<Option<WorkReportResponse>> {
+    ) -> Result<WorkReportResponse> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
         let _ = database2(ctx)?
@@ -111,5 +111,19 @@ impl WorkReportMutation {
         Ok(database2(ctx)?
             .get_work_report_by_id(id, user_id.clone())
             .await?)
+    }
+
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::MerchandiseModerator")
+    )))]
+    async fn delete_work_report(&self, ctx: &Context<'_>, id: WorkReportId) -> Result<bool> {
+        let _ = Claim::from_ctx(ctx)?;
+        // TODO: check if other collections or documents still have a object refercnce to this project
+        // if not we can safely remove the project
+        // if there are still refercnces return an error
+        let _ = database2(ctx)?.delete_work_report(id).await?;
+
+        Ok(true)
     }
 }

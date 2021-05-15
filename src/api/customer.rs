@@ -1,7 +1,7 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
     guard::Guard,
-    Context, Object, Result,
+    Context, Error, Object, Result,
 };
 use bson::from_document;
 use futures::StreamExt;
@@ -9,8 +9,8 @@ use futures::StreamExt;
 use crate::{
     api::{claim::Claim, database2},
     models::{
+        customer::{CustomerId, CustomerResponse, CustomerUpdate, NewCustomer},
         roles::{Role, RoleGuard},
-        work_report::customer::{CustomerId, CustomerResponse, CustomerUpdate, NewCustomer},
     },
 };
 
@@ -23,7 +23,7 @@ impl CustomerQuery {
         &self,
         ctx: &Context<'_>,
         id: CustomerId,
-    ) -> Result<Option<CustomerResponse>> {
+    ) -> Result<CustomerResponse> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(database2(ctx)?.get_customer_by_id(id).await?)
     }
@@ -99,10 +99,29 @@ impl CustomerMutation {
         ctx: &Context<'_>,
         id: CustomerId,
         update: CustomerUpdate,
-    ) -> Result<Option<CustomerResponse>> {
+    ) -> Result<CustomerResponse> {
         let _ = Claim::from_ctx(ctx)?;
         let _ = database2(ctx)?.update_customer(id.clone(), update).await?;
 
         Ok(database2(ctx)?.get_customer_by_id(id).await?)
+    }
+
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::MerchandiseModerator")
+    )))]
+    async fn delete_customer(&self, ctx: &Context<'_>, id: CustomerId) -> Result<bool> {
+        let _ = Claim::from_ctx(ctx)?;
+        if database2(ctx)?
+            .has_ref_to_work_report("customer_id", id.clone())
+            .await?
+        {
+            return Err(Error::new(
+                "Can not delete Project with still a reference to a WorkReport",
+            ));
+        }
+        let _ = database2(ctx)?.delete_customer(id).await?;
+
+        Ok(true)
     }
 }

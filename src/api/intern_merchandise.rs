@@ -1,16 +1,16 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
     guard::Guard,
-    Context, Error, Object, Result,
+    Context, Object, Result,
 };
-use bson::{de::from_document, doc, oid::ObjectId};
+use bson::{de::from_document, oid::ObjectId};
 use futures::stream::StreamExt;
 
 use crate::{
     api::database2,
     database::MDB_COLL_INTERN_MERCH,
     models::{
-        merchandise::intern_merchandise::{
+        intern_merchandise::{
             InternMerchResponse, InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
             InternMerchandiseUpdate, NewInternMerchandise,
         },
@@ -29,27 +29,20 @@ impl InternMerchandiseQuery {
         &self,
         ctx: &Context<'_>,
         id: ObjectId,
-    ) -> Result<Option<InternMerchResponse>> {
+    ) -> Result<InternMerchResponse> {
         let _ = Claim::from_ctx(ctx)?;
-        match database2(ctx)?.get_intern_merch_by_id(id).await? {
-            Some(r) => Ok(Some(r)),
-            None => Err(Error::new("intern merch could not be found")),
-        }
+        Ok(database2(ctx)?.get_intern_merch_by_id(id).await?)
     }
 
     async fn get_intern_merch_by_merch_id(
         &self,
         ctx: &Context<'_>,
         merchandise_id: i32,
-    ) -> Result<Option<InternMerchandise>> {
+    ) -> Result<InternMerchResponse> {
         let _ = Claim::from_ctx(ctx)?;
-        match database2(ctx)?
+        Ok(database2(ctx)?
             .get_intern_merch_by_merch_id(merchandise_id)
-            .await?
-        {
-            Some(r) => Ok(Some(r)),
-            None => Err(Error::new("intern merch could not be found")),
-        }
+            .await?)
     }
 
     async fn list_intern_merch(
@@ -131,7 +124,7 @@ impl InternMerchandiseMutation {
         ctx: &Context<'_>,
         id: InternMerchandiseId,
         update: InternMerchandiseUpdate,
-    ) -> Result<Option<InternMerchResponse>> {
+    ) -> Result<InternMerchResponse> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(database2(ctx)?.update_intern_merch(id, update).await?)
     }
@@ -140,24 +133,35 @@ impl InternMerchandiseMutation {
         &self,
         ctx: &Context<'_>,
         id: InternMerchandiseId,
-        new_status: InternMerchandiseStatus,
-    ) -> Result<Option<InternMerchandise>> {
+        _new_status: InternMerchandiseStatus,
+    ) -> Result<InternMerchResponse> {
         let _ = Claim::from_ctx(ctx)?;
-        let collection = database(ctx)?.collection(MDB_COLL_INTERN_MERCH);
-        let filter = doc! {"_id": id};
-        let mut merch = match collection.find_one(filter, None).await? {
-            None => return Ok(None),
-            Some(doc) => from_document::<InternMerchandise>(doc)?,
-        };
+        let merch = database2(ctx)?.get_intern_merch_by_id(id).await?;
 
-        let orderer_id = merch.orderer.clone();
-        let user = match database2(ctx)?.get_user_by_id(orderer_id).await? {
-            None => return Err(Error::new("the orderer could not be found")),
-            Some(r) => r,
-        };
+        let orderer_id = merch.orderer.get_id().clone();
+        let _user = database2(ctx)?.get_user_by_id(orderer_id).await?;
 
-        merch.change_status(new_status, user);
+        // TODO: fix
+        //merch.change_status(new_status, user);
 
-        Ok(None)
+        Ok(merch)
+    }
+
+    #[graphql(guard(race(
+        RoleGuard(role = "Role::Admin"),
+        RoleGuard(role = "Role::MerchandiseModerator")
+    )))]
+    async fn delete_intern_merch(
+        &self,
+        ctx: &Context<'_>,
+        id: InternMerchandiseId,
+    ) -> Result<bool> {
+        let _ = Claim::from_ctx(ctx)?;
+        // TODO: check if other collections or documents still have a object refercnce to this project
+        // if not we can safely remove the project
+        // if there are still refercnces return an error
+        let _ = database2(ctx)?.delete_intern_merch(id).await?;
+
+        Ok(true)
     }
 }

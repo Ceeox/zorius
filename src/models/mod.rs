@@ -1,5 +1,7 @@
 pub(crate) mod auth;
-pub(crate) mod merchandise;
+pub(crate) mod customer;
+pub(crate) mod intern_merchandise;
+pub(crate) mod project;
 pub(crate) mod roles;
 pub(crate) mod upload;
 pub(crate) mod user;

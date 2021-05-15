@@ -17,7 +17,6 @@ pub struct User {
     #[serde(rename = "_id")]
     id: UserId,
     pub email: UserEmail,
-    #[graphql(skip)]
     password_hash: String,
     pub username: String,
     pub created_at: DateTime,
@@ -81,7 +80,7 @@ pub struct NewUser {
     pub lastname: Option<String>,
 }
 
-#[derive(InputObject, Debug, Deserialize, Serialize)]
+#[derive(InputObject, Debug, Serialize)]
 pub struct UserUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     email: Option<UserEmail>,

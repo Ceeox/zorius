@@ -10,17 +10,17 @@ pub type CustomerId = ObjectId;
 pub struct Customer {
     #[serde(rename = "_id")]
     id: CustomerId,
-    creator: UserId,
+    creator_id: UserId,
     name: String,
     identifier: String,
     note: Option<String>,
 }
 
 impl Customer {
-    pub fn new(new: NewCustomer, creator: UserId) -> Self {
+    pub fn new(new: NewCustomer, creator_id: UserId) -> Self {
         Self {
             id: CustomerId::new(),
-            creator,
+            creator_id,
             name: new.name,
             identifier: new.identifier,
             note: new.note,
@@ -31,7 +31,7 @@ impl Customer {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, SimpleObject)]
+#[derive(Deserialize, Debug, Clone, SimpleObject)]
 pub struct CustomerResponse {
     #[serde(rename = "_id")]
     id: CustomerId,
@@ -41,14 +41,14 @@ pub struct CustomerResponse {
     note: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, InputObject)]
+#[derive(Serialize, Debug, Clone, InputObject)]
 pub struct NewCustomer {
     pub name: String,
     pub identifier: String,
     pub note: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, InputObject)]
+#[derive(Serialize, InputObject)]
 pub struct CustomerUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     creator: Option<UserId>,

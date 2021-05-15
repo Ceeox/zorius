@@ -7,7 +7,6 @@ use async_graphql::{
 use bson::from_document;
 use chrono::{Duration, Utc};
 use futures::StreamExt;
-use jsonwebtoken::{Algorithm, EncodingKey, Header};
 
 use crate::{
     config::CONFIG,
@@ -35,10 +34,7 @@ impl UserQuery {
         password: String,
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
-        let user = match database2(ctx)?.get_user_by_email(email.clone()).await? {
-            Some(r) => r,
-            None => return Err(Error::new("user could not be found")),
-        };
+        let user = database2(ctx)?.get_user_by_email(email.clone()).await?;
 
         if !user.is_password_correct(&password) {
             return Err(err);
@@ -48,8 +44,7 @@ impl UserQuery {
             user.get_id().clone(),
             (Utc::now() + Duration::seconds(CONFIG.token_lifetime)).timestamp() as usize,
         );
-        let key = &EncodingKey::from_secret(&CONFIG.secret_key.as_bytes());
-        let token = jsonwebtoken::encode(&Header::new(Algorithm::HS512), &claim, key)?;
+        let token = claim.to_string();
 
         Ok(LoginResult {
             token,
@@ -58,12 +53,9 @@ impl UserQuery {
         })
     }
 
-    async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<Option<User>> {
+    async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
-        match database2(ctx)?.get_user_by_id(id).await? {
-            Some(r) => Ok(Some(r)),
-            None => Err(Error::new("user could not be found")),
-        }
+        Ok(database2(ctx)?.get_user_by_id(id).await?)
     }
 
     #[graphql(guard(RoleGuard(role = "Role::Admin")))]
@@ -132,10 +124,7 @@ impl UserMutation {
         let auth_info = Claim::from_ctx(ctx)?;
         let user_id = auth_info.user_id();
 
-        let mut user = match database2(ctx)?.get_user_by_id(user_id.clone()).await? {
-            Some(r) => r,
-            None => return Err(Error::new("user could not be found")),
-        };
+        let mut user = database2(ctx)?.get_user_by_id(user_id.clone()).await?;
 
         if !user.is_password_correct(&old_password) {
             return Err(Error::new("old password is wrong!".to_owned()));

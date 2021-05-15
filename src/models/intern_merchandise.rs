@@ -26,7 +26,7 @@ pub struct NewInternMerchandise {
     pub cost: f64,
     pub postage: Option<f64>,
     pub use_case: Option<String>,
-    pub project_leader: String,
+    pub project_leader: UserId,
     pub location: String,
     pub shop: String,
 }
@@ -37,7 +37,7 @@ pub struct InternMerchandise {
     pub id: InternMerchandiseId,
     pub merchandise_id: Option<i32>,
     pub orderer: UserId,
-    pub project_leader: Option<String>,
+    pub project_leader_id: Option<UserId>,
     pub purchased_on: DateTime,
     pub count: i32,
     pub merchandise_name: String,
@@ -56,13 +56,13 @@ pub struct InternMerchandise {
     pub updated_date: DateTime,
 }
 
-#[derive(Deserialize, Serialize, Debug, SimpleObject, Clone)]
+#[derive(Deserialize, Debug, SimpleObject, Clone)]
 pub struct InternMerchResponse {
     #[serde(rename = "_id")]
     pub id: InternMerchandiseId,
     pub merchandise_id: Option<i32>,
     pub orderer: User,
-    pub project_leader: Option<String>,
+    pub project_leader: Option<User>,
     pub purchased_on: DateTime,
     pub count: i32,
     pub merchandise_name: String,
@@ -121,7 +121,7 @@ impl InternMerchandise {
             use_case: new_intern_merchandise.use_case,
             article_number: new_intern_merchandise.article_number,
             postage: new_intern_merchandise.postage,
-            project_leader: Some(new_intern_merchandise.project_leader),
+            project_leader_id: Some(new_intern_merchandise.project_leader),
             location: Some(new_intern_merchandise.location),
             shop: Some(new_intern_merchandise.shop),
 
@@ -138,11 +138,7 @@ impl InternMerchandise {
         self.status = new_status;
         self.updated_date = Utc::now().into();
         let orderer_name = if user.firstname.is_some() && user.lastname.is_some() {
-            format!(
-                "{} {}",
-                user.firstname.unwrap_or_default(),
-                user.lastname.unwrap_or_default()
-            )
+            format!("{} {}", user.firstname.unwrap(), user.lastname.unwrap())
         } else {
             user.username
         };
@@ -175,7 +171,7 @@ pub struct InternMerchandiseUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orderer: Option<UserId>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub project_leader: Option<String>,
+    pub project_leader: Option<UserId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purchased_on: Option<DateTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
