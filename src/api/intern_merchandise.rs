@@ -7,18 +7,15 @@ use bson::{de::from_document, oid::ObjectId};
 use futures::stream::StreamExt;
 
 use crate::{
-    api::database2,
-    database::MDB_COLL_INTERN_MERCH,
+    api::{claim::Claim, database2},
     models::{
         intern_merchandise::{
-            InternMerchResponse, InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
+            DBInternMerchandise, InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
             InternMerchandiseUpdate, NewInternMerchandise,
         },
         roles::{Role, RoleGuard},
     },
 };
-
-use super::{claim::Claim, database};
 
 #[derive(Default)]
 pub struct InternMerchandiseQuery;
@@ -29,7 +26,7 @@ impl InternMerchandiseQuery {
         &self,
         ctx: &Context<'_>,
         id: ObjectId,
-    ) -> Result<InternMerchResponse> {
+    ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(database2(ctx)?.get_intern_merch_by_id(id).await?)
     }
@@ -38,7 +35,7 @@ impl InternMerchandiseQuery {
         &self,
         ctx: &Context<'_>,
         merchandise_id: i32,
-    ) -> Result<InternMerchResponse> {
+    ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(database2(ctx)?
             .get_intern_merch_by_merch_id(merchandise_id)
@@ -52,7 +49,7 @@ impl InternMerchandiseQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
-    ) -> Result<Connection<usize, InternMerchResponse, EmptyFields, EmptyFields>> {
+    ) -> Result<Connection<usize, InternMerchandise, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let doc_count = database2(ctx)?.count_intern_merch().await?;
 
@@ -80,7 +77,7 @@ impl InternMerchandiseQuery {
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
                     .append_stream(cursor.enumerate().map(|(n, doc)| {
-                        let merch = from_document::<InternMerchResponse>(doc.unwrap()).unwrap();
+                        let merch = from_document::<InternMerchandise>(doc.unwrap()).unwrap();
                         Edge::with_additional_fields(n + start, merch, EmptyFields)
                     }))
                     .await;
@@ -110,9 +107,8 @@ impl InternMerchandiseMutation {
         new: NewInternMerchandise,
     ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
-        let new_merch = InternMerchandise::new(new);
-        let _ = database2(ctx)?.new_intern_merch(new_merch.clone()).await?;
-        Ok(new_merch)
+        let new_merch = DBInternMerchandise::new(new);
+        Ok(database2(ctx)?.new_intern_merch(new_merch.clone()).await?)
     }
 
     #[graphql(guard(race(
@@ -124,7 +120,7 @@ impl InternMerchandiseMutation {
         ctx: &Context<'_>,
         id: InternMerchandiseId,
         update: InternMerchandiseUpdate,
-    ) -> Result<InternMerchResponse> {
+    ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(database2(ctx)?.update_intern_merch(id, update).await?)
     }
@@ -134,12 +130,12 @@ impl InternMerchandiseMutation {
         ctx: &Context<'_>,
         id: InternMerchandiseId,
         _new_status: InternMerchandiseStatus,
-    ) -> Result<InternMerchResponse> {
+    ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
         let merch = database2(ctx)?.get_intern_merch_by_id(id).await?;
 
-        let orderer_id = merch.orderer.get_id().clone();
-        let _user = database2(ctx)?.get_user_by_id(orderer_id).await?;
+        //let orderer_id = merch.orderer.get_id().clone();
+        //let _user = database2(ctx)?.get_user_by_id(orderer_id).await?;
 
         // TODO: fix
         //merch.change_status(new_status, user);

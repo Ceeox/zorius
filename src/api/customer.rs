@@ -9,7 +9,7 @@ use futures::StreamExt;
 use crate::{
     api::{claim::Claim, database2},
     models::{
-        customer::{CustomerId, CustomerResponse, CustomerUpdate, NewCustomer},
+        customer::{Customer, CustomerId, NewCustomer, UpdateCustomer},
         roles::{Role, RoleGuard},
     },
 };
@@ -19,11 +19,7 @@ pub struct CustomerQuery;
 
 #[Object]
 impl CustomerQuery {
-    async fn get_customer_by_id(
-        &self,
-        ctx: &Context<'_>,
-        id: CustomerId,
-    ) -> Result<CustomerResponse> {
+    async fn get_customer_by_id(&self, ctx: &Context<'_>, id: CustomerId) -> Result<Customer> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(database2(ctx)?.get_customer_by_id(id).await?)
     }
@@ -35,7 +31,7 @@ impl CustomerQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
-    ) -> Result<Connection<usize, CustomerResponse, EmptyFields, EmptyFields>> {
+    ) -> Result<Connection<usize, Customer, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let doc_count = database2(ctx)?.count_customers().await?;
 
@@ -61,7 +57,7 @@ impl CustomerQuery {
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
                     .append_stream(cursor.enumerate().map(|(n, doc)| {
-                        let customer = from_document::<CustomerResponse>(doc.unwrap()).unwrap();
+                        let customer = from_document::<Customer>(doc.unwrap()).unwrap();
                         Edge::with_additional_fields(n + start, customer, EmptyFields)
                     }))
                     .await;
@@ -81,7 +77,7 @@ impl CustomerMutation {
         RoleGuard(role = "Role::Admin"),
         RoleGuard(role = "Role::WorkReportModerator")
     )))]
-    async fn new_customer(&self, ctx: &Context<'_>, new: NewCustomer) -> Result<CustomerResponse> {
+    async fn new_customer(&self, ctx: &Context<'_>, new: NewCustomer) -> Result<Customer> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
@@ -98,8 +94,8 @@ impl CustomerMutation {
         &self,
         ctx: &Context<'_>,
         id: CustomerId,
-        update: CustomerUpdate,
-    ) -> Result<CustomerResponse> {
+        update: UpdateCustomer,
+    ) -> Result<Customer> {
         let _ = Claim::from_ctx(ctx)?;
         let _ = database2(ctx)?.update_customer(id.clone(), update).await?;
 

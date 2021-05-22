@@ -21,34 +21,34 @@ pub struct NewInternMerchandise {
     pub count: i32,
     #[graphql(validator(Url))]
     pub url: Option<String>,
-    pub orderer: UserId,
+    pub orderer_id: UserId,
     pub article_number: Option<String>,
     pub cost: f64,
     pub postage: Option<f64>,
     pub use_case: Option<String>,
-    pub project_leader: UserId,
-    pub location: String,
+    pub project_leader_id: UserId,
+    pub location: Option<String>,
     pub shop: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, SimpleObject, Clone)]
-pub struct InternMerchandise {
+pub struct DBInternMerchandise {
     #[serde(rename = "_id")]
     pub id: InternMerchandiseId,
     pub merchandise_id: Option<i32>,
-    pub orderer: UserId,
+    pub orderer_id: UserId,
     pub project_leader_id: Option<UserId>,
     pub purchased_on: DateTime,
     pub count: i32,
+    pub cost: f64,
+    pub status: InternMerchandiseStatus,
     pub merchandise_name: String,
     pub use_case: Option<String>,
     pub location: Option<String>,
     pub article_number: Option<String>,
     pub shop: Option<String>,
-    pub cost: f64,
     pub serial_number: Option<Vec<String>>,
     pub arived_on: Option<DateTime>,
-    pub status: InternMerchandiseStatus,
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
@@ -57,7 +57,7 @@ pub struct InternMerchandise {
 }
 
 #[derive(Deserialize, Debug, SimpleObject, Clone)]
-pub struct InternMerchResponse {
+pub struct InternMerchandise {
     #[serde(rename = "_id")]
     pub id: InternMerchandiseId,
     pub merchandise_id: Option<i32>,
@@ -106,14 +106,14 @@ impl Default for InternMerchandiseStatus {
     }
 }
 
-impl InternMerchandise {
+impl DBInternMerchandise {
     pub fn new(new_intern_merchandise: NewInternMerchandise) -> Self {
         Self {
             id: ObjectId::new(),
             merchandise_name: new_intern_merchandise.merchandise_name,
             // bought_through: None,
             count: new_intern_merchandise.count,
-            orderer: new_intern_merchandise.orderer,
+            orderer_id: new_intern_merchandise.orderer_id,
             purchased_on: Utc::now().into(),
             cost: new_intern_merchandise.cost,
             status: InternMerchandiseStatus::Ordered,
@@ -121,8 +121,8 @@ impl InternMerchandise {
             use_case: new_intern_merchandise.use_case,
             article_number: new_intern_merchandise.article_number,
             postage: new_intern_merchandise.postage,
-            project_leader_id: Some(new_intern_merchandise.project_leader),
-            location: Some(new_intern_merchandise.location),
+            project_leader_id: Some(new_intern_merchandise.project_leader_id),
+            location: new_intern_merchandise.location,
             shop: Some(new_intern_merchandise.shop),
 
             merchandise_id: None,

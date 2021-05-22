@@ -13,7 +13,7 @@ pub type UserId = ObjectId;
 pub type UserEmail = String;
 
 #[derive(SimpleObject, Debug, Deserialize, Serialize, Clone)]
-pub struct User {
+pub struct DBUser {
     #[serde(rename = "_id")]
     id: UserId,
     pub email: UserEmail,
@@ -28,9 +28,9 @@ pub struct User {
     pub deleted: bool,
 }
 
-impl User {
+impl DBUser {
     pub fn new(new_user: NewUser) -> Self {
-        let password_hash = User::hash_password(&new_user.password);
+        let password_hash = Self::hash_password(&new_user.password);
         Self {
             id: ObjectId::new(),
             email: new_user.email,
@@ -51,7 +51,7 @@ impl User {
     }
 
     pub fn change_password(&mut self, new_password: &str) {
-        self.password_hash = User::hash_password(new_password);
+        self.password_hash = Self::hash_password(new_password);
     }
 
     pub fn get_id(&self) -> &UserId {
@@ -66,6 +66,20 @@ impl User {
     pub fn is_password_correct(&self, password: &str) -> bool {
         sha512_crypt::verify(password.as_bytes(), &self.password_hash)
     }
+}
+
+#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone)]
+pub struct User {
+    #[serde(rename = "_id")]
+    id: UserId,
+    pub email: UserEmail,
+    pub username: String,
+    pub created_at: DateTime,
+    pub avatar_url: Option<String>,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+    pub updated: DateTime,
+    pub deleted: bool,
 }
 
 #[derive(Deserialize, Debug, InputObject)]

@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use async_graphql::{Context, Error, Result};
+use bson::oid::ObjectId;
 use chrono::Local;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,7 @@ pub struct Claim {
     /// Subject of the JWT (the user)
     sub: String,
     /// Id of the User (not in JWT standard)
-    id: UserId,
+    id: String,
     /// Time after which the JWT expires
     exp: usize,
     /// Time before which the JWT must not be accepted for processing
@@ -30,7 +31,7 @@ pub struct Claim {
 
 impl Claim {
     /// Creates a new Claim with the users email, id and sets the time when the token expires.
-    pub fn new(sub: String, id: UserId, exp: usize) -> Self {
+    pub fn new(sub: String, id: String, exp: usize) -> Self {
         let mut iss = String::new();
         if CONFIG.web.enable_ssl {
             iss.push_str("https://");
@@ -63,8 +64,9 @@ impl Claim {
     }
 
     /// Return a reference to the `user_id`
-    pub fn user_id(&self) -> &UserId {
-        &self.id
+    pub fn user_id(&self) -> UserId {
+        ObjectId::with_string(&self.id.clone())
+            .expect("Couldn't convert from string to ObjectId for UserId")
     }
 
     /// Retruns the unix timestamp when the token expries.

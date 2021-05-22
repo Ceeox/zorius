@@ -1,5 +1,5 @@
 use async_graphql::{Error, Result};
-use bson::{doc, from_document, oid::ObjectId, to_document, Bson, Document};
+use bson::{doc, from_document, oid::ObjectId, to_document, Document};
 use futures::StreamExt;
 use mongodb::{
     options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument},
@@ -9,15 +9,13 @@ use mongodb::{
 use crate::{
     helper::AggregateBuilder,
     models::{
-        customer::{Customer, CustomerId, CustomerResponse, CustomerUpdate, NewCustomer},
+        customer::{Customer, CustomerId, DBCustomer, NewCustomer, UpdateCustomer},
         intern_merchandise::{
-            InternMerchResponse, InternMerchandise, InternMerchandiseId, InternMerchandiseUpdate,
+            DBInternMerchandise, InternMerchandise, InternMerchandiseId, InternMerchandiseUpdate,
         },
-        project::{NewProject, Project, ProjectId, ProjectResponse, ProjectUpdate},
-        user::{NewUser, User, UserId, UserUpdate},
-        work_report::{
-            NewWorkReport, WorkReport, WorkReportId, WorkReportResponse, WorkReportUpdate,
-        },
+        project::{DBProject, NewProject, Project, ProjectId, UpdateProject},
+        user::{DBUser, NewUser, User, UserId, UserUpdate},
+        work_report::{DBWorkReport, NewWorkReport, WorkReport, WorkReportId, WorkReportUpdate},
     },
 };
 
@@ -49,12 +47,30 @@ impl Database {
         }
     }
 
+    pub async fn get_dbuser_by_id(&self, id: UserId) -> Result<DBUser> {
+        let col = self.database.collection(MDB_COLL_NAME_USERS);
+        let filter = doc! {"_id": id};
+        match col.find_one(filter, None).await? {
+            None => Err(Error::new("user wasn't found")),
+            Some(doc) => Ok(from_document::<DBUser>(doc)?),
+        }
+    }
+
     pub async fn get_user_by_email(&self, email: String) -> Result<User> {
         let col = self.database.collection(MDB_COLL_NAME_USERS);
         let filter = doc! { "email": email.clone() };
         match col.find_one(filter, None).await? {
             None => Err(Error::new("user wasn't found")),
             Some(doc) => Ok(from_document::<User>(doc)?),
+        }
+    }
+
+    pub async fn get_dbuser_by_email(&self, email: String) -> Result<DBUser> {
+        let col = self.database.collection(MDB_COLL_NAME_USERS);
+        let filter = doc! { "email": email.clone() };
+        match col.find_one(filter, None).await? {
+            None => Err(Error::new("user wasn't found")),
+            Some(doc) => Ok(from_document::<DBUser>(doc)?),
         }
     }
 
@@ -73,11 +89,11 @@ impl Database {
     }
 
     pub async fn new_user(&self, new_user: NewUser) -> Result<User> {
-        let user = User::new(new_user);
+        let user = DBUser::new(new_user);
         let col = self.database.collection(MDB_COLL_NAME_USERS);
         let doc = to_document(&user)?;
         let _ = col.insert_one(doc.clone(), None).await?;
-        Ok(user)
+        Ok(self.get_user_by_id(user.get_id().clone()).await?)
     }
 
     pub async fn update_user(&self, id: UserId, user_update: UserUpdate) -> Result<User> {
@@ -112,11 +128,11 @@ impl Database {
     pub async fn get_intern_merch_by_id(
         &self,
         id: InternMerchandiseId,
-    ) -> Result<InternMerchResponse> {
+    ) -> Result<InternMerchandise> {
         let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
         let pipeline = AggregateBuilder::new()
-            .matching(("_id", id))
-            .lookup(MDB_COLL_NAME_USERS, "orderer", "_id", "orderer")
+            .matching(vec![("_id", id)])
+            .lookup(MDB_COLL_NAME_USERS, "orderer_id", "_id", "orderer")
             .lookup(
                 MDB_COLL_NAME_USERS,
                 "project_leader_id",
@@ -136,11 +152,11 @@ impl Database {
     pub async fn get_intern_merch_by_merch_id(
         &self,
         merchandise_id: i32,
-    ) -> Result<InternMerchResponse> {
+    ) -> Result<InternMerchandise> {
         let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
         let pipeline = AggregateBuilder::new()
-            .matching(("merchandise_id", merchandise_id))
-            .lookup(MDB_COLL_NAME_USERS, "orderer", "_id", "orderer")
+            .matching(vec![("merchandise_id", merchandise_id)])
+            .lookup(MDB_COLL_NAME_USERS, "orderer_id", "_id", "orderer")
             .lookup(
                 MDB_COLL_NAME_USERS,
                 "project_leader_id",
@@ -162,8 +178,15 @@ impl Database {
         let pipeline = AggregateBuilder::new()
             .skip(start as i64)
             .limit(limit)
-            .lookup(MDB_COLL_NAME_USERS, "orderer", "_id", "orderer")
+            .lookup(MDB_COLL_NAME_USERS, "orderer_id", "_id", "orderer")
+            .lookup(
+                MDB_COLL_NAME_USERS,
+                "project_leader_id",
+                "_id",
+                "project_leader",
+            )
             .unwind("$orderer", None, None)
+            .unwind("$project_leader", None, None)
             .build();
         Ok(collection.aggregate(pipeline, None).await?)
     }
@@ -173,31 +196,27 @@ impl Database {
         Ok(collection.estimated_document_count(None).await? as usize)
     }
 
-    pub async fn new_intern_merch(&self, new_intern_merch: InternMerchandise) -> Result<()> {
+    pub async fn new_intern_merch(
+        &self,
+        new_intern_merch: DBInternMerchandise,
+    ) -> Result<InternMerchandise> {
         let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
+        let id = new_intern_merch.id.clone();
         let doc = to_document(&new_intern_merch)?;
         let _ = collection.insert_one(doc, None).await?;
-        Ok(())
+        Ok(self.get_intern_merch_by_id(id).await?)
     }
 
     pub async fn update_intern_merch(
         &self,
         id: InternMerchandiseId,
         update: InternMerchandiseUpdate,
-    ) -> Result<InternMerchResponse> {
+    ) -> Result<InternMerchandise> {
         let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
-        let filter = doc! {"_id": id};
+        let filter = doc! {"_id": id.clone()};
         let update = doc! {"$set": bson::to_bson(&update)?};
-        let options = FindOneAndUpdateOptions::builder()
-            .return_document(Some(ReturnDocument::After))
-            .build();
-        match collection
-            .find_one_and_update(filter, update, Some(options))
-            .await?
-        {
-            None => Err(Error::new("intern merch wasn't found")),
-            Some(doc) => Ok(from_document(doc)?),
-        }
+        let _ = collection.update_one(filter, update, None).await?;
+        Ok(self.get_intern_merch_by_id(id).await?)
     }
 
     pub async fn delete_intern_merch(&self, id: InternMerchandiseId) -> Result<()> {
@@ -211,11 +230,10 @@ impl Database {
         &self,
         id: WorkReportId,
         user_id: UserId,
-    ) -> Result<WorkReportResponse> {
+    ) -> Result<WorkReport> {
         let collection = self.database.collection(MDB_COLL_WORK_REPORTS);
         let pipeline = AggregateBuilder::new()
-            .matching(("_id", id))
-            .matching(("user_id", user_id))
+            .matching(vec![("_id", id), ("user_id", user_id)])
             .lookup(MDB_COLL_NAME_USERS, "user_id", "_id", "user")
             .lookup(MDB_COLL_PROJECTS, "project_id", "_id", "project")
             .unwind("$project", None, None)
@@ -232,6 +250,49 @@ impl Database {
                 "customer.creator_id",
                 "_id",
                 "customer.creator",
+            )
+            .unwind("$user", None, None)
+            .unwind("$project.creator", None, None)
+            .unwind("$customer.creator", None, None)
+            .build();
+        let mut doc = collection.aggregate(pipeline, None).await?;
+
+        match doc.next().await {
+            Some(r) => Ok(from_document(r?)?),
+            None => Err(Error::new("work report wasn't found")),
+        }
+    }
+
+    pub async fn get_todays_work_reports(
+        &self,
+        id: WorkReportId,
+        user_id: UserId,
+    ) -> Result<WorkReport> {
+        let collection = self.database.collection(MDB_COLL_WORK_REPORTS);
+        let pipeline = AggregateBuilder::new()
+            .matching(vec![("_id", id), ("user_id", user_id)])
+            .lookup(MDB_COLL_NAME_USERS, "user_id", "_id", "user")
+            .lookup(MDB_COLL_PROJECTS, "project_id", "_id", "project")
+            .unwind("$project", None, None)
+            .lookup(
+                MDB_COLL_NAME_USERS,
+                "project.creator_id",
+                "_id",
+                "project.creator",
+            )
+            .lookup(MDB_COLL_CUSTOMERS, "customer_id", "_id", "customer")
+            .unwind("$customer", None, None)
+            .lookup(
+                MDB_COLL_NAME_USERS,
+                "customer.creator_id",
+                "_id",
+                "customer.creator",
+            )
+            .lookup(
+                MDB_COLL_PROJECTS,
+                "customer.project_ids",
+                "_id",
+                "customer.projects",
             )
             .unwind("$user", None, None)
             .unwind("$project.creator", None, None)
@@ -264,7 +325,7 @@ impl Database {
         let pipeline = AggregateBuilder::new()
             .skip(start)
             .limit(limit)
-            .matching(("user_id", user_id))
+            .matching(vec![("user_id", user_id)])
             .lookup(MDB_COLL_NAME_USERS, "user_id", "_id", "user")
             .lookup(MDB_COLL_PROJECTS, "project_id", "_id", "project")
             .unwind("$project", None, None)
@@ -282,6 +343,12 @@ impl Database {
                 "_id",
                 "customer.creator",
             )
+            .lookup(
+                MDB_COLL_PROJECTS,
+                "customer.project_ids",
+                "_id",
+                "customer.projects",
+            )
             .unwind("$user", None, None)
             .unwind("$project.creator", None, None)
             .unwind("$customer.creator", None, None)
@@ -294,13 +361,9 @@ impl Database {
         Ok(collection.estimated_document_count(None).await? as usize)
     }
 
-    pub async fn new_work_report(
-        &self,
-        user_id: UserId,
-        new: NewWorkReport,
-    ) -> Result<WorkReportResponse> {
+    pub async fn new_work_report(&self, user_id: UserId, new: NewWorkReport) -> Result<WorkReport> {
         let col = self.database.collection(MDB_COLL_WORK_REPORTS);
-        let new_work_report = WorkReport::new(user_id.clone(), new);
+        let new_work_report = DBWorkReport::new(user_id.clone(), new);
         let doc = to_document(&new_work_report)?;
 
         let res = col.insert_one(doc, None).await?;
@@ -339,12 +402,13 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_customer_by_id(&self, id: CustomerId) -> Result<CustomerResponse> {
+    pub async fn get_customer_by_id(&self, id: CustomerId) -> Result<Customer> {
         let collection = self.database.collection(MDB_COLL_CUSTOMERS);
         let pipeline = AggregateBuilder::new()
-            .matching(("_id", &id))
+            .matching(vec![("_id", &id)])
             .lookup(MDB_COLL_NAME_USERS, "creator_id", "_id", "creator")
             .unwind("$creator", None, None)
+            .lookup(MDB_COLL_PROJECTS, "project_ids", "_id", "projects")
             .build();
         let mut doc = collection.aggregate(pipeline, None).await?;
         match doc.next().await {
@@ -360,6 +424,7 @@ impl Database {
             .limit(limit)
             .lookup(MDB_COLL_NAME_USERS, "creator_id", "_id", "creator")
             .unwind("$creator", None, None)
+            .lookup(MDB_COLL_PROJECTS, "project_ids", "_id", "projects")
             .build();
         Ok(collection.aggregate(pipeline, None).await?)
     }
@@ -369,13 +434,9 @@ impl Database {
         Ok(collection.estimated_document_count(None).await? as usize)
     }
 
-    pub async fn new_customer(
-        &self,
-        user_id: UserId,
-        new: NewCustomer,
-    ) -> Result<CustomerResponse> {
+    pub async fn new_customer(&self, user_id: UserId, new: NewCustomer) -> Result<Customer> {
         let col = self.database.collection(MDB_COLL_CUSTOMERS);
-        let new_customer = Customer::new(new, user_id.clone());
+        let new_customer = DBCustomer::new(new, user_id.clone());
         let doc = to_document(&new_customer)?;
 
         let _ = col.insert_one(doc, None).await?;
@@ -387,7 +448,7 @@ impl Database {
     pub async fn update_customer(
         &self,
         id: CustomerId,
-        customer_update: CustomerUpdate,
+        customer_update: UpdateCustomer,
     ) -> Result<bool> {
         let col = self.database.collection(MDB_COLL_CUSTOMERS);
         let filter = doc! { "_id": id };
@@ -405,13 +466,9 @@ impl Database {
         Ok(())
     }
 
-    pub async fn get_project_by_id(&self, id: ProjectId) -> Result<ProjectResponse> {
+    pub async fn get_project_by_id(&self, id: ProjectId) -> Result<Project> {
         let collection = self.database.collection(MDB_COLL_PROJECTS);
-        let pipeline = AggregateBuilder::new()
-            .matching(("_id", &id))
-            .lookup(MDB_COLL_NAME_USERS, "creator_id", "_id", "creator")
-            .unwind("$creator", None, None)
-            .build();
+        let pipeline = AggregateBuilder::new().matching(vec![("_id", &id)]).build();
         let mut doc = collection.aggregate(pipeline, None).await?;
         match doc.next().await {
             Some(r) => Ok(from_document(r?)?),
@@ -421,12 +478,7 @@ impl Database {
 
     pub async fn list_projects(&self, start: i64, limit: i64) -> Result<Cursor<Document>> {
         let collection = self.database.collection(MDB_COLL_PROJECTS);
-        let pipeline = AggregateBuilder::new()
-            .skip(start)
-            .limit(limit)
-            .lookup(MDB_COLL_NAME_USERS, "creator_id", "_id", "creator")
-            .unwind("$creator", None, None)
-            .build();
+        let pipeline = AggregateBuilder::new().skip(start).limit(limit).build();
         Ok(collection.aggregate(pipeline, None).await?)
     }
 
@@ -435,9 +487,9 @@ impl Database {
         Ok(collection.estimated_document_count(None).await? as usize)
     }
 
-    pub async fn new_project(&self, user_id: UserId, new: NewProject) -> Result<ProjectResponse> {
+    pub async fn new_project(&self, new: NewProject) -> Result<Project> {
         let col = self.database.collection(MDB_COLL_PROJECTS);
-        let new_project = Project::new(user_id.clone(), new);
+        let new_project = DBProject::new(new);
         let doc = to_document(&new_project)?;
 
         let _ = col.insert_one(doc, None).await?;
@@ -448,8 +500,8 @@ impl Database {
         &self,
         id: ProjectId,
         user_id: UserId,
-        project_update: ProjectUpdate,
-    ) -> Result<ProjectResponse> {
+        project_update: UpdateProject,
+    ) -> Result<Project> {
         let col = self.database.collection(MDB_COLL_PROJECTS);
         let filter = doc! { "_id": id.clone(), "creator_id": user_id };
         let mut update = bson::Document::new();

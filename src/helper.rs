@@ -9,15 +9,16 @@ impl AggregateBuilder {
         Self { docs: Vec::new() }
     }
 
-    pub fn matching<T>(mut self, fields: (&str, T)) -> Self
+    pub fn matching<T>(mut self, fields: Vec<(&str, T)>) -> Self
     where
         T: Into<Bson>,
     {
         let mut doc = Document::new();
         let mut inner = Document::new();
-        inner.insert(fields.0, fields.1);
+        for field in fields {
+            inner.insert(field.0, field.1);
+        }
         doc.insert("$match", inner);
-
         self.docs.push(doc);
         self
     }

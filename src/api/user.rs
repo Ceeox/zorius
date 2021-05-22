@@ -34,14 +34,14 @@ impl UserQuery {
         password: String,
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
-        let user = database2(ctx)?.get_user_by_email(email.clone()).await?;
+        let user = database2(ctx)?.get_dbuser_by_email(email.clone()).await?;
 
         if !user.is_password_correct(&password) {
             return Err(err);
         }
         let claim = Claim::new(
             email,
-            user.get_id().clone(),
+            user.get_id().clone().to_string(),
             (Utc::now() + Duration::seconds(CONFIG.token_lifetime)).timestamp() as usize,
         );
         let token = claim.to_string();
@@ -124,7 +124,7 @@ impl UserMutation {
         let auth_info = Claim::from_ctx(ctx)?;
         let user_id = auth_info.user_id();
 
-        let mut user = database2(ctx)?.get_user_by_id(user_id.clone()).await?;
+        let mut user = database2(ctx)?.get_dbuser_by_id(user_id.clone()).await?;
 
         if !user.is_password_correct(&old_password) {
             return Err(Error::new("old password is wrong!".to_owned()));

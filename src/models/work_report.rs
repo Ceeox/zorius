@@ -4,15 +4,15 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
-    customer::{CustomerId, CustomerResponse},
-    project::{ProjectId, ProjectResponse},
+    customer::{Customer, CustomerId},
+    project::{Project, ProjectId},
     user::{User, UserId},
 };
 
 pub type WorkReportId = ObjectId;
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
-pub struct WorkReport {
+pub struct DBWorkReport {
     #[serde(rename = "_id")]
     id: WorkReportId,
     user_id: UserId,
@@ -23,6 +23,7 @@ pub struct WorkReport {
     times: Vec<WorkReportTimes>,
     status: WorkReportStatus,
     invoiced: bool,
+    created_at: DateTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
@@ -32,17 +33,18 @@ pub struct WorkReportTimes {
 }
 
 #[derive(Deserialize, Debug, SimpleObject, Clone)]
-pub struct WorkReportResponse {
+pub struct WorkReport {
     #[serde(rename = "_id")]
     id: WorkReportId,
     user: User,
-    customer: CustomerResponse,
-    project: ProjectResponse,
+    customer: Customer,
+    project: Project,
     trip_info: TripInfo,
     description: String,
     times: Vec<WorkReportTimes>,
     status: WorkReportStatus,
     invoiced: bool,
+    created_at: DateTime,
 }
 
 #[derive(Serialize, Debug, InputObject)]
@@ -98,7 +100,7 @@ pub enum WorkReportStatus {
     Running,
 }
 
-impl WorkReport {
+impl DBWorkReport {
     pub fn new(user_id: UserId, new_wr: NewWorkReport) -> Self {
         Self {
             id: ObjectId::new(),
@@ -118,6 +120,7 @@ impl WorkReport {
             }],
             status: WorkReportStatus::Running,
             invoiced: true,
+            created_at: Utc::now().into(),
         }
     }
 

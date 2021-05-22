@@ -10,7 +10,7 @@ use crate::{
     api::{claim::Claim, database2},
     models::{
         roles::{Role, RoleGuard},
-        work_report::{NewWorkReport, WorkReportId, WorkReportResponse, WorkReportUpdate},
+        work_report::{NewWorkReport, WorkReport, WorkReportId, WorkReportUpdate},
     },
 };
 
@@ -23,7 +23,7 @@ impl WorkReportQuery {
         &self,
         ctx: &Context<'_>,
         id: WorkReportId,
-    ) -> Result<WorkReportResponse> {
+    ) -> Result<WorkReport> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
@@ -39,7 +39,7 @@ impl WorkReportQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
-    ) -> Result<Connection<usize, WorkReportResponse, EmptyFields, EmptyFields>> {
+    ) -> Result<Connection<usize, WorkReport, EmptyFields, EmptyFields>> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
         let doc_count = database2(ctx)?.count_work_reports().await?;
@@ -68,7 +68,7 @@ impl WorkReportQuery {
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
                     .append_stream(cursor.enumerate().map(|(n, doc)| {
-                        let wr = from_document::<WorkReportResponse>(doc.unwrap()).unwrap();
+                        let wr = from_document::<WorkReport>(doc.unwrap()).unwrap();
                         Edge::with_additional_fields(n + start, wr, EmptyFields)
                     }))
                     .await;
@@ -84,11 +84,7 @@ pub struct WorkReportMutation;
 
 #[Object]
 impl WorkReportMutation {
-    async fn new_work_report(
-        &self,
-        ctx: &Context<'_>,
-        new: NewWorkReport,
-    ) -> Result<WorkReportResponse> {
+    async fn new_work_report(&self, ctx: &Context<'_>, new: NewWorkReport) -> Result<WorkReport> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
@@ -102,7 +98,7 @@ impl WorkReportMutation {
         ctx: &Context<'_>,
         id: WorkReportId,
         update: WorkReportUpdate,
-    ) -> Result<WorkReportResponse> {
+    ) -> Result<WorkReport> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
         let _ = database2(ctx)?

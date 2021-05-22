@@ -123,7 +123,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
                             Ok(String::new())
                         }
                     })
-                    .with_max_requests(50),
+                    .with_max_requests(500),
             )
             // graphql api
             .service(graphql)
