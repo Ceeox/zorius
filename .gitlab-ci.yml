@@ -2,36 +2,35 @@ stages:
   - build
   - deploy
 
-build:
-  image:
-      name: gcr.io/kaniko-project/executor:debug
-      entrypoint: [""]
-  stage: build
-  script:
-      - mkdir -p /kaniko/.docker
-      - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-      - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
-  rules:
-      - if: $CI_COMMIT_TAG
+build_docker_image:
+    image:
+        name: gcr.io/kaniko-project/executor:debug
+        entrypoint: [""]
+    stage: build
+    script:
+        - mkdir -p /kaniko/.docker
+        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+        - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
 
-deploy:
-  image: bitnami/kubectl:latest
-  stage: deploy
-  only:
-    - master
-  script:
-    - kubectl apply -f k8s/deployment.yaml -n zorius
 
-pages:
-  image: rustdocker/rust:stable
-  stage: deploy
-  only:
-    - master
-  script:
-    - cargo doc
-    - rm -rf public
-    - mkdir public
-    - cp -R target/doc/* public
-  artifacts:
-    paths:
-    - public
+deploy_to_k8s:
+    image: bitnami/kubectl:latest
+    stage: deploy
+    only:
+        - master
+    script:
+        - kubectl apply -f k8s/deployment.yaml -n $CI_REGISTRY_IMAGE
+
+deploy_to_pages:
+    image: rustdocker/rust:stable
+    stage: deploy
+    only:
+        - master
+    script:
+        - cargo doc
+        - rm -rf public
+        - mkdir public
+        - cp -R target/doc/* public
+    artifacts:
+        paths:
+        - public
