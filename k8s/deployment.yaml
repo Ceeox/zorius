@@ -1,0 +1,22 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: zorius
+    namespace: zorius
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: zorius
+    template:
+        metadata:
+            labels:
+                app: zorius
+                name: zorius
+    spec:
+        containers:
+        - image: zorius:latest
+        name: zorius
+    imagePullSecrets:
+        - name: regcred
