@@ -1,8 +1,6 @@
 stages:
   - build
-  - image-build
   - deploy
-  - pages
 
 build:
   image:
@@ -22,7 +20,7 @@ deploy:
   only:
     - master
   script:
-    - kubectl apply -f k8s/deployment.yaml -n test
+    - kubectl apply -f k8s/deployment.yaml -n zorius
 
 pages:
   image: rustdocker/rust:stable
