@@ -33,11 +33,5 @@ lint:rustfmt:
   image: "guangie88/rustfmt-clippy"
   # allow_failure: true
   script:
-    - cargo fmt -- --write-mode=diff
-
-lint:clippy:
-  image: "guangie88/rustfmt-clippy"
-  allow_failure: true
-  script:
-    - cargo clippy -- -D warnings # Turn all warnings into errors
+    - cargo fmt -- --files-with-diff
 
