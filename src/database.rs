@@ -7,7 +7,7 @@ use mongodb::{
 };
 
 use crate::{
-    helper::AggregateBuilder,
+    helper::{AggregateBuilder, SortOrder},
     models::{
         customer::{Customer, CustomerId, DBCustomer, NewCustomer, UpdateCustomer},
         intern_merchandise::{
@@ -178,6 +178,7 @@ impl Database {
         let pipeline = AggregateBuilder::new()
             .skip(start as i64)
             .limit(limit)
+            .sort(vec![("created_date", SortOrder::DESC)])
             .lookup(MDB_COLL_NAME_USERS, "orderer_id", "_id", "orderer")
             .lookup(
                 MDB_COLL_NAME_USERS,

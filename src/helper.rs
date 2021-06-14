@@ -1,4 +1,13 @@
+use std::fmt::Display;
+
 use bson::{doc, Bson, Document};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub enum SortOrder {
+    ASCE = 1,
+    DESC = -1,
+}
 
 pub struct AggregateBuilder {
     docs: Vec<Document>,
@@ -7,6 +16,24 @@ pub struct AggregateBuilder {
 impl AggregateBuilder {
     pub fn new() -> Self {
         Self { docs: Vec::new() }
+    }
+
+    pub fn sort(mut self, fields: Vec<(&str, SortOrder)>) -> Self {
+        let mut doc = Document::new();
+        let mut inner = Document::new();
+        for field in fields {
+            match field.1 {
+                SortOrder::ASCE => {
+                    inner.insert(field.0, field.1);
+                }
+                SortOrder::DESC => {
+                    inner.insert(field.0, -1);
+                }
+            }
+        }
+        doc.insert("$sort", inner);
+        self.docs.push(doc);
+        self
     }
 
     pub fn matching<T>(mut self, fields: Vec<(&str, T)>) -> Self
