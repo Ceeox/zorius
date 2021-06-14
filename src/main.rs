@@ -1,9 +1,9 @@
+use std::fs::File;
 use std::io::BufReader;
-use std::{fs::File, time::Duration};
 
 use actix_cors::Cors;
 use actix_files::Files;
-use actix_ratelimit::{MemoryStore, MemoryStoreActor, RateLimiter};
+use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
     http::ContentEncoding,
     middleware::{Compress, DefaultHeaders, Logger},
@@ -104,7 +104,12 @@ async fn main() -> Result<(), errors::ZoriusError> {
     // Start http server
     let webserver_url = format!("{}:{}", CONFIG.web.ip, CONFIG.web.port);
     let log_format = CONFIG.web.log_format.clone();
-    let store = MemoryStore::new();
+    let gov_conf = GovernorConfigBuilder::default()
+        .per_second(10)
+        .burst_size(20)
+        .finish()
+        .unwrap();
+
     let http_server = HttpServer::new(move || {
         App::new()
             .data(schema.clone())
@@ -112,19 +117,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
             .wrap(Compress::new(ContentEncoding::Auto))
-            .wrap(
-                RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
-                    .with_interval(Duration::from_secs(60))
-                    .with_identifier(|req| {
-                        if let Some(key) = req.headers().get("x-request-id") {
-                            let key = key.to_str().unwrap();
-                            Ok(key.to_string())
-                        } else {
-                            Ok(String::new())
-                        }
-                    })
-                    .with_max_requests(500),
-            )
+            .wrap(Governor::new(&gov_conf))
             // graphql api
             .service(graphql)
             .service(gql_playgound)
