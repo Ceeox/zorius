@@ -24,7 +24,7 @@ impl AggregateBuilder {
         for field in fields {
             match field.1 {
                 SortOrder::ASCE => {
-                    inner.insert(field.0, field.1);
+                    inner.insert(field.0, 1);
                 }
                 SortOrder::DESC => {
                     inner.insert(field.0, -1);
