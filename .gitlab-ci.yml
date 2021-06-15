@@ -10,9 +10,9 @@ cache: &global_cache
         - cargo/
     policy: pull-push
 
-rust-stable:
+rust-latest:
     stage: build
-    image: rust:stable
+    image: rust:latest
     cache:
         <<: *global_cache
         policy: push
@@ -22,7 +22,7 @@ rust-stable:
 
 lint-code:
     stage: test
-    needs: [rust-stable]
+    needs: [rust-latest]
     cache:
         <<: *global_cache
         policy: pull
@@ -32,7 +32,7 @@ lint-code:
 
 format-code:
     stage: test
-    needs: [rust-stable]
+    needs: [rust-latest]
     cache:
         <<: *global_cache
         policy: pull
@@ -42,7 +42,7 @@ format-code:
 
 audit-code:
     stage: test
-    needs: [rust-stable]
+    needs: [rust-latest]
     cache:
         <<: *global_cache
         policy: pull
@@ -71,7 +71,7 @@ deploy_to_k8s:
         - kubectl apply -f k8s/deployment.yaml -n $CI_REGISTRY_IMAGE
 
 deploy_to_pages:
-    image: rustdocker/rust:stable
+    image: rustdocker/rust:latest
     stage: deploy
     only:
         - master
