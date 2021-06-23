@@ -169,9 +169,9 @@ pub struct InternMerchandiseUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub merchandise_id: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub orderer: Option<UserId>,
+    pub orderer_id: Option<UserId>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub project_leader: Option<UserId>,
+    pub project_leader_id: Option<UserId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purchased_on: Option<DateTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
