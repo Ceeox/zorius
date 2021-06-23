@@ -105,8 +105,8 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let webserver_url = format!("{}:{}", CONFIG.web.ip, CONFIG.web.port);
     let log_format = CONFIG.web.log_format.clone();
     let gov_conf = GovernorConfigBuilder::default()
-        .per_second(10)
-        .burst_size(20)
+        .per_second(2)
+        .burst_size(10)
         .finish()
         .unwrap();
 
