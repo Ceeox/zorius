@@ -2,17 +2,17 @@ use std::fmt::Display;
 
 use askama::Template;
 use async_graphql::{validators::IntGreaterThan, Enum, InputObject, SimpleObject};
-use bson::{oid::ObjectId, DateTime};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{
-    helper::validators::Url,
     mailer::mailer,
     models::user::{User, UserId},
+    validators::Url,
 };
 
-pub type InternMerchandiseId = ObjectId;
+pub type InternMerchandiseId = Uuid;
 
 #[derive(InputObject, Deserialize, Serialize)]
 pub struct NewInternMerchandise {
@@ -33,12 +33,11 @@ pub struct NewInternMerchandise {
 
 #[derive(Deserialize, Serialize, Debug, SimpleObject, Clone)]
 pub struct DBInternMerchandise {
-    #[serde(rename = "_id")]
     pub id: InternMerchandiseId,
     pub merchandise_id: Option<i32>,
     pub orderer_id: UserId,
     pub project_leader_id: Option<UserId>,
-    pub purchased_on: DateTime,
+    pub purchased_on: DateTime<Utc>,
     pub count: i32,
     pub cost: f64,
     pub status: InternMerchandiseStatus,
@@ -48,22 +47,21 @@ pub struct DBInternMerchandise {
     pub article_number: Option<String>,
     pub shop: Option<String>,
     pub serial_number: Option<Vec<String>>,
-    pub arived_on: Option<DateTime>,
+    pub arived_on: Option<DateTime<Utc>>,
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
-    pub created_date: DateTime,
-    pub updated_date: DateTime,
+    pub created_date: DateTime<Utc>,
+    pub updated_date: DateTime<Utc>,
 }
 
 #[derive(Deserialize, Debug, SimpleObject, Clone)]
 pub struct InternMerchandise {
-    #[serde(rename = "_id")]
     pub id: InternMerchandiseId,
     pub merchandise_id: Option<i32>,
     pub orderer: User,
     pub project_leader: Option<User>,
-    pub purchased_on: DateTime,
+    pub purchased_on: DateTime<Utc>,
     pub count: i32,
     pub merchandise_name: String,
     pub use_case: Option<String>,
@@ -72,13 +70,13 @@ pub struct InternMerchandise {
     pub shop: Option<String>,
     pub cost: f64,
     pub serial_number: Option<Vec<String>>,
-    pub arived_on: Option<DateTime>,
+    pub arived_on: Option<DateTime<Utc>>,
     pub status: InternMerchandiseStatus,
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
-    pub created_date: DateTime,
-    pub updated_date: DateTime,
+    pub created_date: DateTime<Utc>,
+    pub updated_date: DateTime<Utc>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Enum)]
@@ -109,7 +107,7 @@ impl Default for InternMerchandiseStatus {
 impl DBInternMerchandise {
     pub fn new(new_intern_merchandise: NewInternMerchandise) -> Self {
         Self {
-            id: ObjectId::new(),
+            id: InternMerchandiseId::new_v4(),
             merchandise_name: new_intern_merchandise.merchandise_name,
             // bought_through: None,
             count: new_intern_merchandise.count,
@@ -173,7 +171,7 @@ pub struct InternMerchandiseUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_leader_id: Option<UserId>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub purchased_on: Option<DateTime>,
+    pub purchased_on: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -191,7 +189,7 @@ pub struct InternMerchandiseUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub serial_number: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arived_on: Option<DateTime>,
+    pub arived_on: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

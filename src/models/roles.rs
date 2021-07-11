@@ -4,14 +4,13 @@ use std::{
     sync::Arc,
 };
 
-use crate::api::{claim::Claim, database};
+use crate::api::claim::Claim;
 use async_graphql::{guard::Guard, Context, Enum, Result, SimpleObject};
-use bson::{doc, from_document, oid::ObjectId};
 use futures::lock::Mutex;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use super::user::UserId;
-use crate::api::MDB_COLL_ROLES;
 
 #[derive(Debug, Serialize, Deserialize, SimpleObject)]
 pub struct Roles {
@@ -68,7 +67,7 @@ impl Guard for RoleGuard {
 }
 
 pub struct RoleCache {
-    user_roles: Arc<Mutex<HashMap<ObjectId, Vec<Role>>>>,
+    user_roles: Arc<Mutex<HashMap<Uuid, Vec<Role>>>>,
 }
 
 impl RoleCache {
@@ -110,14 +109,7 @@ impl RoleCache {
     }
 
     async fn load_roles(&self, ctx: &Context<'_>, user_id: &UserId) -> Result<Option<Vec<Role>>> {
-        let db = database(ctx)?;
-        let filter = doc! { "user_id" : user_id.clone() };
-        match db.collection(MDB_COLL_ROLES).find_one(filter, None).await? {
-            Some(r) => {
-                let roles = from_document::<Roles>(r)?;
-                Ok(Some(roles.roles))
-            }
-            _ => Ok(None),
-        }
+        // TODO: create call in Database class
+        Ok(None)
     }
 }

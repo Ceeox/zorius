@@ -1,130 +1,102 @@
+use std::usize;
+
 use async_graphql::{Error, Result};
-use bson::{doc, from_document, oid::ObjectId, to_document, Document};
-use futures::StreamExt;
-use mongodb::{
-    options::{FindOneAndUpdateOptions, FindOptions, ReturnDocument},
-    Client, Cursor, Database as MongoDB,
-};
+use sqlx::{Pool, Postgres};
 
-use crate::{
-    helper::{AggregateBuilder, SortOrder},
-    models::{
-        customer::{Customer, CustomerId, DBCustomer, NewCustomer, UpdateCustomer},
-        intern_merchandise::{
-            DBInternMerchandise, InternMerchandise, InternMerchandiseId, InternMerchandiseUpdate,
-        },
-        project::{DBProject, NewProject, Project, ProjectId, UpdateProject},
-        user::{DBUser, NewUser, User, UserId, UserUpdate},
-        work_report::{DBWorkReport, NewWorkReport, WorkReport, WorkReportId, WorkReportUpdate},
-    },
-};
-
-pub(crate) static MDB_COLL_NAME_USERS: &str = "users";
-pub(crate) static MDB_COLL_WORK_REPORTS: &str = "work_reports";
-pub(crate) static MDB_COLL_INTERN_MERCH: &str = "merchandise_intern";
-pub(crate) static MDB_COLL_CUSTOMERS: &str = "customers";
-pub(crate) static MDB_COLL_PROJECTS: &str = "projects";
+use crate::models::user::{DBUser, NewUser, User, UserId, UserUpdate};
 
 pub struct Database {
-    _client: Client,
-    database: MongoDB,
+    database: Pool<Postgres>,
 }
 
 impl Database {
-    pub fn new(client: Client, database: mongodb::Database) -> Self {
-        Self {
-            _client: client,
-            database,
-        }
+    pub async fn new(database: Pool<Postgres>) -> Self {
+        sqlx::migrate!("./migrations")
+            .run(&database)
+            .await
+            .expect("failed to run migrations");
+        Self { database }
     }
 
-    pub async fn get_user_by_id(&self, id: UserId) -> Result<User> {
-        let col = self.database.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! {"_id": id};
-        match col.find_one(filter, None).await? {
-            None => Err(Error::new("user wasn't found")),
-            Some(doc) => Ok(from_document::<User>(doc)?),
-        }
-    }
-
-    pub async fn get_dbuser_by_id(&self, id: UserId) -> Result<DBUser> {
-        let col = self.database.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! {"_id": id};
-        match col.find_one(filter, None).await? {
-            None => Err(Error::new("user wasn't found")),
-            Some(doc) => Ok(from_document::<DBUser>(doc)?),
-        }
-    }
-
-    pub async fn get_user_by_email(&self, email: String) -> Result<User> {
-        let col = self.database.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! { "email": email.clone() };
-        match col.find_one(filter, None).await? {
-            None => Err(Error::new("user wasn't found")),
-            Some(doc) => Ok(from_document::<User>(doc)?),
-        }
+    pub async fn get_dbuser_by_id(&self, id: uuid::Uuid) -> Result<DBUser> {
+        let user = sqlx::query_as(
+            r#"
+                SELECT *
+                FROM users
+                WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_one(&self.database)
+        .await?;
+        Ok(user)
     }
 
     pub async fn get_dbuser_by_email(&self, email: String) -> Result<DBUser> {
-        let col = self.database.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! { "email": email.clone() };
-        match col.find_one(filter, None).await? {
-            None => Err(Error::new("user wasn't found")),
-            Some(doc) => Ok(from_document::<DBUser>(doc)?),
-        }
+        let user = sqlx::query_as(
+            r#"
+                SELECT *
+                FROM users
+                WHERE email = $1
+            "#,
+        )
+        .bind(email)
+        .fetch_one(&self.database)
+        .await?;
+        Ok(user)
     }
 
-    pub async fn list_users(&self, start: i64, limit: i64) -> Result<Cursor<Document>> {
-        let collection = self.database.collection(MDB_COLL_NAME_USERS);
-        let options = FindOptions::builder()
-            .skip(start as i64)
-            .limit(limit)
-            .build();
-        Ok(collection.find(None, options).await?)
+    pub async fn list_users(&self, start: i64, limit: i64) -> Result<Vec<DBUser>> {
+        let user = sqlx::query_as(
+            r#"
+                SELECT *
+                FROM users
+                LIMIT $1
+                OFFSET $1
+            "#,
+        )
+        .bind(limit)
+        .bind(start)
+        .fetch_all(&self.database)
+        .await?;
+        Ok(user)
     }
 
     pub async fn count_users(&self) -> Result<usize> {
-        let collection = self.database.collection(MDB_COLL_NAME_USERS);
-        Ok(collection.estimated_document_count(None).await? as usize)
+        todo!();
     }
 
     pub async fn new_user(&self, new_user: NewUser) -> Result<User> {
         let user = DBUser::new(new_user);
-        let col = self.database.collection(MDB_COLL_NAME_USERS);
-        let doc = to_document(&user)?;
-        let _ = col.insert_one(doc.clone(), None).await?;
-        Ok(self.get_user_by_id(user.get_id().clone()).await?)
+        // let rec = sqlx::query!(
+        //     r#"
+        //         INSERT INTO users (
+        //             user as "user: DBUser"
+        //         )
+        //         VALUES ( $1 )
+        //         RETURNING *
+        //     "#,
+        //     user
+        // )
+        // .fetch_one(&self.database)
+        // .await?;
+        Ok(user.into())
     }
 
     pub async fn update_user(&self, id: UserId, user_update: UserUpdate) -> Result<User> {
-        let col = self.database.collection(MDB_COLL_NAME_USERS);
-        let filter = doc! { "_id": id };
-
-        let mut update = bson::Document::new();
-        update.insert("$set", bson::to_bson(&user_update)?);
-
-        let options = FindOneAndUpdateOptions::builder()
-            .return_document(Some(ReturnDocument::After))
-            .build();
-
-        let user = match col
-            .find_one_and_update(filter, update, Some(options))
-            .await?
-        {
-            None => return Err(Error::new("specified user not found")),
-            Some(r) => r,
-        };
-        Ok(from_document(user)?)
+        todo!()
     }
 
-    pub async fn reset_password(&self, user_id: UserId, password_hash: &str) -> Result<()> {
-        let update = doc! {"$set" : doc! {"password_hash": password_hash }};
-        let filter = doc! {"_id": user_id};
-        let collection = self.database.collection(MDB_COLL_NAME_USERS);
-        let _ = collection.update_one(filter, update, None).await?;
+    pub async fn reset_password(&self, user_id: uuid::Uuid, password_hash: &str) -> Result<()> {
+        let _ = sqlx::query_as::<_, DBUser>("UPDATE users SET password_hash = $1 WHERE id = $1")
+            .bind(password_hash)
+            .bind(user_id)
+            .fetch_one(&self.database)
+            .await;
         Ok(())
     }
 
+    /*
     pub async fn get_intern_merch_by_id(
         &self,
         id: InternMerchandiseId,
@@ -519,4 +491,5 @@ impl Database {
         let _ = col.delete_one(query, None).await?;
         Ok(())
     }
+    */
 }

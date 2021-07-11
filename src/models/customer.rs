@@ -1,17 +1,16 @@
 use async_graphql::{InputObject, SimpleObject};
-use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::models::{
     project::{Project, ProjectId},
     user::{User, UserId},
 };
 
-pub type CustomerId = ObjectId;
+pub type CustomerId = Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone, SimpleObject)]
 pub struct DBCustomer {
-    #[serde(rename = "_id")]
     id: CustomerId,
     creator_id: UserId,
     name: String,
@@ -23,7 +22,7 @@ pub struct DBCustomer {
 impl DBCustomer {
     pub fn new(new: NewCustomer, creator_id: UserId) -> Self {
         Self {
-            id: CustomerId::new(),
+            id: CustomerId::new_v4(),
             creator_id,
             name: new.name,
             identifier: new.identifier,
@@ -39,7 +38,6 @@ impl DBCustomer {
 
 #[derive(Deserialize, Debug, Clone, SimpleObject)]
 pub struct Customer {
-    #[serde(rename = "_id")]
     id: CustomerId,
     creator: User,
     name: String,

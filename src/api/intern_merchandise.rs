@@ -3,11 +3,9 @@ use async_graphql::{
     guard::Guard,
     Context, Object, Result,
 };
-use bson::{de::from_document, oid::ObjectId};
-use futures::stream::StreamExt;
 
 use crate::{
-    api::{claim::Claim, database2},
+    api::{claim::Claim, database},
     models::{
         intern_merchandise::{
             DBInternMerchandise, InternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
@@ -25,10 +23,10 @@ impl InternMerchandiseQuery {
     async fn get_intern_merch_by_id(
         &self,
         ctx: &Context<'_>,
-        id: ObjectId,
+        id: InternMerchandiseId,
     ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(database2(ctx)?.get_intern_merch_by_id(id).await?)
+        Ok(database(ctx)?.get_intern_merch_by_id(id).await?)
     }
 
     async fn get_intern_merch_by_merch_id(
@@ -37,7 +35,7 @@ impl InternMerchandiseQuery {
         merchandise_id: i32,
     ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(database2(ctx)?
+        Ok(database(ctx)?
             .get_intern_merch_by_merch_id(merchandise_id)
             .await?)
     }
@@ -51,7 +49,7 @@ impl InternMerchandiseQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, InternMerchandise, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let doc_count = database2(ctx)?.count_intern_merch().await?;
+        let doc_count = database(ctx)?.count_intern_merch().await?;
 
         query(
             after,
@@ -70,7 +68,7 @@ impl InternMerchandiseQuery {
                 }
                 let limit = (end - start) as i64;
 
-                let cursor = database2(ctx)?
+                let cursor = database(ctx)?
                     .list_intern_merch(start as i64, limit)
                     .await?;
 
@@ -88,7 +86,7 @@ impl InternMerchandiseQuery {
     }
 
     pub async fn count_intern_merch(&self, ctx: &Context<'_>) -> Result<usize> {
-        Ok(database2(ctx)?.count_intern_merch().await?)
+        Ok(database(ctx)?.count_intern_merch().await?)
     }
 }
 
@@ -108,7 +106,7 @@ impl InternMerchandiseMutation {
     ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
         let new_merch = DBInternMerchandise::new(new);
-        Ok(database2(ctx)?.new_intern_merch(new_merch.clone()).await?)
+        Ok(database(ctx)?.new_intern_merch(new_merch.clone()).await?)
     }
 
     #[graphql(guard(race(
@@ -122,7 +120,7 @@ impl InternMerchandiseMutation {
         update: InternMerchandiseUpdate,
     ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(database2(ctx)?.update_intern_merch(id, update).await?)
+        Ok(database(ctx)?.update_intern_merch(id, update).await?)
     }
 
     async fn change_status(
@@ -132,10 +130,10 @@ impl InternMerchandiseMutation {
         _new_status: InternMerchandiseStatus,
     ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
-        let merch = database2(ctx)?.get_intern_merch_by_id(id).await?;
+        let merch = database(ctx)?.get_intern_merch_by_id(id).await?;
 
         //let orderer_id = merch.orderer.get_id().clone();
-        //let _user = database2(ctx)?.get_user_by_id(orderer_id).await?;
+        //let _user = database(ctx)?.get_user_by_id(orderer_id).await?;
 
         // TODO: fix
         //merch.change_status(new_status, user);
@@ -156,7 +154,7 @@ impl InternMerchandiseMutation {
         // TODO: check if other collections or documents still have a object refercnce to this project
         // if not we can safely remove the project
         // if there are still refercnces return an error
-        let _ = database2(ctx)?.delete_intern_merch(id).await?;
+        let _ = database(ctx)?.delete_intern_merch(id).await?;
 
         Ok(true)
     }

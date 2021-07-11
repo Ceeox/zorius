@@ -16,7 +16,19 @@ spec:
                 name: zorius
     spec:
         containers:
-        - image: zorius:latest
+            - image: zorius:latest
         name: zorius
     imagePullSecrets:
         - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+    name: zorius-service
+spec:
+    selector:
+        app: zorius
+    ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 9376

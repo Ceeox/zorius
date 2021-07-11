@@ -3,11 +3,9 @@ use async_graphql::{
     guard::Guard,
     Context, Error, Object, Result,
 };
-use bson::from_document;
-use futures::StreamExt;
 
 use crate::{
-    api::{claim::Claim, database2},
+    api::{claim::Claim, database},
     models::{
         customer::{Customer, CustomerId, NewCustomer, UpdateCustomer},
         roles::{Role, RoleGuard},
@@ -21,7 +19,7 @@ pub struct CustomerQuery;
 impl CustomerQuery {
     async fn get_customer_by_id(&self, ctx: &Context<'_>, id: CustomerId) -> Result<Customer> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(database2(ctx)?.get_customer_by_id(id).await?)
+        Ok(database(ctx)?.get_customer_by_id(id).await?)
     }
 
     async fn list_customers(
@@ -33,7 +31,7 @@ impl CustomerQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, Customer, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let doc_count = database2(ctx)?.count_customers().await?;
+        let doc_count = database(ctx)?.count_customers().await?;
 
         query(
             after,
@@ -52,7 +50,7 @@ impl CustomerQuery {
                 }
                 let limit = (end - start) as i64;
 
-                let cursor = database2(ctx)?.list_customer(start as i64, limit).await?;
+                let cursor = database(ctx)?.list_customer(start as i64, limit).await?;
 
                 let mut connection = Connection::new(start > 0, end < doc_count);
                 connection
@@ -81,9 +79,7 @@ impl CustomerMutation {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
-        Ok(database2(ctx)?
-            .new_customer(user_id.to_owned(), new)
-            .await?)
+        Ok(database(ctx)?.new_customer(user_id.to_owned(), new).await?)
     }
 
     #[graphql(guard(race(
@@ -97,9 +93,9 @@ impl CustomerMutation {
         update: UpdateCustomer,
     ) -> Result<Customer> {
         let _ = Claim::from_ctx(ctx)?;
-        let _ = database2(ctx)?.update_customer(id.clone(), update).await?;
+        let _ = database(ctx)?.update_customer(id.clone(), update).await?;
 
-        Ok(database2(ctx)?.get_customer_by_id(id).await?)
+        Ok(database(ctx)?.get_customer_by_id(id).await?)
     }
 
     #[graphql(guard(race(
@@ -108,7 +104,7 @@ impl CustomerMutation {
     )))]
     async fn delete_customer(&self, ctx: &Context<'_>, id: CustomerId) -> Result<bool> {
         let _ = Claim::from_ctx(ctx)?;
-        if database2(ctx)?
+        if database(ctx)?
             .has_ref_to_work_report("customer_id", id.clone())
             .await?
         {
@@ -116,7 +112,7 @@ impl CustomerMutation {
                 "Can not delete Project with still a reference to a WorkReport",
             ));
         }
-        let _ = database2(ctx)?.delete_customer(id).await?;
+        let _ = database(ctx)?.delete_customer(id).await?;
 
         Ok(true)
     }

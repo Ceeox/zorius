@@ -2,37 +2,37 @@ use async_graphql::{
     validators::{Email, StringMaxLength, StringMinLength},
     InputObject, SimpleObject,
 };
-use bson::{oid::ObjectId, DateTime};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use pwhash::sha512_crypt;
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+use uuid::Uuid;
 
-use crate::helper::validators::Password;
+use crate::validators::Password;
 
-pub type UserId = ObjectId;
+pub type UserId = Uuid;
 pub type UserEmail = String;
 
-#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone)]
+#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone, FromRow)]
 pub struct DBUser {
-    #[serde(rename = "_id")]
     id: UserId,
-    pub email: UserEmail,
+    email: String,
     password_hash: String,
-    pub username: String,
-    pub created_at: DateTime,
-    pub invitation_pending: bool,
-    pub avatar_url: Option<String>,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
-    pub updated: DateTime,
-    pub deleted: bool,
+    username: String,
+    created_at: DateTime<Utc>,
+    invitation_pending: bool,
+    avatar_url: Option<String>,
+    firstname: Option<String>,
+    lastname: Option<String>,
+    updated_at: DateTime<Utc>,
+    deleted: bool,
 }
 
 impl DBUser {
     pub fn new(new_user: NewUser) -> Self {
         let password_hash = Self::hash_password(&new_user.password);
         Self {
-            id: ObjectId::new(),
+            id: UserId::new_v4(),
             email: new_user.email,
             password_hash,
             username: new_user.username,
@@ -40,7 +40,7 @@ impl DBUser {
             lastname: new_user.lastname,
             created_at: Utc::now().into(),
             invitation_pending: true,
-            updated: Utc::now().into(),
+            updated_at: Utc::now().into(),
             avatar_url: None,
             deleted: false,
         }
@@ -54,7 +54,7 @@ impl DBUser {
         self.password_hash = Self::hash_password(new_password);
     }
 
-    pub fn get_id(&self) -> &UserId {
+    pub fn get_id(&self) -> &Uuid {
         &self.id
     }
 
@@ -68,18 +68,31 @@ impl DBUser {
     }
 }
 
-#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone)]
+#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone, FromRow)]
 pub struct User {
-    #[serde(rename = "_id")]
-    id: UserId,
+    pub id: UserId,
     pub email: UserEmail,
     pub username: String,
-    pub created_at: DateTime,
+    pub created_at: DateTime<Utc>,
     pub avatar_url: Option<String>,
     pub firstname: Option<String>,
     pub lastname: Option<String>,
-    pub updated: DateTime,
-    pub deleted: bool,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<DBUser> for User {
+    fn from(db_user: DBUser) -> Self {
+        Self {
+            id: db_user.id,
+            email: db_user.email,
+            username: db_user.username,
+            created_at: db_user.created_at,
+            avatar_url: db_user.avatar_url,
+            firstname: db_user.firstname,
+            lastname: db_user.lastname,
+            updated_at: db_user.updated_at,
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, InputObject)]
@@ -97,11 +110,11 @@ pub struct NewUser {
 #[derive(InputObject, Debug, Serialize)]
 pub struct UserUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
-    email: Option<UserEmail>,
+    pub email: Option<UserEmail>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    username: Option<String>,
+    pub username: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    avatar_url: Option<String>,
-    firstname: Option<String>,
-    lastname: Option<String>,
+    pub avatar_url: Option<String>,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
 }

@@ -4,25 +4,24 @@ use async_graphql::{
     Context, EmptySubscription, Error, MergedObject, Object, Result, Schema,
 };
 use async_graphql_actix_web::{Request, Response};
-use mongodb::Database;
 
 pub mod claim;
-pub mod customer;
-pub mod intern_merchandise;
-pub mod project;
-pub mod role;
+//pub mod customer;
+//pub mod intern_merchandise;
+//pub mod project;
+//pub mod role;
 pub mod user;
-pub mod work_report;
+//pub mod work_report;
 
 use crate::{
     api::{
         claim::Token,
-        customer::{CustomerMutation, CustomerQuery},
-        intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
-        project::{ProjectMutation, ProjectQuery},
-        role::{RoleMutation, RoleQuery},
+        // customer::{CustomerMutation, CustomerQuery},
+        // intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
+        // project::{ProjectMutation, ProjectQuery},
+        // role::{RoleMutation, RoleQuery},
         user::{UserMutation, UserQuery},
-        work_report::{WorkReportMutation, WorkReportQuery},
+        // work_report::{WorkReportMutation, WorkReportQuery},
     },
     config::CONFIG,
     API_VERSION,
@@ -36,21 +35,21 @@ pub type RootSchema = Schema<Query, Mutation, EmptySubscription>;
 pub struct Query(
     ServerQuery,
     UserQuery,
-    RoleQuery,
-    CustomerQuery,
-    ProjectQuery,
-    WorkReportQuery,
-    InternMerchandiseQuery,
+    // RoleQuery,
+    // CustomerQuery,
+    // ProjectQuery,
+    // WorkReportQuery,
+    // InternMerchandiseQuery,
 );
 
 #[derive(Default, MergedObject)]
 pub struct Mutation(
     UserMutation,
-    RoleMutation,
-    CustomerMutation,
-    ProjectMutation,
-    WorkReportMutation,
-    InternMerchandiseMutation,
+    // RoleMutation,
+    // CustomerMutation,
+    // ProjectMutation,
+    // WorkReportMutation,
+    // InternMerchandiseMutation,
 );
 
 #[derive(Default)]
@@ -85,20 +84,13 @@ pub async fn graphql(
 }
 
 #[get("/playground")]
-pub async fn gql_playgound() -> HttpResponse {
+pub async fn playground() -> HttpResponse {
     HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(playground_source(GraphQLPlaygroundConfig::new("/")))
 }
 
-pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a Database> {
-    match ctx.data::<Database>() {
-        Err(_e) => Err(Error::new("missing Database in Context!")),
-        Ok(r) => Ok(r),
-    }
-}
-
-pub fn database2<'a>(ctx: &'a Context<'_>) -> Result<&'a crate::database::Database> {
+pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a crate::database::Database> {
     match ctx.data::<crate::database::Database>() {
         Err(_e) => Err(Error::new("missing Database in Context!")),
         Ok(r) => Ok(r),

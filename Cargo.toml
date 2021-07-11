@@ -5,41 +5,32 @@ name = "zorius"
 resolver = "2"
 version = "0.1.0"
 
-[profile.dev]
-# lto = "thin"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-actix-cors = "0.5"
-actix-files = "0.5"
-actix-governor = "0.2"
-actix-multipart = "0.3"
-actix-web = {version = "3.3", features = ["rustls"]}
+actix-cors = "0.5.4"
+actix-governor = "0.2.4"
+actix-multipart = "0.3.0"
+actix-web = {version = "3.3.2", features = ["rustls"]}
 askama = "0.10.5"
-async-graphql = {version = "2.8", features = ["bson", "chrono", "dataloader"]}
-async-graphql-actix-web = "2.8"
-async-trait = "0.1"
-bson = "1.1"
-chrono = {version = "0.4", features = ["serde"]}
-config = "0.11"
-dotenv = "0.15"
-dotenv_codegen = "0.15"
-env_logger = "0.8"
-futures = "0.3"
-jsonwebtoken = "7"
-lazy_static = "1.4"
-lettre = "0.9"
-lettre_email = "0.9"
-log = "0.4"
-mongodb = "1.2"
-pwhash = "1.0"
-ron = "0.6"
+async-graphql = {version = "2.9.6", features = ["chrono", "dataloader", "uuid"]}
+async-graphql-actix-web = "2.9.6"
+async-trait = "0.1.50"
+chrono = {version = "0.4.19", features = ["serde"]}
+config = "0.11.0"
+env_logger = "0.8.4"
+futures = "0.3.15"
+jsonwebtoken = "7.2"
+lazy_static = "1.4.0"
+lettre = "0.9.6"
+lettre_email = "0.9.4"
+log = "0.4.14"
+pwhash = "1.0.0"
 rustls = "0.18.1"
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
-slab = "0.4"
-tokio = {version = "0.2"}
-url = "2.2"
-uuid = {version = "0.8", features = ["v4"]}
+serde = "1.0.126"
+serde_derive = "1.0.126"
+serde_json = "1.0.64"
+slab = "0.4.3"
+sqlx = {version = "0.4.2", features = ["postgres", "json", "runtime-actix-rustls", "chrono", "uuid"]}
+tokio = {version = "0.2.25"}
+url = "2.2.2"
+uuid = {version = "0.8.2", features = ["v4", "serde"]}

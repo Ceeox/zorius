@@ -1,12 +1,11 @@
 use async_graphql::{InputObject, SimpleObject};
-use bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-pub type ProjectId = ObjectId;
+pub type ProjectId = Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone, SimpleObject)]
 pub struct DBProject {
-    #[serde(rename = "_id")]
     pub id: ProjectId,
     pub name: String,
     pub description: Option<String>,
@@ -15,7 +14,6 @@ pub struct DBProject {
 
 #[derive(Serialize, Deserialize, Debug, Clone, SimpleObject)]
 pub struct Project {
-    #[serde(rename = "_id")]
     pub id: ProjectId,
     pub name: String,
     pub description: Option<String>,
@@ -42,7 +40,7 @@ pub struct UpdateProject {
 impl DBProject {
     pub fn new(new: NewProject) -> Self {
         Self {
-            id: ProjectId::new(),
+            id: ProjectId::new_v4(),
             name: new.name,
             description: new.description,
             note: new.note,

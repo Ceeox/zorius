@@ -1,7 +1,7 @@
 use async_graphql::{Enum, InputObject, SimpleObject};
-use bson::{doc, oid::ObjectId, DateTime};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::models::{
     customer::{Customer, CustomerId},
@@ -9,11 +9,10 @@ use crate::models::{
     user::{User, UserId},
 };
 
-pub type WorkReportId = ObjectId;
+pub type WorkReportId = Uuid;
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct DBWorkReport {
-    #[serde(rename = "_id")]
     id: WorkReportId,
     user_id: UserId,
     customer_id: CustomerId,
@@ -23,18 +22,17 @@ pub struct DBWorkReport {
     times: Vec<WorkReportTimes>,
     status: WorkReportStatus,
     invoiced: bool,
-    created_at: DateTime,
+    created_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct WorkReportTimes {
-    pub started: DateTime,
-    pub ended: Option<DateTime>,
+    pub started: DateTime<Utc>,
+    pub ended: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize, Debug, SimpleObject, Clone)]
 pub struct WorkReport {
-    #[serde(rename = "_id")]
     id: WorkReportId,
     user: User,
     customer: Customer,
@@ -44,17 +42,17 @@ pub struct WorkReport {
     times: Vec<WorkReportTimes>,
     status: WorkReportStatus,
     invoiced: bool,
-    created_at: DateTime,
+    created_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Debug, InputObject)]
 pub struct NewWorkReport {
     pub customer_id: CustomerId,
     pub project_id: ProjectId,
-    pub to_customer_started: Option<DateTime>,
-    pub to_customer_arrived: Option<DateTime>,
-    pub from_customer_started: Option<DateTime>,
-    pub from_customer_arrived: Option<DateTime>,
+    pub to_customer_started: Option<DateTime<Utc>>,
+    pub to_customer_arrived: Option<DateTime<Utc>>,
+    pub from_customer_started: Option<DateTime<Utc>>,
+    pub from_customer_arrived: Option<DateTime<Utc>>,
     pub description: String,
 }
 
@@ -65,19 +63,19 @@ pub struct WorkReportUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     project_id: Option<ProjectId>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    to_customer_started: Option<DateTime>,
+    to_customer_started: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    to_customer_arrived: Option<DateTime>,
+    to_customer_arrived: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    from_customer_started: Option<DateTime>,
+    from_customer_started: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    from_customer_arrived: Option<DateTime>,
+    from_customer_arrived: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    started: Option<DateTime>,
+    started: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    ended: Option<Option<DateTime>>,
+    ended: Option<Option<DateTime<Utc>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     status: Option<WorkReportStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -86,11 +84,11 @@ pub struct WorkReportUpdate {
 
 #[derive(Serialize, Deserialize, Debug, SimpleObject, Clone)]
 pub struct TripInfo {
-    to_customer_started: Option<DateTime>,
-    to_customer_arrived: Option<DateTime>,
+    to_customer_started: Option<DateTime<Utc>>,
+    to_customer_arrived: Option<DateTime<Utc>>,
 
-    from_customer_started: Option<DateTime>,
-    from_customer_arrived: Option<DateTime>,
+    from_customer_started: Option<DateTime<Utc>>,
+    from_customer_arrived: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Enum, PartialEq, Eq, Clone, Copy)]
@@ -103,7 +101,7 @@ pub enum WorkReportStatus {
 impl DBWorkReport {
     pub fn new(user_id: UserId, new_wr: NewWorkReport) -> Self {
         Self {
-            id: ObjectId::new(),
+            id: WorkReportId::new_v4(),
             user_id,
             customer_id: new_wr.customer_id,
             project_id: new_wr.project_id,

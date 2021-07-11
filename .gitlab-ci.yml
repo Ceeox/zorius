@@ -1,7 +1,9 @@
 stages:
+    - prepare
     - build
     - test
     - deploy
+    - pages
 
 cache: &global_cache
     key: ${CI_COMMIT_REF_SLUG}
@@ -11,7 +13,7 @@ cache: &global_cache
     policy: pull-push
 
 rust-latest:
-    stage: build
+    stage: prepare
     image: rust:latest
     cache:
         <<: *global_cache
@@ -20,9 +22,24 @@ rust-latest:
         - cargo build --verbose
         - cargo test --verbose
 
+build_docker_image:
+    image:
+        name: gcr.io/kaniko-project/executor:debug
+        entrypoint: [""]
+    stage: build
+    needs: [rust-latest]
+    when: on_success
+    only:
+        - master
+    script:
+        - mkdir -p /kaniko/.docker
+        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+        - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
+
 lint-code:
     stage: test
     needs: [rust-latest]
+    when: on_success
     cache:
         <<: *global_cache
         policy: pull
@@ -33,6 +50,7 @@ lint-code:
 format-code:
     stage: test
     needs: [rust-latest]
+    when: on_success
     cache:
         <<: *global_cache
         policy: pull
@@ -43,6 +61,7 @@ format-code:
 audit-code:
     stage: test
     needs: [rust-latest]
+    when: on_success
     cache:
         <<: *global_cache
         policy: pull
@@ -50,21 +69,11 @@ audit-code:
         - cargo install cargo-audit
         - cargo audit
 
-build_docker_image:
-    image:
-        name: gcr.io/kaniko-project/executor:debug
-        entrypoint: [""]
-    stage: deploy
-    only:
-        - master
-    script:
-        - mkdir -p /kaniko/.docker
-        - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-        - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
-
 deploy_to_k8s:
     image: bitnami/kubectl:latest
     stage: deploy
+    needs: [build_docker_image]
+    when: on_success
     only:
         - master
     script:
@@ -72,7 +81,9 @@ deploy_to_k8s:
 
 deploy_to_pages:
     image: rustdocker/rust:latest
-    stage: deploy
+    needs: [rust-latest]
+    when: on_success
+    stage: pages
     only:
         - master
     script:

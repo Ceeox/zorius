@@ -1,7 +1,6 @@
 use std::convert::TryFrom;
 
 use async_graphql::{Context, Error, Result};
-use bson::oid::ObjectId;
 use chrono::Local;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
@@ -65,8 +64,7 @@ impl Claim {
 
     /// Return a reference to the `user_id`
     pub fn user_id(&self) -> UserId {
-        ObjectId::with_string(&self.id.clone())
-            .expect("Couldn't convert from string to ObjectId for UserId")
+        UserId::parse_str(&self.id.clone()).expect("Couldn't convert UserId from string to Uuid")
     }
 
     /// Retruns the unix timestamp when the token expries.
