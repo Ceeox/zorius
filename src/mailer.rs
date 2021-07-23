@@ -11,7 +11,7 @@ use crate::config::CONFIG;
 /// From header is created with the config domain like: zorius@`domain`
 // TODO:    1. return the result to report if the emails failed to send
 //          2. remove `unwraps` and `expects` and replace them
-pub fn mailer(subject: &str, body: &str) {
+pub fn mailer(to: &str, subject: &str, body: &str) {
     if !CONFIG.mailer.enable_mailer {
         return;
     }
@@ -21,7 +21,7 @@ pub fn mailer(subject: &str, body: &str) {
     let password: &str = CONFIG.mailer.smtp_password.as_ref();
 
     let from = EmailAddress::new(format!("zorius@{}", CONFIG.domain)).unwrap();
-    let to = EmailAddress::new(CONFIG.mailer.email_send_to.clone()).unwrap();
+    let to = EmailAddress::new(to.to_owned()).unwrap();
     let envelope = Envelope::new(Some(from), vec![to]).unwrap();
 
     let email = EmailBuilder::new()

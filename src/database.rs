@@ -1,9 +1,13 @@
 use std::usize;
 
 use async_graphql::{Error, Result};
-use sqlx::{Pool, Postgres};
+use log::{error, info};
+use sqlx::{Error::RowNotFound, Pool, Postgres};
 
-use crate::models::user::{DBUser, NewUser, User, UserId, UserUpdate};
+use crate::{
+    config::CONFIG,
+    models::user::{DBUser, NewUser, User, UserId, UserUpdate},
+};
 
 pub struct Database {
     database: Pool<Postgres>,
@@ -11,10 +15,47 @@ pub struct Database {
 
 impl Database {
     pub async fn new(database: Pool<Postgres>) -> Self {
+        info!("Running migrations...");
         sqlx::migrate!("./migrations")
             .run(&database)
             .await
             .expect("failed to run migrations");
+
+        let admin_user = NewUser {
+            email: CONFIG.admin_user.email.clone(),
+            password: CONFIG.admin_user.password.clone(),
+            firstname: CONFIG.admin_user.firstname.clone(),
+            lastname: CONFIG.admin_user.lastname.clone(),
+        };
+        let user = DBUser::new(admin_user);
+        let admin_user: DBUser = sqlx::query_as!(
+            DBUser,
+            r#"INSERT INTO users (
+                id,
+                email,
+                password_hash,
+                created_at,
+                invitation_pending,
+                firstname,
+                lastname,
+                updated_at,
+                deleted
+            )
+            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9);"#,
+            user.id,
+            user.email,
+            user.password_hash,
+            user.created_at,
+            user.invitation_pending,
+            user.firstname,
+            user.lastname,
+            user.updated_at,
+            user.deleted
+        )
+        .fetch_one(&database)
+        .await
+        .expect("Failed to insert admin user");
+
         Self { database }
     }
 
@@ -33,7 +74,7 @@ impl Database {
     }
 
     pub async fn get_dbuser_by_email(&self, email: String) -> Result<DBUser> {
-        let user = sqlx::query_as(
+        let user: DBUser = match sqlx::query_as(
             r#"
                 SELECT *
                 FROM users
@@ -42,7 +83,13 @@ impl Database {
         )
         .bind(email)
         .fetch_one(&self.database)
-        .await?;
+        .await
+        {
+            Ok(r) => r,
+            Err(RowNotFound) => return Err(Error::new("User not found")),
+            Err(_) => return Err(Error::new("Server error")),
+        };
+
         Ok(user)
     }
 
@@ -68,19 +115,17 @@ impl Database {
 
     pub async fn new_user(&self, new_user: NewUser) -> Result<User> {
         let user = DBUser::new(new_user);
-        // let rec = sqlx::query!(
-        //     r#"
-        //         INSERT INTO users (
-        //             user as "user: DBUser"
-        //         )
-        //         VALUES ( $1 )
-        //         RETURNING *
-        //     "#,
-        //     user
-        // )
-        // .fetch_one(&self.database)
-        // .await?;
-        Ok(user.into())
+        let res: DBUser = sqlx::query_as(
+            r#"
+                INSERT INTO users ( user )
+                VALUES ( $1 )
+                RETURNING *
+            "#,
+        )
+        .bind(user)
+        .fetch_one(&self.database)
+        .await?;
+        Ok(res.into())
     }
 
     pub async fn update_user(&self, id: UserId, user_update: UserUpdate) -> Result<User> {

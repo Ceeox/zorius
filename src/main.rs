@@ -1,5 +1,5 @@
-use std::fs::File;
 use std::io::BufReader;
+use std::{fs::File, time::Duration};
 
 use actix_cors::Cors;
 
@@ -11,12 +11,13 @@ use actix_web::{
 };
 use async_graphql::{EmptySubscription, Schema};
 use errors::ZoriusError;
-use log::{debug, info};
+use log::{debug, error, info};
 use models::{roles::RoleCache, upload::Storage};
 use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
 use sqlx::{PgPool, Pool, Postgres};
+use tokio::time::sleep;
 use uuid::Uuid;
 
 mod api;
@@ -36,27 +37,24 @@ use crate::{
 
 const API_VERSION: &str = "v1";
 
-async fn setup_pg() -> Result<Pool<Postgres>, sqlx::Error> {
+async fn setup_pg() -> Result<Database, sqlx::Error> {
     let url = format!(
-        "postgres://{}:{}@{}/{}",
-        CONFIG.db.username, CONFIG.db.password, CONFIG.db.server, CONFIG.db.name
+        "postgres://{}:{}@{}:{}/{}",
+        CONFIG.db.username, CONFIG.db.password, CONFIG.db.server, CONFIG.db.port, CONFIG.db.name
     );
     let pw_hidden_url = format!(
-        "postgres://{}:{}@{}/{}",
-        CONFIG.db.username, "<hidden>", CONFIG.db.server, CONFIG.db.name
+        "postgres://{}:{}@{}:{}/{}",
+        CONFIG.db.username, "<hidden>", CONFIG.db.server, CONFIG.db.port, CONFIG.db.name
     );
     debug!("Connecting to: {:?}", pw_hidden_url);
-    Ok(PgPool::connect(&url).await?)
+
+    Ok(Database::new(PgPool::connect(&url).await?).await)
 }
 
 fn setup_log() {
-    if CONFIG.debug {
-        std::env::set_var("RUST_LOG", "debug,actix_web=debug");
-        debug!("Running in DEBUG mode...");
-    } else {
-        std::env::set_var("RUST_LOG", "error,actix_web=error");
-        info!("Running in PRODUCTION mode...");
-    }
+    let value = format!("{},actix_web={}", CONFIG.log_level, CONFIG.log_level);
+    std::env::set_var("RUST_LOG", &value);
+    debug!("Running in DEBUG mode...");
 
     env_logger::init();
 }
@@ -87,10 +85,23 @@ async fn main() -> Result<(), errors::ZoriusError> {
     check_folders()?;
 
     let role_cache = RoleCache::new();
-    let pg_db = setup_pg()
-        .await
-        .expect("failed to connect to postgres database");
-    let database = Database::new(pg_db).await;
+
+    let mut db_connect_trys: i32 = 1;
+    let database = loop {
+        match setup_pg().await {
+            Ok(r) => break r,
+            Err(e) => {
+                error!(
+                    "Failed to connect to postgres database (Try: {}).\n{}",
+                    db_connect_trys, e
+                );
+                db_connect_trys += 1;
+                sleep(Duration::from_secs(10)).await;
+                continue;
+            }
+        }
+    };
+    info!("Successfully connected to database...");
 
     let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
         .data(database)
@@ -119,7 +130,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
             )
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
-            .wrap(Governor::new(&gov_conf))
+            //.wrap(Governor::new(&gov_conf))
             .service(graphql)
             .service(playground)
     });
@@ -127,6 +138,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
     let res = if CONFIG.web.enable_ssl {
         let tls_config = setup_tls();
 
+        info!("Starting webserver...");
         http_server
             .bind_rustls(webserver_url, tls_config)?
             .run()

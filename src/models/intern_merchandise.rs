@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    config::CONFIG,
     mailer::mailer,
     models::user::{User, UserId},
     validators::Url,
@@ -47,7 +48,7 @@ pub struct DBInternMerchandise {
     pub article_number: Option<String>,
     pub shop: Option<String>,
     pub serial_number: Option<Vec<String>>,
-    pub arived_on: Option<DateTime<Utc>>,
+    pub arrived_on: Option<DateTime<Utc>>,
     pub url: Option<String>,
     pub postage: Option<f64>,
     pub invoice_number: Option<i32>,
@@ -70,7 +71,7 @@ pub struct InternMerchandise {
     pub shop: Option<String>,
     pub cost: f64,
     pub serial_number: Option<Vec<String>>,
-    pub arived_on: Option<DateTime<Utc>>,
+    pub arrived_on: Option<DateTime<Utc>>,
     pub status: InternMerchandiseStatus,
     pub url: Option<String>,
     pub postage: Option<f64>,
@@ -125,7 +126,7 @@ impl DBInternMerchandise {
 
             merchandise_id: None,
             serial_number: None,
-            arived_on: None,
+            arrived_on: None,
             invoice_number: None,
             created_date: Utc::now().into(),
             updated_date: Utc::now().into(),
@@ -135,11 +136,7 @@ impl DBInternMerchandise {
     pub fn change_status(&mut self, new_status: InternMerchandiseStatus, user: User) {
         self.status = new_status;
         self.updated_date = Utc::now().into();
-        let orderer_name = if user.firstname.is_some() && user.lastname.is_some() {
-            format!("{} {}", user.firstname.unwrap(), user.lastname.unwrap())
-        } else {
-            user.username
-        };
+        let orderer_name = format!("{} {}", user.firstname, user.lastname);
         let template: StatusTemplate = StatusTemplate {
             id: self.id.clone(),
             merchandise_id: self.merchandise_id,
@@ -152,6 +149,7 @@ impl DBInternMerchandise {
         let body = template.render().unwrap();
 
         mailer(
+            &CONFIG.mailer.merchandise_email_send_to,
             &format!(
                 "Intern Merchandise Staus Change to {} for {}",
                 new_status.to_string(),
@@ -189,7 +187,7 @@ pub struct InternMerchandiseUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub serial_number: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arived_on: Option<DateTime<Utc>>,
+    pub arrived_on: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

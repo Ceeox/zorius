@@ -5,7 +5,7 @@ use async_graphql::{
 use chrono::{DateTime, Utc};
 use pwhash::sha512_crypt;
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, Type};
 use uuid::Uuid;
 
 use crate::validators::Password;
@@ -13,19 +13,18 @@ use crate::validators::Password;
 pub type UserId = Uuid;
 pub type UserEmail = String;
 
-#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone, FromRow)]
+#[sqlx(type_name = "DBUser")]
+#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone, Type, FromRow)]
 pub struct DBUser {
-    id: UserId,
-    email: String,
-    password_hash: String,
-    username: String,
-    created_at: DateTime<Utc>,
-    invitation_pending: bool,
-    avatar_url: Option<String>,
-    firstname: Option<String>,
-    lastname: Option<String>,
-    updated_at: DateTime<Utc>,
-    deleted: bool,
+    pub id: UserId,
+    pub email: String,
+    pub password_hash: String,
+    pub created_at: DateTime<Utc>,
+    pub invitation_pending: bool,
+    pub firstname: String,
+    pub lastname: String,
+    pub updated_at: DateTime<Utc>,
+    pub deleted: bool,
 }
 
 impl DBUser {
@@ -35,13 +34,11 @@ impl DBUser {
             id: UserId::new_v4(),
             email: new_user.email,
             password_hash,
-            username: new_user.username,
             firstname: new_user.firstname,
             lastname: new_user.lastname,
             created_at: Utc::now().into(),
             invitation_pending: true,
             updated_at: Utc::now().into(),
-            avatar_url: None,
             deleted: false,
         }
     }
@@ -68,15 +65,13 @@ impl DBUser {
     }
 }
 
-#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone, FromRow)]
+#[derive(SimpleObject, Debug, Deserialize, Serialize, Clone, FromRow, Type)]
 pub struct User {
     pub id: UserId,
     pub email: UserEmail,
-    pub username: String,
     pub created_at: DateTime<Utc>,
-    pub avatar_url: Option<String>,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
+    pub firstname: String,
+    pub lastname: String,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -85,9 +80,7 @@ impl From<DBUser> for User {
         Self {
             id: db_user.id,
             email: db_user.email,
-            username: db_user.username,
             created_at: db_user.created_at,
-            avatar_url: db_user.avatar_url,
             firstname: db_user.firstname,
             lastname: db_user.lastname,
             updated_at: db_user.updated_at,
@@ -99,12 +92,10 @@ impl From<DBUser> for User {
 pub struct NewUser {
     #[graphql(validator(Email))]
     pub email: UserEmail,
-    #[graphql(validator(and(StringMinLength(length = "4"), StringMaxLength(length = "64"))))]
-    pub username: String,
     #[graphql(validator(Password))]
     pub password: String,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
+    pub firstname: String,
+    pub lastname: String,
 }
 
 #[derive(InputObject, Debug, Serialize)]
@@ -112,9 +103,7 @@ pub struct UserUpdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<UserEmail>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub username: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub avatar_url: Option<String>,
     pub firstname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub lastname: Option<String>,
 }

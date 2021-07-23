@@ -7,17 +7,17 @@ version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-actix-cors = "0.5.4"
+actix-cors = "0.6.0-beta.2"
 actix-governor = "0.2.4"
 actix-multipart = "0.3.0"
-actix-web = {version = "3.3.2", features = ["rustls"]}
+actix-web = {version = "4.0.0-beta.8", features = ["rustls"]}
 askama = "0.10.5"
-async-graphql = {version = "2.9.6", features = ["chrono", "dataloader", "uuid"]}
-async-graphql-actix-web = "2.9.6"
+async-graphql = {git = "https://github.com/async-graphql/async-graphql", branch = "actix-web-v4-beta", features = ["chrono", "dataloader", "uuid"]}
+async-graphql-actix-web = {git = "https://github.com/async-graphql/async-graphql", branch = "actix-web-v4-beta"}
 async-trait = "0.1.50"
 chrono = {version = "0.4.19", features = ["serde"]}
 config = "0.11.0"
-env_logger = "0.8.4"
+env_logger = "0.9.0"
 futures = "0.3.15"
 jsonwebtoken = "7.2"
 lazy_static = "1.4.0"
@@ -25,12 +25,12 @@ lettre = "0.9.6"
 lettre_email = "0.9.4"
 log = "0.4.14"
 pwhash = "1.0.0"
-rustls = "0.18.1"
+rustls = "0.19.1"
 serde = "1.0.126"
 serde_derive = "1.0.126"
 serde_json = "1.0.64"
 slab = "0.4.3"
-sqlx = {version = "0.4.2", features = ["postgres", "json", "runtime-actix-rustls", "chrono", "uuid"]}
-tokio = {version = "0.2.25"}
+sqlx = {version = "0.5.5", features = ["postgres", "json", "runtime-actix-rustls", "chrono", "uuid"]}
+tokio = {version = "1.8.1"}
 url = "2.2.2"
 uuid = {version = "0.8.2", features = ["v4", "serde"]}
