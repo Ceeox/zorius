@@ -19,7 +19,6 @@ rust-latest:
     - rustup component add clippy
   script:
     - cargo fmt -- --check
-    - cargo clippy --all-features -- -D warnings
     - cargo test --all-features --verbose
 
 rust-nightly:
