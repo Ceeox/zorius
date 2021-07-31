@@ -8,6 +8,7 @@ use crate::api::claim::Claim;
 use async_graphql::{guard::Guard, Context, Enum, Result, SimpleObject};
 use futures::lock::Mutex;
 use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, Type};
 use uuid::Uuid;
 
 use super::user::UserId;
@@ -24,7 +25,7 @@ pub enum RoleUpdateMode {
     Remove,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize, Enum)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize, Enum, Type)]
 pub enum Role {
     WorkReportModerator,
     WorkAccountModerator,

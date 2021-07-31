@@ -6,8 +6,6 @@ use async_graphql::{
     Context, Error, Object, Result, Upload,
 };
 use chrono::{Duration, Utc};
-use log::error;
-use sqlx::Error as SqlxError;
 
 use crate::{
     config::CONFIG,
@@ -15,7 +13,7 @@ use crate::{
         auth::LoginResult,
         roles::{Role, RoleGuard},
         upload::{FileInfo, Storage},
-        user::{NewUser, User, UserId, UserUpdate},
+        user::{NewUser, User, UserEmail, UserId, UserUpdate},
     },
     validators::Password,
 };
@@ -31,7 +29,10 @@ impl UserQuery {
         &self,
         ctx: &Context<'_>,
         #[graphql(validator(Email))] email: String,
-        #[graphql(validator(and(StringMinLength(length = "8"), StringMaxLength(length = "64"))))]
+        #[graphql(validator(and(
+            StringMinLength(length = "8"),
+            StringMaxLength(length = "255")
+        )))]
         password: String,
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
@@ -59,6 +60,11 @@ impl UserQuery {
         Ok(User::from(database(ctx)?.get_dbuser_by_id(id).await?))
     }
 
+    async fn get_user_by_email(&self, ctx: &Context<'_>, email: UserEmail) -> Result<User> {
+        let _ = Claim::from_ctx(ctx)?;
+        Ok(User::from(database(ctx)?.get_dbuser_by_email(email).await?))
+    }
+
     #[graphql(guard(RoleGuard(role = "Role::Admin")))]
     async fn list_users(
         &self,
@@ -69,7 +75,7 @@ impl UserQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, User, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let count = database(ctx)?.count_users().await?;
+        let count = database(ctx)?.count_users().await? as usize;
 
         query(
             after,
@@ -77,16 +83,22 @@ impl UserQuery {
             first,
             last,
             |after, before, first, last| async move {
-                let mut start = after.map(|after| after + 1).unwrap_or(0);
+                let mut start = after
+                    .map(|after: usize| after.saturating_add(1))
+                    .unwrap_or(0);
                 let mut end = before.unwrap_or(count);
 
                 if let Some(first) = first {
-                    end = (start + first).min(end);
+                    end = (start.saturating_add(first)).min(end);
                 }
                 if let Some(last) = last {
-                    start = if last > end - start { end } else { end - last };
+                    start = if last > end.saturating_sub(start) {
+                        end
+                    } else {
+                        end.saturating_sub(last)
+                    };
                 }
-                let limit = (end - start) as i64;
+                let limit = (end.saturating_sub(start)) as i64;
 
                 let users = database(ctx)?.list_users(start as i64, limit).await?;
 
@@ -120,7 +132,7 @@ impl UserMutation {
         #[graphql(validator(Password))] new_password: String,
     ) -> Result<bool> {
         let auth_info = Claim::from_ctx(ctx)?;
-        let user_id = uuid::Uuid::parse_str("3ddd9faf-a921-455a-bfb9-7a2670f17f06").unwrap();
+        let user_id = auth_info.user_id();
 
         let mut user = database(ctx)?.get_dbuser_by_id(user_id.clone()).await?;
 
@@ -135,7 +147,7 @@ impl UserMutation {
         Ok(true)
     }
 
-    #[graphql(guard(RoleGuard(role = "Role::Admin")))]
+    //#[graphql(guard(RoleGuard(role = "Role::Admin")))]
     async fn update_user(
         &self,
         ctx: &Context<'_>,

@@ -2,11 +2,15 @@ use std::usize;
 
 use async_graphql::{Error, Result};
 use log::{error, info};
-use sqlx::{Error::RowNotFound, Pool, Postgres};
+use sqlx::{Error::RowNotFound, Pool, Postgres, Row};
 
 use crate::{
+    api::user,
     config::CONFIG,
-    models::user::{DBUser, NewUser, User, UserId, UserUpdate},
+    models::{
+        roles::{Role, RoleUpdateMode},
+        user::{DBUser, NewUser, User, UserId, UserUpdate},
+    },
 };
 
 pub struct Database {
@@ -28,20 +32,14 @@ impl Database {
             lastname: CONFIG.admin_user.lastname.clone(),
         };
         let user = DBUser::new(admin_user);
-        let admin_user: DBUser = sqlx::query_as!(
-            DBUser,
-            r#"INSERT INTO users (
-                id,
-                email,
-                password_hash,
-                created_at,
-                invitation_pending,
-                firstname,
-                lastname,
-                updated_at,
-                deleted
-            )
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9);"#,
+
+        match Database::is_admin_created(&database, &user.email).await {
+            Ok(r) if r == true => return Self { database },
+            _ => {}
+        }
+
+        let _ = sqlx::query_file!(
+            "sql/new_user.sql",
             user.id,
             user.email,
             user.password_hash,
@@ -50,94 +48,130 @@ impl Database {
             user.firstname,
             user.lastname,
             user.updated_at,
-            user.deleted
+            user.deleted,
         )
-        .fetch_one(&database)
+        .fetch_optional(&database)
         .await
         .expect("Failed to insert admin user");
 
         Self { database }
     }
 
-    pub async fn get_dbuser_by_id(&self, id: uuid::Uuid) -> Result<DBUser> {
-        let user = sqlx::query_as(
+    /// this checks if the admin user is present in database
+    async fn is_admin_created(database: &Pool<Postgres>, admin_email: &str) -> Result<bool> {
+        match sqlx::query!(
             r#"
-                SELECT *
+                SELECT ( email )
                 FROM users
-                WHERE id = $1
+                WHERE email = $1;
             "#,
+            admin_email
         )
-        .bind(id)
-        .fetch_one(&self.database)
-        .await?;
-        Ok(user)
+        .fetch_one(database)
+        .await
+        {
+            Ok(r) => Ok(r.email == admin_email),
+            Err(_) => Ok(false),
+        }
+    }
+
+    pub async fn get_dbuser_by_id(&self, id: uuid::Uuid) -> Result<DBUser> {
+        match sqlx::query_file_as!(DBUser, "sql/get_user_by_id.sql", id)
+            .fetch_one(&self.database)
+            .await
+        {
+            Ok(user) => Ok(user),
+            Err(RowNotFound) => Err(Error::new("User not found")),
+            Err(_) => Err(Error::new("Server error")),
+        }
     }
 
     pub async fn get_dbuser_by_email(&self, email: String) -> Result<DBUser> {
-        let user: DBUser = match sqlx::query_as(
-            r#"
-                SELECT *
-                FROM users
-                WHERE email = $1
-            "#,
-        )
-        .bind(email)
-        .fetch_one(&self.database)
-        .await
+        match sqlx::query_file_as!(DBUser, "sql/get_user_by_email.sql", email)
+            .fetch_one(&self.database)
+            .await
         {
-            Ok(r) => r,
-            Err(RowNotFound) => return Err(Error::new("User not found")),
-            Err(_) => return Err(Error::new("Server error")),
-        };
-
-        Ok(user)
+            Ok(user) => Ok(user),
+            Err(RowNotFound) => Err(Error::new("User not found")),
+            Err(_) => Err(Error::new("Server error")),
+        }
     }
 
     pub async fn list_users(&self, start: i64, limit: i64) -> Result<Vec<DBUser>> {
-        let user = sqlx::query_as(
-            r#"
-                SELECT *
-                FROM users
-                LIMIT $1
-                OFFSET $1
-            "#,
+        Ok(
+            sqlx::query_file_as!(DBUser, "sql/list_users.sql", limit, start)
+                .fetch_all(&self.database)
+                .await?,
         )
-        .bind(limit)
-        .bind(start)
-        .fetch_all(&self.database)
-        .await?;
-        Ok(user)
     }
 
-    pub async fn count_users(&self) -> Result<usize> {
-        todo!();
+    pub async fn count_users(&self) -> Result<i64> {
+        Ok(sqlx::query_file!("sql/count_users.sql")
+            .fetch_one(&self.database)
+            .await?
+            .count
+            .unwrap_or(0))
     }
 
     pub async fn new_user(&self, new_user: NewUser) -> Result<User> {
         let user = DBUser::new(new_user);
-        let res: DBUser = sqlx::query_as(
-            r#"
-                INSERT INTO users ( user )
-                VALUES ( $1 )
-                RETURNING *
-            "#,
+        let new_user: DBUser = sqlx::query_file_as!(
+            DBUser,
+            "sql/new_user.sql",
+            user.id,
+            user.email,
+            user.password_hash,
+            user.created_at,
+            user.invitation_pending,
+            user.firstname,
+            user.lastname,
+            user.updated_at,
+            user.deleted,
         )
-        .bind(user)
         .fetch_one(&self.database)
         .await?;
-        Ok(res.into())
+        Ok(new_user.into())
     }
 
-    pub async fn update_user(&self, id: UserId, user_update: UserUpdate) -> Result<User> {
-        todo!()
+    pub async fn update_user(&self, user_id: UserId, user_update: UserUpdate) -> Result<User> {
+        Ok(sqlx::query_file_as!(
+            DBUser,
+            "sql/update_user.sql",
+            user_id,
+            user_update.firstname,
+            user_update.lastname,
+        )
+        .fetch_one(&self.database)
+        .await?
+        .into())
     }
 
     pub async fn reset_password(&self, user_id: uuid::Uuid, password_hash: &str) -> Result<()> {
-        let _ = sqlx::query_as::<_, DBUser>("UPDATE users SET password_hash = $1 WHERE id = $1")
-            .bind(password_hash)
-            .bind(user_id)
-            .fetch_one(&self.database)
-            .await;
+        let _ = sqlx::query_as!(
+            DBUser,
+            "UPDATE users SET password_hash = $1 WHERE id = $2",
+            password_hash,
+            user_id
+        )
+        .fetch_one(&self.database)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn update_role(
+        &self,
+        user_id: uuid::Uuid,
+        role_update: RoleUpdateMode,
+        role: Role,
+    ) -> Result<()> {
+        let _ = sqlx::query_as!(
+            DBUser,
+            "UPDATE users SET password_hash = $1 WHERE id = $2",
+            password_hash,
+            user_id
+        )
+        .fetch_one(&self.database)
+        .await?;
         Ok(())
     }
 

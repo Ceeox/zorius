@@ -30,7 +30,7 @@ impl ResponseError for ZoriusError {
     fn status_code(&self) -> StatusCode {
         match self {
             ZoriusError::IoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ZoriusError::JWTError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ZoriusError::JWTError(_) => StatusCode::BAD_REQUEST,
             ZoriusError::ActixError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ZoriusError::SqlxError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -38,10 +38,10 @@ impl ResponseError for ZoriusError {
 
     fn error_response(&self) -> HttpResponse {
         match self {
-            ZoriusError::IoError(_)
-            | ZoriusError::JWTError(_)
-            | ZoriusError::ActixError(_)
-            | ZoriusError::SqlxError(_) => HttpResponse::InternalServerError().finish(),
+            ZoriusError::IoError(_) | ZoriusError::ActixError(_) | ZoriusError::SqlxError(_) => {
+                HttpResponse::InternalServerError().finish()
+            }
+            ZoriusError::JWTError(_) => HttpResponse::BadRequest().finish(),
         }
     }
 }
@@ -61,5 +61,11 @@ impl From<StdIoError> for ZoriusError {
 impl From<JWTError> for ZoriusError {
     fn from(err: JWTError) -> Self {
         ZoriusError::JWTError(err)
+    }
+}
+
+impl From<SqlxError> for ZoriusError {
+    fn from(err: SqlxError) -> Self {
+        ZoriusError::SqlxError(err)
     }
 }

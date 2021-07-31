@@ -13,7 +13,6 @@ use crate::validators::Password;
 pub type UserId = Uuid;
 pub type UserEmail = String;
 
-#[sqlx(type_name = "DBUser")]
 #[derive(SimpleObject, Debug, Deserialize, Serialize, Clone, Type, FromRow)]
 pub struct DBUser {
     pub id: UserId,
@@ -100,10 +99,6 @@ pub struct NewUser {
 
 #[derive(InputObject, Debug, Serialize)]
 pub struct UserUpdate {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub email: Option<UserEmail>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub firstname: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lastname: Option<String>,
+    pub firstname: String,
+    pub lastname: String,
 }

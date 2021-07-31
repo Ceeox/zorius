@@ -16,7 +16,7 @@ use models::{roles::RoleCache, upload::Storage};
 use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
-use sqlx::{PgPool, Pool, Postgres};
+use sqlx::PgPool;
 use tokio::time::sleep;
 use uuid::Uuid;
 
@@ -46,7 +46,7 @@ async fn setup_pg() -> Result<Database, sqlx::Error> {
         "postgres://{}:{}@{}:{}/{}",
         CONFIG.db.username, "<hidden>", CONFIG.db.server, CONFIG.db.port, CONFIG.db.name
     );
-    debug!("Connecting to: {:?}", pw_hidden_url);
+    info!("Connecting to: {:?}", pw_hidden_url);
 
     Ok(Database::new(PgPool::connect(&url).await?).await)
 }
