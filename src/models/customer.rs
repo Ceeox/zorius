@@ -2,9 +2,12 @@ use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::{
-    project::{Project, ProjectId},
-    user::{User, UserId},
+use crate::{
+    models::{
+        project::{Project, ProjectId},
+        users::UserId,
+    },
+    view::users::User,
 };
 
 pub type CustomerId = Uuid;
@@ -36,7 +39,7 @@ impl DBCustomer {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, SimpleObject)]
+#[derive(Serialize, Debug, Clone, SimpleObject)]
 pub struct Customer {
     id: CustomerId,
     creator: User,

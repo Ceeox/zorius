@@ -3,10 +3,13 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::{
-    customer::{Customer, CustomerId},
-    project::{Project, ProjectId},
-    user::{User, UserId},
+use crate::{
+    models::{
+        customer::{Customer, CustomerId},
+        project::{Project, ProjectId},
+        users::UserId,
+    },
+    view::users::User,
 };
 
 pub type WorkReportId = Uuid;
@@ -31,7 +34,7 @@ pub struct WorkReportTimes {
     pub ended: Option<DateTime<Utc>>,
 }
 
-#[derive(Deserialize, Debug, SimpleObject, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct WorkReport {
     id: WorkReportId,
     user: User,

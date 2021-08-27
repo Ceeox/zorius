@@ -1,5 +1,4 @@
-INSERT INTO
-  users (
+INSERT INTO users (
     id,
     email,
     password_hash,
@@ -9,9 +8,8 @@ INSERT INTO
     lastname,
     updated_at,
     deleted
-  )
-VALUES
-  (
+)
+VALUES (
     $1,
     $2,
     $3,
@@ -21,4 +19,5 @@ VALUES
     $7,
     $8,
     $9
-  ) RETURNING *;
+)
+RETURNING *;

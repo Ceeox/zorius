@@ -13,9 +13,10 @@ use crate::{
         auth::LoginResult,
         roles::{Role, RoleGuard},
         upload::{FileInfo, Storage},
-        user::{NewUser, User, UserEmail, UserId, UserUpdate},
+        users::{User as DbUser, UserEmail, UserId},
     },
     validators::Password,
+    view::users::{NewUser, User, UserUpdate},
 };
 
 use super::{claim::Claim, database};
@@ -36,7 +37,8 @@ impl UserQuery {
         password: String,
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
-        let user = database(ctx)?.get_dbuser_by_email(email.clone()).await?;
+
+        let user = DbUser::get_dbuser_by_email(database(&ctx)?.get_pool(), email.clone()).await?;
 
         if !user.is_password_correct(&password) {
             return Err(err);
@@ -48,24 +50,24 @@ impl UserQuery {
         );
         let token = claim.to_string();
 
-        Ok(LoginResult {
-            token,
-            expires_at: claim.expires_at(),
-            user_id: user.get_id().to_owned(),
-        })
+        Ok(LoginResult { token })
     }
 
     async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(User::from(database(ctx)?.get_dbuser_by_id(id).await?))
+        Ok(User::from(
+            DbUser::get_dbuser_by_id(database(&ctx)?.get_pool(), id).await?,
+        ))
     }
 
     async fn get_user_by_email(&self, ctx: &Context<'_>, email: UserEmail) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(User::from(database(ctx)?.get_dbuser_by_email(email).await?))
+        Ok(User::from(
+            DbUser::get_dbuser_by_email(database(&ctx)?.get_pool(), email).await?,
+        ))
     }
 
-    #[graphql(guard(RoleGuard(role = "Role::Admin")))]
+    //#[graphql(guard(RoleGuard(role = "Role::Admin")))]
     async fn list_users(
         &self,
         ctx: &Context<'_>,
@@ -75,7 +77,7 @@ impl UserQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, User, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let count = database(ctx)?.count_users().await? as usize;
+        let count = DbUser::count_users(database(&ctx)?.get_pool()).await? as usize;
 
         query(
             after,
@@ -100,7 +102,8 @@ impl UserQuery {
                 }
                 let limit = (end.saturating_sub(start)) as i64;
 
-                let users = database(ctx)?.list_users(start as i64, limit).await?;
+                let users =
+                    DbUser::list_users(database(&ctx)?.get_pool(), start as i64, limit).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection.append(users.into_iter().enumerate().map(|(n, db_user)| {
@@ -122,7 +125,9 @@ impl UserMutation {
         if !CONFIG.registration_enabled {
             return Err(Error::new("registration is not enabled"));
         }
-        Ok(database(ctx)?.new_user(new_user).await?)
+        Ok(DbUser::new_user(database(&ctx)?.get_pool(), new_user)
+            .await?
+            .into())
     }
 
     async fn reset_password(
@@ -134,7 +139,8 @@ impl UserMutation {
         let auth_info = Claim::from_ctx(ctx)?;
         let user_id = auth_info.user_id();
 
-        let mut user = database(ctx)?.get_dbuser_by_id(user_id.clone()).await?;
+        let mut user =
+            DbUser::get_dbuser_by_id(database(&ctx)?.get_pool(), user_id.clone()).await?;
 
         if !user.is_password_correct(&old_password) {
             return Err(Error::new("old password is wrong!".to_owned()));
@@ -142,7 +148,11 @@ impl UserMutation {
             user.change_password(&new_password);
         }
 
-        let _ = database(ctx)?.reset_password(user.get_id().clone(), user.get_password_hash());
+        let _ = DbUser::reset_password(
+            database(&ctx)?.get_pool(),
+            user.get_id().clone(),
+            user.get_password_hash(),
+        );
 
         Ok(true)
     }
@@ -155,7 +165,11 @@ impl UserMutation {
         user_update: UserUpdate,
     ) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(database(ctx)?.update_user(user_id, user_update).await?)
+        Ok(
+            DbUser::update_user(database(&ctx)?.get_pool(), user_id, user_update)
+                .await?
+                .into(),
+        )
     }
 
     async fn upload_avatar(&self, ctx: &Context<'_>, files: Vec<Upload>) -> Result<Vec<FileInfo>> {

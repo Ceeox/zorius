@@ -28,6 +28,7 @@ mod helper;
 mod mailer;
 mod models;
 mod validators;
+mod view;
 
 use crate::{
     api::{graphql, playground, Mutation, Query},
@@ -54,7 +55,7 @@ async fn setup_pg() -> Result<Database, sqlx::Error> {
 fn setup_log() {
     let value = format!("{},actix_web={}", CONFIG.log_level, CONFIG.log_level);
     std::env::set_var("RUST_LOG", &value);
-    debug!("Running in DEBUG mode...");
+    debug!("Running in DEBUG mode");
 
     env_logger::init();
 }
@@ -101,7 +102,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
             }
         }
     };
-    info!("Successfully connected to database...");
+    info!("Successfully connected to database");
 
     let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
         .data(database)

@@ -5,7 +5,7 @@ use chrono::Local;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::{config::CONFIG, models::user::UserId};
+use crate::{config::CONFIG, models::users::UserId};
 
 pub struct Token(pub String);
 

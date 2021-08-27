@@ -30,7 +30,7 @@ serde = "1.0.126"
 serde_derive = "1.0.126"
 serde_json = "1.0.64"
 slab = "0.4.3"
-sqlx = {version = "0.5.5", features = ["postgres", "json", "runtime-actix-rustls", "chrono", "uuid"]}
+sqlx = {version = "0.5.7", features = ["postgres", "json", "runtime-actix-rustls", "chrono", "uuid", "decimal"]}
 tokio = {version = "1.8.1"}
 url = "2.2.2"
 uuid = {version = "0.8.2", features = ["v4", "serde"]}

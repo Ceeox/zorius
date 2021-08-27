@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 use uuid::Uuid;
 
-use super::user::UserId;
+use super::users::UserId;
 
 #[derive(Debug, Serialize, Deserialize, SimpleObject)]
 pub struct Roles {
