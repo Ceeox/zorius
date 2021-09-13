@@ -1,15 +1,18 @@
-use std::{fmt::Display, str::FromStr};
+use std::str::FromStr;
 
 use async_graphql::Enum;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    postgres::PgArgumentBuffer, query_file_as, types::Decimal, Decode, Encode, FromRow, PgPool,
+    postgres::PgArgumentBuffer, query, query_as, types::Decimal, Decode, Encode, FromRow, PgPool,
     Postgres, Type,
 };
 use uuid::Uuid;
 
-use crate::{models::users::UserId, view::intern_merchandise::NewInternMerchandise};
+use crate::{
+    models::users::{Test, User, UserId},
+    view::intern_merchandise::{IncomingInternMerchandise, NewInternMerchandise},
+};
 
 pub type InternMerchandiseId = Uuid;
 
@@ -22,7 +25,7 @@ pub struct InternMerchandise {
     pub purchased_on: DateTime<Utc>,
     pub count: i64,
     pub cost: Decimal,
-    pub merch_status: InternMerchandiseStatus,
+    pub status: InternMerchandiseStatus,
     pub merchandise_name: String,
     pub use_case: Option<String>,
     pub location: Option<String>,
@@ -32,9 +35,270 @@ pub struct InternMerchandise {
     pub arrived_on: Option<DateTime<Utc>>,
     pub url: Option<String>,
     pub postage: Option<Decimal>,
-    pub invoice_number: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl InternMerchandise {
+    pub async fn new(
+        pool: &PgPool,
+        orderer_id: UserId,
+        new_intern_merch: NewInternMerchandise,
+    ) -> Result<InternMerchandise, sqlx::Error> {
+        let res = query_as!(
+            InternMerchandise,
+            r#"INSERT INTO intern_merchandises (
+                merchandise_id,
+                orderer_id,
+                project_leader_id,
+                purchased_on,
+                count,
+                cost,
+                status,
+                merchandise_name,
+                use_case,
+                location,
+                article_number,
+                shop,
+                serial_number,
+                url,
+                postage
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+            RETURNING
+                id,
+                merchandise_id,
+                orderer_id,
+                project_leader_id,
+                purchased_on,
+                count,
+                cost,
+                status as "status:_",
+                merchandise_name,
+                use_case,
+                location,
+                article_number,
+                shop,
+                serial_number,
+                arrived_on,
+                url,
+                postage,
+                created_at,
+                updated_at;"#,
+            None as Option<i64>,
+            orderer_id,
+            new_intern_merch.project_leader_id,
+            Utc::now().into(),
+            new_intern_merch.count,
+            Decimal::from_str(&new_intern_merch.cost.to_string()).unwrap_or(Decimal::default()),
+            InternMerchandiseStatus::Ordered as _,
+            new_intern_merch.merchandise_name,
+            new_intern_merch.use_case,
+            new_intern_merch.location,
+            new_intern_merch.article_number,
+            new_intern_merch.shop,
+            None as Option<String>,
+            new_intern_merch.url,
+            Decimal::from_str(&new_intern_merch.postage.to_string()).unwrap_or(Decimal::default())
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(res)
+    }
+
+    pub async fn get_intern_merch_by_id(
+        pool: &PgPool,
+        id: InternMerchandiseId,
+    ) -> Result<InternMerchandise, sqlx::Error> {
+        Ok(sqlx::query_as!(
+            InternMerchandise,
+            r#"SELECT 
+                id,
+                merchandise_id,
+                orderer_id,
+                project_leader_id,
+                purchased_on,
+                count,
+                cost,
+                status as "status: _",
+                merchandise_name,
+                use_case,
+                location,
+                article_number,
+                shop,
+                serial_number,
+                arrived_on,
+                url,
+                postage,
+                created_at,
+                updated_at
+            FROM intern_merchandises
+            WHERE id = $1
+            ORDER BY created_at DESC;"#,
+            id
+        )
+        .fetch_one(pool)
+        .await?)
+    }
+
+    pub async fn test(pool: &PgPool, id: InternMerchandiseId) -> Result<(), sqlx::Error> {
+        let res = sqlx::query_as!(
+            Test,
+            r#"SELECT
+                intern_merchandises.id,
+                merchandise_id,
+                purchased_on,
+                count,
+                cost,
+                status as "status: InternMerchandiseStatus",
+                merchandise_name,
+                use_case,
+                location,
+                article_number,
+                shop,
+                serial_number,
+                arrived_on,
+                url,
+                postage,
+                intern_merchandises.created_at,
+                intern_merchandises.updated_at,
+                (
+                    users.id,
+                    users.email,
+                    users.password_hash,
+                    users.invitation_pending,
+                    users.firstname,
+                    users.lastname,
+                    users.deleted,
+                    users.created_at,
+                    users.updated_at
+                ) AS "orderer: User",
+                (
+                    users.id,
+                    users.email,
+                    users.password_hash,
+                    users.invitation_pending,
+                    users.firstname,
+                    users.lastname,
+                    users.deleted,
+                    users.created_at,
+                    users.updated_at
+                ) AS "project_leader: User"
+            FROM intern_merchandises
+            INNER JOIN users
+                ON (intern_merchandises.orderer_id = users.id)
+                OR (intern_merchandises.project_leader_id = users.id)
+            WHERE intern_merchandises.id = $1;"#,
+            id
+        )
+        .fetch_one(pool)
+        .await;
+
+        println!("{:?}", res);
+        Ok(())
+    }
+
+    pub async fn list_intern_merch(
+        pool: &PgPool,
+        start: i64,
+        limit: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        Ok(query_as!(
+            InternMerchandise,
+            r#"SELECT
+                    id,
+                    merchandise_id,
+                    orderer_id,
+                    project_leader_id,
+                    purchased_on,
+                    count,
+                    cost,
+                    status as "status: _",
+                    merchandise_name,
+                    use_case,
+                    location,
+                    article_number,
+                    shop,
+                    serial_number,
+                    arrived_on,
+                    url,
+                    postage,
+                    created_at,
+                    updated_at
+                FROM intern_merchandises
+                ORDER BY created_at ASC
+                LIMIT $1
+                OFFSET $2;"#,
+            limit,
+            start
+        )
+        .fetch_all(pool)
+        .await?)
+    }
+
+    pub async fn count_intern_merch(pool: &PgPool) -> Result<i64, sqlx::Error> {
+        Ok(sqlx::query!(
+            r#"SELECT COUNT(id)
+            FROM intern_merchandises;"#
+        )
+        .fetch_one(pool)
+        .await?
+        .count
+        .unwrap_or_default())
+    }
+
+    pub async fn incoming_intern_merchandise(
+        pool: &PgPool,
+        update: IncomingInternMerchandise,
+    ) -> Result<InternMerchandise, sqlx::Error> {
+        Ok(query_as!(
+            Self,
+            r#"UPDATE intern_merchandises
+                SET 
+                    merchandise_id = $2,
+                    serial_number = $3,
+                    arrived_on = NOW()
+                WHERE id = $1
+                RETURNING
+                    id,
+                    merchandise_id,
+                    orderer_id,
+                    project_leader_id,
+                    purchased_on,
+                    count,
+                    cost,
+                    status as "status: _",
+                    merchandise_name,
+                    use_case,
+                    location,
+                    article_number,
+                    shop,
+                    serial_number,
+                    arrived_on,
+                    url,
+                    postage,
+                    created_at,
+                    updated_at;"#,
+            update.id,
+            update.merchandise_id,
+            update.serial_number,
+        )
+        .fetch_one(pool)
+        .await?)
+    }
+
+    pub async fn delete(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
+        query!(
+            r#"DELETE
+            FROM intern_merchandises
+            WHERE id = $1;"#,
+            self.id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
 }
 
 impl<'r> Decode<'r, Postgres> for InternMerchandise {
@@ -50,18 +314,17 @@ impl<'r> Decode<'r, Postgres> for InternMerchandise {
             project_leader_id: decoder.try_decode::<UserId>()?,
             purchased_on: decoder.try_decode::<DateTime<Utc>>()?,
             count: decoder.try_decode::<i64>()?,
+            cost: decoder.try_decode::<Decimal>()?,
+            status: decoder.try_decode::<InternMerchandiseStatus>()?,
             merchandise_name: decoder.try_decode::<String>()?,
             use_case: decoder.try_decode::<Option<String>>()?,
             location: decoder.try_decode::<Option<String>>()?,
             article_number: decoder.try_decode::<String>()?,
             shop: decoder.try_decode::<String>()?,
-            cost: decoder.try_decode::<Decimal>()?,
             serial_number: decoder.try_decode::<Option<String>>()?,
             arrived_on: decoder.try_decode::<Option<DateTime<Utc>>>()?,
-            merch_status: decoder.try_decode::<InternMerchandiseStatus>()?,
             url: decoder.try_decode::<Option<String>>()?,
             postage: decoder.try_decode::<Option<Decimal>>()?,
-            invoice_number: decoder.try_decode::<Option<i64>>()?,
             created_at: decoder.try_decode::<DateTime<Utc>>()?,
             updated_at: decoder.try_decode::<DateTime<Utc>>()?,
         })
@@ -79,7 +342,7 @@ impl<'r> Encode<'r, Postgres> for InternMerchandise {
         encoder.encode(self.purchased_on);
         encoder.encode(self.count);
         encoder.encode(self.cost);
-        encoder.encode(self.merch_status);
+        encoder.encode(self.status);
         encoder.encode(self.merchandise_name.clone());
         encoder.encode(self.use_case.clone());
         encoder.encode(self.location.clone());
@@ -89,199 +352,9 @@ impl<'r> Encode<'r, Postgres> for InternMerchandise {
         encoder.encode(self.arrived_on);
         encoder.encode(self.url.clone());
         encoder.encode(self.postage);
-        encoder.encode(self.invoice_number);
-        encoder.encode(self.created_at);
-        encoder.encode(self.updated_at);
         encoder.finish();
         sqlx::encode::IsNull::No
     }
-}
-
-impl InternMerchandise {
-    pub fn new(new_intern_merchandise: NewInternMerchandise) -> Self {
-        Self {
-            id: InternMerchandiseId::new_v4(),
-            merchandise_name: new_intern_merchandise.merchandise_name,
-            count: new_intern_merchandise.count,
-            orderer_id: new_intern_merchandise.orderer_id,
-            purchased_on: Utc::now().into(),
-            cost: Decimal::from_str(&new_intern_merchandise.cost.to_string())
-                .unwrap_or(Decimal::default()),
-            merch_status: InternMerchandiseStatus::Ordered,
-            url: new_intern_merchandise.url,
-            use_case: new_intern_merchandise.use_case,
-            article_number: new_intern_merchandise.article_number,
-            postage: Some(
-                Decimal::from_str(&new_intern_merchandise.cost.to_string())
-                    .unwrap_or(Decimal::default()),
-            ),
-            project_leader_id: new_intern_merchandise.project_leader_id,
-            location: new_intern_merchandise.location,
-            shop: new_intern_merchandise.shop,
-
-            merchandise_id: None,
-            serial_number: None,
-            arrived_on: None,
-            invoice_number: None,
-            created_at: Utc::now().into(),
-            updated_at: Utc::now().into(),
-        }
-    }
-
-    // pub fn change_status(&mut self, new_status: InternMerchandiseStatus, user: User) {
-    //     self.status = new_status;
-    //     self.updated_date = Utc::now().into();
-    //     let orderer_name = format!("{} {}", user.firstname, user.lastname);
-    //     let template: StatusTemplate = StatusTemplate {
-    //         id: self.id.clone(),
-    //         merchandise_id: self.merchandise_id,
-    //         orderer_name,
-    //         count: self.count,
-    //         merchandise_name: self.merchandise_name.clone(),
-    //         cost: self.cost,
-    //         status: new_status,
-    //     };
-    //     let body = template.render().unwrap();
-
-    //     mailer(
-    //         &CONFIG.mailer.merchandise_email_send_to,
-    //         &format!(
-    //             "Intern Merchandise Staus Change to {} for {}",
-    //             new_status.to_string(),
-    //             self.merchandise_name,
-    //         ),
-    //         &body,
-    //     );
-    // }
-
-    // pub async fn get_intern_merch_by_id(
-    //     pool: &PgPool,
-    //     id: InternMerchandiseId,
-    // ) -> Result<Self, sqlx::Error> {
-    //     Ok(
-    //         sqlx::query_file_as!(Self, "sql/get_intern_merch_by_id.sql", id)
-    //             .fetch_one(pool)
-    //             .await?,
-    //     )
-    // }
-
-    // pub async fn get_intern_merch_by_merch_id(
-    //     &self,
-    //     merchandise_id: i32,
-    // ) -> Result<InternMerchandise> {
-    //     let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
-    //     let pipeline = AggregateBuilder::new()
-    //         .matching(vec![("merchandise_id", merchandise_id)])
-    //         .lookup(MDB_COLL_NAME_USERS, "orderer_id", "_id", "orderer")
-    //         .lookup(
-    //             MDB_COLL_NAME_USERS,
-    //             "project_leader_id",
-    //             "_id",
-    //             "project_leader",
-    //         )
-    //         .unwind("$orderer", None, None)
-    //         .unwind("$project_leader", None, None)
-    //         .build();
-    //     let mut doc = collection.aggregate(pipeline, None).await?;
-    //     match doc.next().await {
-    //         Some(r) => Ok(from_document(r?)?),
-    //         None => Err(Error::new("intern merch wasn't found")),
-    //     }
-    // }
-
-    // pub async fn list_intern_merch(&self, start: i64, limit: i64) -> Result<Cursor<Document>> {
-    //     let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
-    //     let pipeline = AggregateBuilder::new()
-    //         .skip(start as i64)
-    //         .limit(limit)
-    //         .sort(vec![("created_date", SortOrder::DESC)])
-    //         .lookup(MDB_COLL_NAME_USERS, "orderer_id", "_id", "orderer")
-    //         .lookup(
-    //             MDB_COLL_NAME_USERS,
-    //             "project_leader_id",
-    //             "_id",
-    //             "project_leader",
-    //         )
-    //         .unwind("$orderer", None, None)
-    //         .unwind("$project_leader", None, None)
-    //         .build();
-    //     Ok(collection.aggregate(pipeline, None).await?)
-    // }
-
-    // pub async fn list_intern_merch(
-    //     pool: &PgPool,
-    //     start: i64,
-    //     limit: i64,
-    // ) -> Result<Vec<Self>, sqlx::Error> {
-    //     Ok(
-    //         query_file_as!(Self, "sql/list_intern_merch.sql", limit, start)
-    //             .fetch_all(pool)
-    //             .await?,
-    //     )
-    // }
-
-    pub async fn count_intern_merch(pool: &PgPool) -> Result<i64, sqlx::Error> {
-        Ok(sqlx::query_file!("sql/count_intern_merch.sql")
-            .fetch_one(pool)
-            .await?
-            .count
-            .unwrap_or(0))
-    }
-
-    // pub async fn new_intern_merch(
-    //     pool: &PgPool,
-    //     new_intern_merch: NewInternMerchandise,
-    // ) -> Result<InternMerchandise, sqlx::Error> {
-    //     let new_intern_merch = InternMerchandise::new(new_intern_merch);
-    //     // let id = new_intern_merch.id.clone();
-    //     let intern_merch = query_file_as!(
-    //         InternMerchandise,
-    //         "sql/new_intern_merch.sql",
-    //         new_intern_merch.id,
-    //         new_intern_merch.merchandise_id,
-    //         new_intern_merch.orderer_id,
-    //         new_intern_merch.project_leader_id,
-    //         new_intern_merch.purchased_on,
-    //         new_intern_merch.count,
-    //         new_intern_merch.cost,
-    //         new_intern_merch.status.to_string(),
-    //         new_intern_merch.merchandise_name,
-    //         new_intern_merch.use_case,
-    //         new_intern_merch.location,
-    //         new_intern_merch.article_number,
-    //         new_intern_merch.shop,
-    //         new_intern_merch.serial_number,
-    //         new_intern_merch.arrived_on,
-    //         new_intern_merch.url,
-    //         new_intern_merch.postage,
-    //         new_intern_merch.invoice_number,
-    //         new_intern_merch.created_at,
-    //         new_intern_merch.updated_at,
-    //     )
-    //     .fetch_one(pool)
-    //     .await?;
-
-    //     Ok(intern_merch)
-    // }
-
-    // pub async fn update_intern_merch(
-    //     &self,
-    //     id: InternMerchandiseId,
-    //     update: InternMerchandiseUpdate,
-    // ) -> Result<InternMerchandise> {
-    //     let collection = self.database.collection(MDB_COLL_INTERN_MERCH);
-    //     let filter = doc! {"_id": id.clone()};
-    //     let update = doc! {"$set": bson::to_bson(&update)?};
-    //     let _ = collection.update_one(filter, update, None).await?;
-    //     Ok(self.get_intern_merch_by_id(id).await?)
-    // }
-
-    // pub async fn delete_intern_merch(&self, id: InternMerchandiseId) -> Result<()> {
-    //     let col = self.database.collection(MDB_COLL_INTERN_MERCH);
-    //     let query = doc! {"_id": id};
-    //     let _ = col.delete_one(query, None).await?;
-    //     Ok(())
-    // }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Type, Enum)]
@@ -291,17 +364,6 @@ pub enum InternMerchandiseStatus {
     Delivered,
     Stored,
     Used,
-}
-
-impl Display for InternMerchandiseStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InternMerchandiseStatus::Ordered => write!(f, "Ordered"),
-            InternMerchandiseStatus::Delivered => write!(f, "Delivered"),
-            InternMerchandiseStatus::Stored => write!(f, "Stored"),
-            InternMerchandiseStatus::Used => write!(f, "Used"),
-        }
-    }
 }
 
 impl Default for InternMerchandiseStatus {

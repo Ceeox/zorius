@@ -2,23 +2,21 @@ use std::io::BufReader;
 use std::{fs::File, time::Duration};
 
 use actix_cors::Cors;
-
-use actix_governor::{Governor, GovernorConfigBuilder};
 use actix_web::{
     http::Method,
     middleware::{DefaultHeaders, Logger},
     App, HttpServer,
 };
 use async_graphql::{EmptySubscription, Schema};
-use errors::ZoriusError;
 use log::{debug, error, info};
-use models::{roles::RoleCache, upload::Storage};
 use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
 use sqlx::PgPool;
 use tokio::time::sleep;
 use uuid::Uuid;
+
+use crate::{errors::ZoriusError, models::upload::Storage};
 
 mod api;
 mod config;
@@ -85,8 +83,6 @@ async fn main() -> Result<(), errors::ZoriusError> {
     setup_log();
     check_folders()?;
 
-    let role_cache = RoleCache::new();
-
     let mut db_connect_trys: i32 = 1;
     let database = loop {
         match setup_pg().await {
@@ -106,22 +102,16 @@ async fn main() -> Result<(), errors::ZoriusError> {
 
     let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
         .data(database)
-        .data(role_cache)
         .data(Storage::default())
         .finish();
 
     // Start http server
     let webserver_url = format!("{}:{}", CONFIG.web.ip, CONFIG.web.port);
     let log_format = CONFIG.web.log_format.clone();
-    let gov_conf = GovernorConfigBuilder::default()
-        .per_second(2)
-        .burst_size(10)
-        .finish()
-        .unwrap();
 
     let http_server = HttpServer::new(move || {
         App::new()
-            .data(schema.clone())
+            .app_data(schema.clone())
             .wrap(
                 Cors::default()
                     .allow_any_header()
@@ -131,7 +121,6 @@ async fn main() -> Result<(), errors::ZoriusError> {
             )
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
-            //.wrap(Governor::new(&gov_conf))
             .service(graphql)
             .service(playground)
     });

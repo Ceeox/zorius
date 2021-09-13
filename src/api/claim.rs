@@ -67,11 +67,6 @@ impl Claim {
         UserId::parse_str(&self.id.clone()).expect("Couldn't convert UserId from string to Uuid")
     }
 
-    /// Retruns the unix timestamp when the token expries.
-    pub fn expires_at(&self) -> usize {
-        self.exp
-    }
-
     /// Retruns if the token is expired
     pub fn token_expired(&self) -> bool {
         let now = Local::now().timestamp() as usize;

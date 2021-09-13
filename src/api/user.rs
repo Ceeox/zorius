@@ -1,7 +1,5 @@
-use actix_web::HttpResponse;
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    guard::Guard,
     validators::{Email, StringMaxLength, StringMinLength},
     Context, Error, Object, Result, Upload,
 };
@@ -11,7 +9,6 @@ use crate::{
     config::CONFIG,
     models::{
         auth::LoginResult,
-        roles::{Role, RoleGuard},
         upload::{FileInfo, Storage},
         users::{User as DbUser, UserEmail, UserId},
     },
@@ -38,7 +35,7 @@ impl UserQuery {
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
 
-        let user = DbUser::get_dbuser_by_email(database(&ctx)?.get_pool(), email.clone()).await?;
+        let user = DbUser::user_by_email(database(&ctx)?.get_pool(), &email).await?;
 
         if !user.is_password_correct(&password) {
             return Err(err);
@@ -56,14 +53,14 @@ impl UserQuery {
     async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(User::from(
-            DbUser::get_dbuser_by_id(database(&ctx)?.get_pool(), id).await?,
+            DbUser::user_by_id(database(&ctx)?.get_pool(), id).await?,
         ))
     }
 
     async fn get_user_by_email(&self, ctx: &Context<'_>, email: UserEmail) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(User::from(
-            DbUser::get_dbuser_by_email(database(&ctx)?.get_pool(), email).await?,
+            DbUser::user_by_email(database(&ctx)?.get_pool(), &email).await?,
         ))
     }
 
@@ -106,9 +103,12 @@ impl UserQuery {
                     DbUser::list_users(database(&ctx)?.get_pool(), start as i64, limit).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
-                connection.append(users.into_iter().enumerate().map(|(n, db_user)| {
-                    Edge::with_additional_fields(n + start, User::from(db_user), EmptyFields)
-                }));
+                connection.append(
+                    users
+                        .into_iter()
+                        .enumerate()
+                        .map(|(n, db_user)| Edge::new(n + start, User::from(db_user))),
+                );
                 Ok(connection)
             },
         )
@@ -122,10 +122,17 @@ pub struct UserMutation;
 #[Object]
 impl UserMutation {
     async fn register(&self, ctx: &Context<'_>, new_user: NewUser) -> Result<User> {
+        let pool = database(&ctx)?.get_pool();
+
         if !CONFIG.registration_enabled {
             return Err(Error::new("registration is not enabled"));
         }
-        Ok(DbUser::new_user(database(&ctx)?.get_pool(), new_user)
+
+        if DbUser::user_by_email(pool, &new_user.email).await.is_ok() {
+            return Err(Error::new("email already registerd"));
+        }
+
+        Ok(DbUser::new(database(&ctx)?.get_pool(), new_user)
             .await?
             .into())
     }
@@ -133,26 +140,20 @@ impl UserMutation {
     async fn reset_password(
         &self,
         ctx: &Context<'_>,
-        #[graphql(validator(StringMaxLength(length = "64")))] old_password: String,
+        #[graphql(validator(Password))] old_password: String,
         #[graphql(validator(Password))] new_password: String,
     ) -> Result<bool> {
         let auth_info = Claim::from_ctx(ctx)?;
         let user_id = auth_info.user_id();
 
-        let mut user =
-            DbUser::get_dbuser_by_id(database(&ctx)?.get_pool(), user_id.clone()).await?;
+        let user = DbUser::user_by_id(database(&ctx)?.get_pool(), user_id.clone()).await?;
 
         if !user.is_password_correct(&old_password) {
-            return Err(Error::new("old password is wrong!".to_owned()));
+            return Err(Error::new("old password is wrong".to_owned()));
         } else {
-            user.change_password(&new_password);
+            user.reset_password(database(&ctx)?.get_pool(), &new_password)
+                .await?;
         }
-
-        let _ = DbUser::reset_password(
-            database(&ctx)?.get_pool(),
-            user.get_id().clone(),
-            user.get_password_hash(),
-        );
 
         Ok(true)
     }

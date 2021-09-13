@@ -1,5 +1,6 @@
 use async_graphql::{validators::InputValueValidator, Value};
 use url::Url as CrateUrl;
+use uuid::Uuid as CrateUuid;
 
 pub struct Password;
 
@@ -23,6 +24,20 @@ impl InputValueValidator for Url {
         let mut res = Err("not a valid url".to_owned());
         if let Value::String(s) = value {
             if CrateUrl::parse(s).is_ok() {
+                res = Ok(());
+            }
+        }
+        res
+    }
+}
+
+pub struct Uuid;
+
+impl InputValueValidator for Uuid {
+    fn is_valid(&self, value: &Value) -> Result<(), String> {
+        let mut res = Err("not a valid uuid".to_owned());
+        if let Value::String(s) = value {
+            if CrateUuid::parse_str(s).is_ok() {
                 res = Ok(());
             }
         }

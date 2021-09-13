@@ -11,9 +11,9 @@ use crate::{
 pub struct User {
     pub id: UserId,
     pub email: UserEmail,
-    pub created_at: DateTime<Utc>,
     pub firstname: Option<String>,
     pub lastname: Option<String>,
+    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -38,6 +38,13 @@ pub struct NewUser {
     pub password: String,
     pub firstname: String,
     pub lastname: String,
+}
+
+#[derive(InputObject, Debug, Serialize)]
+pub struct PasswordChange {
+    pub old_password: String,
+    #[graphql(validator(Password))]
+    pub new_password: String,
 }
 
 #[derive(InputObject, Debug, Serialize)]

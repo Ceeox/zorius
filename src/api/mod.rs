@@ -6,8 +6,8 @@ use async_graphql::{
 use async_graphql_actix_web::{Request, Response};
 
 pub mod claim;
-//pub mod customer;
-//pub mod intern_merchandise;
+pub mod customer;
+pub mod intern_merchandise;
 //pub mod project;
 //pub mod role;
 pub mod user;
@@ -16,8 +16,8 @@ pub mod user;
 use crate::{
     api::{
         claim::Token,
-        // customer::{CustomerMutation, CustomerQuery},
-        // intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
+        customer::{CustomerMutation, CustomerQuery},
+        intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
         // project::{ProjectMutation, ProjectQuery},
         // role::{RoleMutation, RoleQuery},
         user::{UserMutation, UserQuery},
@@ -27,8 +27,6 @@ use crate::{
     API_VERSION,
 };
 
-pub(crate) static MDB_COLL_ROLES: &str = "roles";
-
 pub type RootSchema = Schema<Query, Mutation, EmptySubscription>;
 
 #[derive(MergedObject, Default)]
@@ -36,20 +34,20 @@ pub struct Query(
     ServerQuery,
     UserQuery,
     // RoleQuery,
-    // CustomerQuery,
+    CustomerQuery,
     // ProjectQuery,
     // WorkReportQuery,
-    // InternMerchandiseQuery,
+    InternMerchandiseQuery,
 );
 
 #[derive(Default, MergedObject)]
 pub struct Mutation(
     UserMutation,
     // RoleMutation,
-    // CustomerMutation,
+    CustomerMutation,
     // ProjectMutation,
     // WorkReportMutation,
-    // InternMerchandiseMutation,
+    InternMerchandiseMutation,
 );
 
 #[derive(Default)]

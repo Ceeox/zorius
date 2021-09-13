@@ -1,6 +1,4 @@
-use actix_web::{
-    error::Error as ActixError, http::StatusCode, HttpResponse, Responder, ResponseError,
-};
+use actix_web::{error::Error as ActixError, http::StatusCode, HttpResponse, ResponseError};
 use jsonwebtoken::errors::Error as JWTError;
 use sqlx::Error as SqlxError;
 
