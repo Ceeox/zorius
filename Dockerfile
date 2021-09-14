@@ -39,21 +39,21 @@ COPY --from=builder /zorius/target/release/zorius /zorius
 COPY config/default.toml /zorius/config/default.toml
 RUN apk add --no-cache openssl
 
-ENV DEBUG=
+ENV DEBUG=false
 ENV SECRET_KEY=
-ENV DOMAIN=
-ENV TOKEN_LIFETIME=
-ENV WEB_IP=
+ENV DOMAIN=localhost
+ENV TOKEN_LIFETIME=86400
+ENV WEB_IP=127.0.0.1
 ENV WEB_PORT=8080
-ENV WEB_ENABLE_SSL=
+ENV WEB_ENABLE_SSL=false
 ENV WEB_CERT_PATH=
 ENV WEB_KEY_PATH=
 ENV WEB_LOG_FORMAT=
-ENV DB_SERVER_DOMAIN=
+ENV DB_SERVER_DOMAIN=localhost
 ENV DB_USERNAME=
 ENV DB_PASSWORD=
-ENV DB_APP_NAME=
-ENV DB_NAME=
+ENV DB_APP_NAME=zorius
+ENV DB_NAME=zorius
 
 EXPOSE ${WEB_PORT}
 ENTRYPOINT ["/zorius/zorius"]

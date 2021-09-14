@@ -2,23 +2,21 @@ use std::io::BufReader;
 use std::{fs::File, time::Duration};
 
 use actix_cors::Cors;
-use actix_files::Files;
-use actix_ratelimit::{MemoryStore, MemoryStoreActor, RateLimiter};
 use actix_web::{
-    http::ContentEncoding,
-    middleware::{Compress, DefaultHeaders, Logger},
+    http::Method,
+    middleware::{DefaultHeaders, Logger},
     App, HttpServer,
 };
 use async_graphql::{EmptySubscription, Schema};
-use mongodb::{options::ClientOptions, options::ResolverConfig, Client};
+use log::{debug, error, info};
 use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
-
-use api::{gql_playgound, Mutation, Query};
-use errors::ZoriusError;
-use models::{roles::RoleCache, upload::Storage};
+use sqlx::PgPool;
+use tokio::time::sleep;
 use uuid::Uuid;
+
+use crate::{errors::ZoriusError, models::upload::Storage};
 
 mod api;
 mod config;
@@ -27,33 +25,35 @@ mod errors;
 mod helper;
 mod mailer;
 mod models;
+mod validators;
+mod view;
 
-use crate::{api::graphql, config::CONFIG, database::Database};
+use crate::{
+    api::{graphql, playground, Mutation, Query},
+    config::CONFIG,
+    database::Database,
+};
 
 const API_VERSION: &str = "v1";
 
-async fn setup_mongodb() -> Result<Client, ZoriusError> {
+async fn setup_pg() -> Result<Database, sqlx::Error> {
     let url = format!(
-        "mongodb+srv://{}:{}@{}/{}",
-        CONFIG.db.username, CONFIG.db.password, CONFIG.db.server, CONFIG.db.name
+        "postgres://{}:{}@{}:{}/{}",
+        CONFIG.db.username, CONFIG.db.password, CONFIG.db.server, CONFIG.db.port, CONFIG.db.name
     );
+    let pw_hidden_url = format!(
+        "postgres://{}:{}@{}:{}/{}",
+        CONFIG.db.username, "<hidden>", CONFIG.db.server, CONFIG.db.port, CONFIG.db.name
+    );
+    info!("Connecting to: {:?}", pw_hidden_url);
 
-    // Use to cloudflare resolver to work around a mongodb dns resolver issue.
-    // For more Infos: https://github.com/mongodb/mongo-rust-driver#windows-dns-note
-    let mut client_options =
-        ClientOptions::parse_with_resolver_config(&url, ResolverConfig::cloudflare()).await?;
-
-    client_options.app_name = Some(CONFIG.db.app_name.clone());
-    Ok(Client::with_options(client_options)?)
+    Ok(Database::new(PgPool::connect(&url).await?).await)
 }
 
 fn setup_log() {
-    if CONFIG.debug {
-        std::env::set_var("RUST_LOG", "actix_web=debug");
-        println!("Running in DEBUG MODE...");
-    } else {
-        std::env::set_var("RUST_LOG", "actix_web=error");
-    }
+    let value = format!("{},actix_web={}", CONFIG.log_level, CONFIG.log_level);
+    std::env::set_var("RUST_LOG", &value);
+    debug!("Running in DEBUG mode");
 
     env_logger::init();
 }
@@ -72,12 +72,6 @@ fn setup_tls() -> ServerConfig {
 
 fn check_folders() -> Result<(), ZoriusError> {
     use std::path::Path;
-    /*
-        if !Path::new("static").exists() {
-            panic!("missing frondend files folder");
-        }
-    */
-
     if !Path::new("files").exists() {
         std::fs::create_dir("files")?;
     }
@@ -89,61 +83,52 @@ async fn main() -> Result<(), errors::ZoriusError> {
     setup_log();
     check_folders()?;
 
-    let client = setup_mongodb().await?;
-    let role_cache = RoleCache::new();
-    let db = client.database(&CONFIG.db.name);
-    let database = Database::new(client, db.clone());
+    let mut db_connect_trys: i32 = 1;
+    let database = loop {
+        match setup_pg().await {
+            Ok(r) => break r,
+            Err(e) => {
+                error!(
+                    "Failed to connect to postgres database (Try: {}).\n{}",
+                    db_connect_trys, e
+                );
+                db_connect_trys += 1;
+                sleep(Duration::from_secs(10)).await;
+                continue;
+            }
+        }
+    };
+    info!("Successfully connected to database");
 
     let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
         .data(database)
-        .data(db)
-        .data(role_cache)
         .data(Storage::default())
         .finish();
 
     // Start http server
     let webserver_url = format!("{}:{}", CONFIG.web.ip, CONFIG.web.port);
     let log_format = CONFIG.web.log_format.clone();
-    let store = MemoryStore::new();
+
     let http_server = HttpServer::new(move || {
         App::new()
-            .data(schema.clone())
-            .wrap(Cors::permissive())
+            .app_data(schema.clone())
+            .wrap(
+                Cors::default()
+                    .allow_any_header()
+                    .allowed_methods(&[Method::GET, Method::POST, Method::OPTIONS])
+                    .allowed_origin("localhost")
+                    .allowed_origin(&CONFIG.domain),
+            )
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
-            .wrap(Compress::new(ContentEncoding::Auto))
-            .wrap(
-                RateLimiter::new(MemoryStoreActor::from(store.clone()).start())
-                    .with_interval(Duration::from_secs(60))
-                    .with_identifier(|req| {
-                        if let Some(key) = req.headers().get("x-request-id") {
-                            let key = key.to_str().unwrap();
-                            Ok(key.to_string())
-                        } else {
-                            Ok(String::new())
-                        }
-                    })
-                    .with_max_requests(500),
-            )
-            // graphql api
             .service(graphql)
-            .service(gql_playgound)
-            // static file serving
-            .service(
-                Files::new("/", "static")
-                    .prefer_utf8(true)
-                    .index_file("index.html"),
-            )
-            .service(
-                Files::new("/files", "./files")
-                    .prefer_utf8(true)
-                    .show_files_listing(),
-            )
+            .service(playground)
     });
 
     let res = if CONFIG.web.enable_ssl {
         let tls_config = setup_tls();
 
+        info!("Starting webserver...");
         http_server
             .bind_rustls(webserver_url, tls_config)?
             .run()

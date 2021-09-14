@@ -1,69 +1,123 @@
-use async_graphql::{InputObject, SimpleObject};
-use bson::oid::ObjectId;
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
+use sqlx::{query, query_as, PgPool};
+use uuid::Uuid;
 
-use crate::models::{
-    project::{Project, ProjectId},
-    user::{User, UserId},
-};
+use crate::view::customer::NewCustomer;
 
-pub type CustomerId = ObjectId;
+pub type CustomerId = Uuid;
 
-#[derive(Serialize, Deserialize, Debug, Clone, SimpleObject)]
-pub struct DBCustomer {
-    #[serde(rename = "_id")]
-    id: CustomerId,
-    creator_id: UserId,
-    name: String,
-    identifier: String,
-    note: Option<String>,
-    project_ids: Vec<ProjectId>,
-}
-
-impl DBCustomer {
-    pub fn new(new: NewCustomer, creator_id: UserId) -> Self {
-        Self {
-            id: CustomerId::new(),
-            creator_id,
-            name: new.name,
-            identifier: new.identifier,
-            note: new.note,
-            project_ids: new.project_ids,
-        }
-    }
-
-    pub fn get_id(&self) -> &CustomerId {
-        &self.id
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, SimpleObject)]
+#[derive(Debug, Clone)]
 pub struct Customer {
-    #[serde(rename = "_id")]
-    id: CustomerId,
-    creator: User,
-    name: String,
-    identifier: String,
-    note: Option<String>,
-    projects: Vec<Project>,
-}
-
-#[derive(Serialize, Debug, Clone, InputObject)]
-pub struct NewCustomer {
+    pub id: CustomerId,
     pub name: String,
     pub identifier: String,
     pub note: Option<String>,
-    pub project_ids: Vec<ProjectId>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Serialize, InputObject)]
-pub struct UpdateCustomer {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    creator: Option<UserId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    identifier: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    note: Option<String>,
+impl Customer {
+    pub async fn new(pool: &PgPool, new_customer: NewCustomer) -> Result<Self, sqlx::Error> {
+        let res = query_as!(
+            Customer,
+            r#"INSERT INTO customers (
+                name,
+                identifier,
+                note
+            )
+            VALUES ($1,$2,$3)
+            RETURNING *;"#,
+            new_customer.name,
+            new_customer.identifier,
+            new_customer.note,
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(res)
+    }
+
+    pub async fn get_customer_by_id(
+        pool: &PgPool,
+        id: CustomerId,
+    ) -> Result<Customer, sqlx::Error> {
+        Ok(query_as!(
+            Customer,
+            r#"SELECT *
+            FROM customers c
+            WHERE c.id = $1;"#,
+            id
+        )
+        .fetch_one(pool)
+        .await?)
+    }
+
+    pub async fn count_customers(pool: &PgPool) -> Result<i64, sqlx::Error> {
+        Ok(query!(
+            r#"SELECT COUNT(id) 
+            FROM customers;"#
+        )
+        .fetch_one(pool)
+        .await?
+        .count
+        .unwrap_or(0))
+    }
+
+    pub async fn list_customer(
+        pool: &PgPool,
+        start: i64,
+        limit: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        Ok(query_as!(
+            Customer,
+            r#"SELECT *
+            FROM customers
+            ORDER BY created_at ASC
+            LIMIT $1
+            OFFSET $2;"#,
+            limit,
+            start,
+        )
+        .fetch_all(pool)
+        .await?)
+    }
+
+    // pub async fn update_customer(
+    //     pool: &PgPool,
+    //     id: CustomerId,
+    //     update: UpdateCustomer,
+    // ) -> Result<CustomerView, sqlx::Error> {
+    //     Ok(query_as!(
+    //         CustomerView,
+    //         r#"WITH updated as (
+    //                 UPDATE customers
+    //                 SET name = $2,
+    //                     identifier = $3,
+    //                     note = $4
+    //                 WHERE id = $1
+    //                 RETURNING *
+    //             )
+    //             SELECT updated.*, projects.*
+    //             FROM updated, projects
+    //             WHERE updated.id = projects.customer_id;"#,
+    //         id,
+    //         update.name,
+    //         update.identifier,
+    //         update.note.unwrap_or(None)
+    //     )
+    //     .fetch_one(pool)
+    //     .await?)
+    // }
+
+    pub async fn delete_customer(pool: &PgPool, id: CustomerId) -> Result<Self, sqlx::Error> {
+        Ok(query_as!(
+            Customer,
+            r#"DELETE
+            FROM customers
+            WHERE id = $1
+            RETURNING *;"#,
+            id
+        )
+        .fetch_one(pool)
+        .await?)
+    }
 }

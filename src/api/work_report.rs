@@ -3,11 +3,10 @@ use async_graphql::{
     guard::Guard,
     Context, Object, Result,
 };
-use bson::from_document;
 use futures::StreamExt;
 
 use crate::{
-    api::{claim::Claim, database2},
+    api::{claim::Claim, database},
     models::{
         roles::{Role, RoleGuard},
         work_report::{NewWorkReport, WorkReport, WorkReportId, WorkReportUpdate},
@@ -27,7 +26,7 @@ impl WorkReportQuery {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
-        Ok(database2(ctx)?
+        Ok(database(ctx)?
             .get_work_report_by_id(id, user_id.clone())
             .await?)
     }
@@ -42,7 +41,7 @@ impl WorkReportQuery {
     ) -> Result<Connection<usize, WorkReport, EmptyFields, EmptyFields>> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
-        let doc_count = database2(ctx)?.count_work_reports().await?;
+        let doc_count = database(ctx)?.count_work_reports().await?;
 
         query(
             after,
@@ -61,7 +60,7 @@ impl WorkReportQuery {
                 }
                 let limit = (end - start) as i64;
 
-                let cursor = database2(ctx)?
+                let cursor = database(ctx)?
                     .list_work_report(user_id.clone(), start as i64, limit)
                     .await?;
 
@@ -88,9 +87,7 @@ impl WorkReportMutation {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
 
-        Ok(database2(ctx)?
-            .new_work_report(user_id.clone(), new)
-            .await?)
+        Ok(database(ctx)?.new_work_report(user_id.clone(), new).await?)
     }
 
     async fn update_work_report(
@@ -101,10 +98,10 @@ impl WorkReportMutation {
     ) -> Result<WorkReport> {
         let claim = Claim::from_ctx(ctx)?;
         let user_id = claim.user_id();
-        let _ = database2(ctx)?
+        let _ = database(ctx)?
             .update_work_report(id.clone(), user_id.clone(), update)
             .await?;
-        Ok(database2(ctx)?
+        Ok(database(ctx)?
             .get_work_report_by_id(id, user_id.clone())
             .await?)
     }
@@ -118,7 +115,7 @@ impl WorkReportMutation {
         // TODO: check if other collections or documents still have a object refercnce to this project
         // if not we can safely remove the project
         // if there are still refercnces return an error
-        let _ = database2(ctx)?.delete_work_report(id).await?;
+        let _ = database(ctx)?.delete_work_report(id).await?;
 
         Ok(true)
     }

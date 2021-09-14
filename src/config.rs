@@ -24,6 +24,16 @@ pub struct Settings {
     pub token_lifetime: i64,
     pub registration_enabled: bool,
     pub mailer: MailConfig,
+    pub log_level: String,
+    pub admin_user: AdminUser,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminUser {
+    pub email: String,
+    pub password: String,
+    pub firstname: String,
+    pub lastname: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,6 +53,7 @@ pub struct DbServerConfig {
     pub password: String,
     pub app_name: String,
     pub name: String,
+    pub port: u16,
 }
 
 #[derive(Debug, Deserialize)]
@@ -51,7 +62,7 @@ pub struct MailConfig {
     pub smtp_address: String,
     pub smtp_username: String,
     pub smtp_password: String,
-    pub email_send_to: String,
+    pub merchandise_email_send_to: String,
 }
 
 impl Settings {

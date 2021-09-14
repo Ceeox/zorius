@@ -1,103 +1,369 @@
-use std::fmt::Display;
+use std::str::FromStr;
 
-use askama::Template;
-use async_graphql::{validators::IntGreaterThan, Enum, InputObject, SimpleObject};
-use bson::{oid::ObjectId, DateTime};
-use chrono::Utc;
+use async_graphql::Enum;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::{
+    postgres::PgArgumentBuffer, query, query_as, types::Decimal, Decode, Encode, FromRow, PgPool,
+    Postgres, Type,
+};
+use uuid::Uuid;
 
 use crate::{
-    helper::validators::Url,
-    mailer::mailer,
-    models::user::{User, UserId},
+    models::users::{Test, User, UserId},
+    view::intern_merchandise::{IncomingInternMerchandise, NewInternMerchandise},
 };
 
-pub type InternMerchandiseId = ObjectId;
+pub type InternMerchandiseId = Uuid;
 
-#[derive(InputObject, Deserialize, Serialize)]
-pub struct NewInternMerchandise {
-    pub merchandise_name: String,
-    #[graphql(validator(IntGreaterThan(value = "0")))]
-    pub count: i32,
-    #[graphql(validator(Url))]
-    pub url: Option<String>,
-    pub orderer_id: UserId,
-    pub article_number: Option<String>,
-    pub cost: f64,
-    pub postage: Option<f64>,
-    pub use_case: Option<String>,
-    pub project_leader_id: UserId,
-    pub location: Option<String>,
-    pub shop: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, SimpleObject, Clone)]
-pub struct DBInternMerchandise {
-    #[serde(rename = "_id")]
-    pub id: InternMerchandiseId,
-    pub merchandise_id: Option<i32>,
-    pub orderer_id: UserId,
-    pub project_leader_id: Option<UserId>,
-    pub purchased_on: DateTime,
-    pub count: i32,
-    pub cost: f64,
-    pub status: InternMerchandiseStatus,
-    pub merchandise_name: String,
-    pub use_case: Option<String>,
-    pub location: Option<String>,
-    pub article_number: Option<String>,
-    pub shop: Option<String>,
-    pub serial_number: Option<Vec<String>>,
-    pub arived_on: Option<DateTime>,
-    pub url: Option<String>,
-    pub postage: Option<f64>,
-    pub invoice_number: Option<i32>,
-    pub created_date: DateTime,
-    pub updated_date: DateTime,
-}
-
-#[derive(Deserialize, Debug, SimpleObject, Clone)]
+#[derive(Debug, Clone, FromRow)]
 pub struct InternMerchandise {
-    #[serde(rename = "_id")]
     pub id: InternMerchandiseId,
-    pub merchandise_id: Option<i32>,
-    pub orderer: User,
-    pub project_leader: Option<User>,
-    pub purchased_on: DateTime,
-    pub count: i32,
+    pub merchandise_id: Option<i64>,
+    pub orderer_id: UserId,
+    pub project_leader_id: UserId,
+    pub purchased_on: DateTime<Utc>,
+    pub count: i64,
+    pub cost: Decimal,
+    pub status: InternMerchandiseStatus,
     pub merchandise_name: String,
     pub use_case: Option<String>,
     pub location: Option<String>,
-    pub article_number: Option<String>,
-    pub shop: Option<String>,
-    pub cost: f64,
-    pub serial_number: Option<Vec<String>>,
-    pub arived_on: Option<DateTime>,
-    pub status: InternMerchandiseStatus,
+    pub article_number: String,
+    pub shop: String,
+    pub serial_number: Option<String>,
+    pub arrived_on: Option<DateTime<Utc>>,
     pub url: Option<String>,
-    pub postage: Option<f64>,
-    pub invoice_number: Option<i32>,
-    pub created_date: DateTime,
-    pub updated_date: DateTime,
+    pub postage: Option<Decimal>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Enum)]
+impl InternMerchandise {
+    pub async fn new(
+        pool: &PgPool,
+        orderer_id: UserId,
+        new_intern_merch: NewInternMerchandise,
+    ) -> Result<InternMerchandise, sqlx::Error> {
+        let res = query_as!(
+            InternMerchandise,
+            r#"INSERT INTO intern_merchandises (
+                merchandise_id,
+                orderer_id,
+                project_leader_id,
+                purchased_on,
+                count,
+                cost,
+                status,
+                merchandise_name,
+                use_case,
+                location,
+                article_number,
+                shop,
+                serial_number,
+                url,
+                postage
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+            RETURNING
+                id,
+                merchandise_id,
+                orderer_id,
+                project_leader_id,
+                purchased_on,
+                count,
+                cost,
+                status as "status:_",
+                merchandise_name,
+                use_case,
+                location,
+                article_number,
+                shop,
+                serial_number,
+                arrived_on,
+                url,
+                postage,
+                created_at,
+                updated_at;"#,
+            None as Option<i64>,
+            orderer_id,
+            new_intern_merch.project_leader_id,
+            Utc::now().into(),
+            new_intern_merch.count,
+            Decimal::from_str(&new_intern_merch.cost.to_string()).unwrap_or(Decimal::default()),
+            InternMerchandiseStatus::Ordered as _,
+            new_intern_merch.merchandise_name,
+            new_intern_merch.use_case,
+            new_intern_merch.location,
+            new_intern_merch.article_number,
+            new_intern_merch.shop,
+            None as Option<String>,
+            new_intern_merch.url,
+            Decimal::from_str(&new_intern_merch.postage.to_string()).unwrap_or(Decimal::default())
+        )
+        .fetch_one(pool)
+        .await?;
+
+        Ok(res)
+    }
+
+    pub async fn get_intern_merch_by_id(
+        pool: &PgPool,
+        id: InternMerchandiseId,
+    ) -> Result<InternMerchandise, sqlx::Error> {
+        Ok(sqlx::query_as!(
+            InternMerchandise,
+            r#"SELECT 
+                id,
+                merchandise_id,
+                orderer_id,
+                project_leader_id,
+                purchased_on,
+                count,
+                cost,
+                status as "status: _",
+                merchandise_name,
+                use_case,
+                location,
+                article_number,
+                shop,
+                serial_number,
+                arrived_on,
+                url,
+                postage,
+                created_at,
+                updated_at
+            FROM intern_merchandises
+            WHERE id = $1
+            ORDER BY created_at DESC;"#,
+            id
+        )
+        .fetch_one(pool)
+        .await?)
+    }
+
+    pub async fn test(pool: &PgPool, id: InternMerchandiseId) -> Result<(), sqlx::Error> {
+        let res = sqlx::query_as!(
+            Test,
+            r#"SELECT
+                intern_merchandises.id,
+                merchandise_id,
+                purchased_on,
+                count,
+                cost,
+                status as "status: InternMerchandiseStatus",
+                merchandise_name,
+                use_case,
+                location,
+                article_number,
+                shop,
+                serial_number,
+                arrived_on,
+                url,
+                postage,
+                intern_merchandises.created_at,
+                intern_merchandises.updated_at,
+                (
+                    users.id,
+                    users.email,
+                    users.password_hash,
+                    users.invitation_pending,
+                    users.firstname,
+                    users.lastname,
+                    users.deleted,
+                    users.created_at,
+                    users.updated_at
+                ) AS "orderer: User",
+                (
+                    users.id,
+                    users.email,
+                    users.password_hash,
+                    users.invitation_pending,
+                    users.firstname,
+                    users.lastname,
+                    users.deleted,
+                    users.created_at,
+                    users.updated_at
+                ) AS "project_leader: User"
+            FROM intern_merchandises
+            INNER JOIN users
+                ON (intern_merchandises.orderer_id = users.id)
+                OR (intern_merchandises.project_leader_id = users.id)
+            WHERE intern_merchandises.id = $1;"#,
+            id
+        )
+        .fetch_one(pool)
+        .await;
+
+        println!("{:?}", res);
+        Ok(())
+    }
+
+    pub async fn list_intern_merch(
+        pool: &PgPool,
+        start: i64,
+        limit: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        Ok(query_as!(
+            InternMerchandise,
+            r#"SELECT
+                    id,
+                    merchandise_id,
+                    orderer_id,
+                    project_leader_id,
+                    purchased_on,
+                    count,
+                    cost,
+                    status as "status: _",
+                    merchandise_name,
+                    use_case,
+                    location,
+                    article_number,
+                    shop,
+                    serial_number,
+                    arrived_on,
+                    url,
+                    postage,
+                    created_at,
+                    updated_at
+                FROM intern_merchandises
+                ORDER BY created_at ASC
+                LIMIT $1
+                OFFSET $2;"#,
+            limit,
+            start
+        )
+        .fetch_all(pool)
+        .await?)
+    }
+
+    pub async fn count_intern_merch(pool: &PgPool) -> Result<i64, sqlx::Error> {
+        Ok(sqlx::query!(
+            r#"SELECT COUNT(id)
+            FROM intern_merchandises;"#
+        )
+        .fetch_one(pool)
+        .await?
+        .count
+        .unwrap_or_default())
+    }
+
+    pub async fn incoming_intern_merchandise(
+        pool: &PgPool,
+        update: IncomingInternMerchandise,
+    ) -> Result<InternMerchandise, sqlx::Error> {
+        Ok(query_as!(
+            Self,
+            r#"UPDATE intern_merchandises
+                SET 
+                    merchandise_id = $2,
+                    serial_number = $3,
+                    arrived_on = NOW()
+                WHERE id = $1
+                RETURNING
+                    id,
+                    merchandise_id,
+                    orderer_id,
+                    project_leader_id,
+                    purchased_on,
+                    count,
+                    cost,
+                    status as "status: _",
+                    merchandise_name,
+                    use_case,
+                    location,
+                    article_number,
+                    shop,
+                    serial_number,
+                    arrived_on,
+                    url,
+                    postage,
+                    created_at,
+                    updated_at;"#,
+            update.id,
+            update.merchandise_id,
+            update.serial_number,
+        )
+        .fetch_one(pool)
+        .await?)
+    }
+
+    pub async fn delete(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
+        query!(
+            r#"DELETE
+            FROM intern_merchandises
+            WHERE id = $1;"#,
+            self.id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+}
+
+impl<'r> Decode<'r, Postgres> for InternMerchandise {
+    fn decode(
+        value: <Postgres as sqlx::database::HasValueRef<'r>>::ValueRef,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
+        let mut decoder = sqlx::postgres::types::PgRecordDecoder::new(value)?;
+
+        Ok(InternMerchandise {
+            id: decoder.try_decode::<InternMerchandiseId>()?,
+            merchandise_id: decoder.try_decode::<Option<i64>>()?,
+            orderer_id: decoder.try_decode::<UserId>()?,
+            project_leader_id: decoder.try_decode::<UserId>()?,
+            purchased_on: decoder.try_decode::<DateTime<Utc>>()?,
+            count: decoder.try_decode::<i64>()?,
+            cost: decoder.try_decode::<Decimal>()?,
+            status: decoder.try_decode::<InternMerchandiseStatus>()?,
+            merchandise_name: decoder.try_decode::<String>()?,
+            use_case: decoder.try_decode::<Option<String>>()?,
+            location: decoder.try_decode::<Option<String>>()?,
+            article_number: decoder.try_decode::<String>()?,
+            shop: decoder.try_decode::<String>()?,
+            serial_number: decoder.try_decode::<Option<String>>()?,
+            arrived_on: decoder.try_decode::<Option<DateTime<Utc>>>()?,
+            url: decoder.try_decode::<Option<String>>()?,
+            postage: decoder.try_decode::<Option<Decimal>>()?,
+            created_at: decoder.try_decode::<DateTime<Utc>>()?,
+            updated_at: decoder.try_decode::<DateTime<Utc>>()?,
+        })
+    }
+}
+
+impl<'r> Encode<'r, Postgres> for InternMerchandise {
+    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> sqlx::encode::IsNull {
+        let mut encoder = sqlx::postgres::types::PgRecordEncoder::new(buf);
+
+        encoder.encode(self.id);
+        encoder.encode(self.merchandise_id);
+        encoder.encode(self.orderer_id);
+        encoder.encode(self.project_leader_id);
+        encoder.encode(self.purchased_on);
+        encoder.encode(self.count);
+        encoder.encode(self.cost);
+        encoder.encode(self.status);
+        encoder.encode(self.merchandise_name.clone());
+        encoder.encode(self.use_case.clone());
+        encoder.encode(self.location.clone());
+        encoder.encode(self.article_number.clone());
+        encoder.encode(self.shop.clone());
+        encoder.encode(self.serial_number.clone());
+        encoder.encode(self.arrived_on);
+        encoder.encode(self.url.clone());
+        encoder.encode(self.postage);
+        encoder.finish();
+        sqlx::encode::IsNull::No
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Type, Enum)]
+#[sqlx(type_name = "intern_merchandise_status", rename_all = "snake_case")]
 pub enum InternMerchandiseStatus {
     Ordered,
     Delivered,
     Stored,
     Used,
-}
-
-impl Display for InternMerchandiseStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InternMerchandiseStatus::Ordered => write!(f, "Ordered"),
-            InternMerchandiseStatus::Delivered => write!(f, "Delivered"),
-            InternMerchandiseStatus::Stored => write!(f, "Stored"),
-            InternMerchandiseStatus::Used => write!(f, "Used"),
-        }
-    }
 }
 
 impl Default for InternMerchandiseStatus {
@@ -106,108 +372,14 @@ impl Default for InternMerchandiseStatus {
     }
 }
 
-impl DBInternMerchandise {
-    pub fn new(new_intern_merchandise: NewInternMerchandise) -> Self {
-        Self {
-            id: ObjectId::new(),
-            merchandise_name: new_intern_merchandise.merchandise_name,
-            // bought_through: None,
-            count: new_intern_merchandise.count,
-            orderer_id: new_intern_merchandise.orderer_id,
-            purchased_on: Utc::now().into(),
-            cost: new_intern_merchandise.cost,
-            status: InternMerchandiseStatus::Ordered,
-            url: new_intern_merchandise.url,
-            use_case: new_intern_merchandise.use_case,
-            article_number: new_intern_merchandise.article_number,
-            postage: new_intern_merchandise.postage,
-            project_leader_id: Some(new_intern_merchandise.project_leader_id),
-            location: new_intern_merchandise.location,
-            shop: Some(new_intern_merchandise.shop),
-
-            merchandise_id: None,
-            serial_number: None,
-            arived_on: None,
-            invoice_number: None,
-            created_date: Utc::now().into(),
-            updated_date: Utc::now().into(),
-        }
-    }
-
-    pub fn change_status(&mut self, new_status: InternMerchandiseStatus, user: User) {
-        self.status = new_status;
-        self.updated_date = Utc::now().into();
-        let orderer_name = if user.firstname.is_some() && user.lastname.is_some() {
-            format!("{} {}", user.firstname.unwrap(), user.lastname.unwrap())
-        } else {
-            user.username
-        };
-        let template: StatusTemplate = StatusTemplate {
-            id: self.id.clone(),
-            merchandise_id: self.merchandise_id,
-            orderer_name,
-            count: self.count,
-            merchandise_name: self.merchandise_name.clone(),
-            cost: self.cost,
-            status: new_status,
-        };
-        let body = template.render().unwrap();
-
-        mailer(
-            &format!(
-                "Intern Merchandise Staus Change to {} for {}",
-                new_status.to_string(),
-                self.merchandise_name,
-            ),
-            &body,
-        );
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, InputObject, Default)]
-pub struct InternMerchandiseUpdate {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub merchandise_id: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub orderer: Option<UserId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub project_leader: Option<UserId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub purchased_on: Option<DateTime>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub count: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub merchandise_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub use_case: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub location: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub article_number: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shop: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cost: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub serial_number: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub arived_on: Option<DateTime>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub postage: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub invoice_number: Option<i32>,
-}
-
-#[derive(Template)]
-#[template(path = "intern_merch_used.html")]
-pub struct StatusTemplate {
-    pub(crate) id: InternMerchandiseId,
-    pub(crate) merchandise_id: Option<i32>,
-    pub(crate) orderer_name: String,
-    pub(crate) count: i32,
-    pub(crate) merchandise_name: String,
-    pub(crate) cost: f64,
-    pub(crate) status: InternMerchandiseStatus,
-}
+// #[derive(Template)]
+// #[template(path = "intern_merch_used.html")]
+// pub struct StatusTemplate {
+//     pub(crate) id: InternMerchandiseId,
+//     pub(crate) merchandise_id: Option<i32>,
+//     pub(crate) orderer_name: String,
+//     pub(crate) count: i32,
+//     pub(crate) merchandise_name: String,
+//     pub(crate) cost: String,
+//     pub(crate) status: InternMerchandiseStatus,
+// }

@@ -1,25 +1,22 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    guard::Guard,
     validators::{Email, StringMaxLength, StringMinLength},
     Context, Error, Object, Result, Upload,
 };
-use bson::from_document;
 use chrono::{Duration, Utc};
-use futures::StreamExt;
 
 use crate::{
     config::CONFIG,
-    helper::validators::Password,
     models::{
         auth::LoginResult,
-        roles::{Role, RoleGuard},
         upload::{FileInfo, Storage},
-        user::{NewUser, User, UserId, UserUpdate},
+        users::{User as DbUser, UserEmail, UserId},
     },
+    validators::Password,
+    view::users::{NewUser, User, UserUpdate},
 };
 
-use super::{claim::Claim, database2};
+use super::{claim::Claim, database};
 
 #[derive(Default)]
 pub struct UserQuery;
@@ -30,11 +27,15 @@ impl UserQuery {
         &self,
         ctx: &Context<'_>,
         #[graphql(validator(Email))] email: String,
-        #[graphql(validator(and(StringMinLength(length = "8"), StringMaxLength(length = "64"))))]
+        #[graphql(validator(and(
+            StringMinLength(length = "8"),
+            StringMaxLength(length = "255")
+        )))]
         password: String,
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
-        let user = database2(ctx)?.get_dbuser_by_email(email.clone()).await?;
+
+        let user = DbUser::user_by_email(database(&ctx)?.get_pool(), &email).await?;
 
         if !user.is_password_correct(&password) {
             return Err(err);
@@ -46,19 +47,24 @@ impl UserQuery {
         );
         let token = claim.to_string();
 
-        Ok(LoginResult {
-            token,
-            expires_at: claim.expires_at(),
-            user_id: user.get_id().to_owned(),
-        })
+        Ok(LoginResult { token })
     }
 
     async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(database2(ctx)?.get_user_by_id(id).await?)
+        Ok(User::from(
+            DbUser::user_by_id(database(&ctx)?.get_pool(), id).await?,
+        ))
     }
 
-    #[graphql(guard(RoleGuard(role = "Role::Admin")))]
+    async fn get_user_by_email(&self, ctx: &Context<'_>, email: UserEmail) -> Result<User> {
+        let _ = Claim::from_ctx(ctx)?;
+        Ok(User::from(
+            DbUser::user_by_email(database(&ctx)?.get_pool(), &email).await?,
+        ))
+    }
+
+    //#[graphql(guard(RoleGuard(role = "Role::Admin")))]
     async fn list_users(
         &self,
         ctx: &Context<'_>,
@@ -68,7 +74,7 @@ impl UserQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, User, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let doc_count = database2(ctx)?.count_users().await?;
+        let count = DbUser::count_users(database(&ctx)?.get_pool()).await? as usize;
 
         query(
             after,
@@ -76,26 +82,33 @@ impl UserQuery {
             first,
             last,
             |after, before, first, last| async move {
-                let mut start = after.map(|after| after + 1).unwrap_or(0);
-                let mut end = before.unwrap_or(doc_count);
+                let mut start = after
+                    .map(|after: usize| after.saturating_add(1))
+                    .unwrap_or(0);
+                let mut end = before.unwrap_or(count);
 
                 if let Some(first) = first {
-                    end = (start + first).min(end);
+                    end = (start.saturating_add(first)).min(end);
                 }
                 if let Some(last) = last {
-                    start = if last > end - start { end } else { end - last };
+                    start = if last > end.saturating_sub(start) {
+                        end
+                    } else {
+                        end.saturating_sub(last)
+                    };
                 }
-                let limit = (end - start) as i64;
+                let limit = (end.saturating_sub(start)) as i64;
 
-                let cursor = database2(ctx)?.list_users(start as i64, limit).await?;
+                let users =
+                    DbUser::list_users(database(&ctx)?.get_pool(), start as i64, limit).await?;
 
-                let mut connection = Connection::new(start > 0, end < doc_count);
-                connection
-                    .append_stream(cursor.enumerate().map(|(n, doc)| {
-                        let merch = from_document::<User>(doc.unwrap()).unwrap();
-                        Edge::with_additional_fields(n + start, merch, EmptyFields)
-                    }))
-                    .await;
+                let mut connection = Connection::new(start > 0, end < count);
+                connection.append(
+                    users
+                        .into_iter()
+                        .enumerate()
+                        .map(|(n, db_user)| Edge::new(n + start, User::from(db_user))),
+                );
                 Ok(connection)
             },
         )
@@ -109,35 +122,43 @@ pub struct UserMutation;
 #[Object]
 impl UserMutation {
     async fn register(&self, ctx: &Context<'_>, new_user: NewUser) -> Result<User> {
+        let pool = database(&ctx)?.get_pool();
+
         if !CONFIG.registration_enabled {
             return Err(Error::new("registration is not enabled"));
         }
-        Ok(database2(ctx)?.new_user(new_user).await?)
+
+        if DbUser::user_by_email(pool, &new_user.email).await.is_ok() {
+            return Err(Error::new("email already registerd"));
+        }
+
+        Ok(DbUser::new(database(&ctx)?.get_pool(), new_user)
+            .await?
+            .into())
     }
 
     async fn reset_password(
         &self,
         ctx: &Context<'_>,
-        #[graphql(validator(StringMaxLength(length = "64")))] old_password: String,
+        #[graphql(validator(Password))] old_password: String,
         #[graphql(validator(Password))] new_password: String,
     ) -> Result<bool> {
         let auth_info = Claim::from_ctx(ctx)?;
         let user_id = auth_info.user_id();
 
-        let mut user = database2(ctx)?.get_dbuser_by_id(user_id.clone()).await?;
+        let user = DbUser::user_by_id(database(&ctx)?.get_pool(), user_id.clone()).await?;
 
         if !user.is_password_correct(&old_password) {
-            return Err(Error::new("old password is wrong!".to_owned()));
+            return Err(Error::new("old password is wrong".to_owned()));
         } else {
-            user.change_password(&new_password);
+            user.reset_password(database(&ctx)?.get_pool(), &new_password)
+                .await?;
         }
-
-        let _ = database2(ctx)?.reset_password(user.get_id().clone(), user.get_password_hash());
 
         Ok(true)
     }
 
-    #[graphql(guard(RoleGuard(role = "Role::Admin")))]
+    //#[graphql(guard(RoleGuard(role = "Role::Admin")))]
     async fn update_user(
         &self,
         ctx: &Context<'_>,
@@ -145,7 +166,11 @@ impl UserMutation {
         user_update: UserUpdate,
     ) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(database2(ctx)?.update_user(user_id, user_update).await?)
+        Ok(
+            DbUser::update_user(database(&ctx)?.get_pool(), user_id, user_update)
+                .await?
+                .into(),
+        )
     }
 
     async fn upload_avatar(&self, ctx: &Context<'_>, files: Vec<Upload>) -> Result<Vec<FileInfo>> {
