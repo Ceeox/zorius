@@ -111,7 +111,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
 
     let http_server = HttpServer::new(move || {
         App::new()
-            .app_data(schema.clone())
+            .data(schema.clone())
             .wrap(
                 Cors::default()
                     .allow_any_header()
@@ -122,6 +122,7 @@ async fn main() -> Result<(), errors::ZoriusError> {
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))
             .service(graphql)
+            .app_data(schema.clone())
             .service(playground)
     });
 

@@ -2,11 +2,12 @@ use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
     Context, Object, Result,
 };
+use futures::{stream, StreamExt};
 
 use crate::{
-    api::{claim::Claim, database},
+    api::{calc_list_params, claim::Claim, database},
     models::{
-        customer::{Customer as DbCustomer, CustomerId},
+        customer::{self, Customer as DbCustomer, CustomerId},
         project::Project as DbProject,
     },
     view::customer::{Customer, NewCustomer, UpdateCustomer},
@@ -21,7 +22,11 @@ impl CustomerQuery {
         let _ = Claim::from_ctx(ctx)?;
         let pool = database(&ctx)?.get_pool();
         let customer = DbCustomer::get_customer_by_id(pool, id).await?;
-        let mut projects = Some(DbProject::get_projects_for_customer_id(pool, id).await?);
+        let mut projects = DbProject::get_projects_for_customer_id(pool, id)
+            .await?
+            .into_iter()
+            .map(|project| project.into())
+            .collect();
         let mut res: Customer = customer.into();
         std::mem::swap(&mut res.projects, &mut projects);
 
@@ -46,32 +51,33 @@ impl CustomerQuery {
             first,
             last,
             |after, before, first, last| async move {
-                let mut start = after
-                    .map(|after: usize| after.saturating_add(1))
-                    .unwrap_or(0);
-                let mut end = before.unwrap_or(count);
+                let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                if let Some(first) = first {
-                    end = (start.saturating_add(first)).min(end);
-                }
-                if let Some(last) = last {
-                    start = if last > end.saturating_sub(start) {
-                        end
-                    } else {
-                        end.saturating_sub(last)
-                    };
-                }
-                let limit = (end.saturating_sub(start)) as i64;
-
-                let customers = DbCustomer::list_customer(pool, start as i64, limit).await?;
+                let customers = DbCustomer::list_customer(pool, start as i64, limit as i64).await?;
+                let customers: Vec<Customer> = stream::iter(customers)
+                    .filter_map(|db_customer| async move {
+                        let mut projects =
+                            match DbProject::get_projects_for_customer_id(pool, db_customer.id)
+                                .await
+                            {
+                                Ok(r) => r.into_iter().map(|project| project.into()).collect(),
+                                Err(_) => return None,
+                            };
+                        let mut customer: Customer = db_customer.into();
+                        std::mem::swap(&mut customer.projects, &mut projects);
+                        Some(customer)
+                    })
+                    .collect()
+                    .await;
 
                 let mut connection = Connection::new(start > 0, end < count);
-                connection.append(
-                    customers
-                        .into_iter()
-                        .enumerate()
-                        .map(|(n, db_customer)| Edge::new(n + start, Customer::from(db_customer))),
-                );
+                connection
+                    .append_stream(
+                        stream::iter(customers)
+                            .enumerate()
+                            .map(|(n, customer)| Edge::new(n + start, customer)),
+                    )
+                    .await;
                 Ok(connection)
             },
         )

@@ -6,6 +6,7 @@ use async_graphql::{
 use chrono::{Duration, Utc};
 
 use crate::{
+    api::{calc_list_params, claim::Claim, database},
     config::CONFIG,
     models::{
         auth::LoginResult,
@@ -15,8 +16,6 @@ use crate::{
     validators::Password,
     view::users::{NewUser, User, UserUpdate},
 };
-
-use super::{claim::Claim, database};
 
 #[derive(Default)]
 pub struct UserQuery;
@@ -82,25 +81,11 @@ impl UserQuery {
             first,
             last,
             |after, before, first, last| async move {
-                let mut start = after
-                    .map(|after: usize| after.saturating_add(1))
-                    .unwrap_or(0);
-                let mut end = before.unwrap_or(count);
-
-                if let Some(first) = first {
-                    end = (start.saturating_add(first)).min(end);
-                }
-                if let Some(last) = last {
-                    start = if last > end.saturating_sub(start) {
-                        end
-                    } else {
-                        end.saturating_sub(last)
-                    };
-                }
-                let limit = (end.saturating_sub(start)) as i64;
+                let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
                 let users =
-                    DbUser::list_users(database(&ctx)?.get_pool(), start as i64, limit).await?;
+                    DbUser::list_users(database(&ctx)?.get_pool(), start as i64, limit as i64)
+                        .await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection.append(
@@ -149,7 +134,7 @@ impl UserMutation {
         let user = DbUser::user_by_id(database(&ctx)?.get_pool(), user_id.clone()).await?;
 
         if !user.is_password_correct(&old_password) {
-            return Err(Error::new("old password is wrong".to_owned()));
+            return Err(Error::new("old password is incorrect".to_owned()));
         } else {
             user.reset_password(database(&ctx)?.get_pool(), &new_password)
                 .await?;
