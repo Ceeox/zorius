@@ -18,22 +18,9 @@ rust-latest:
     - rustup component add rustfmt
     - rustup component add clippy
   script:
-    - cargo fmt -- --check
-    - cargo clippy --all-features -- -D warnings
-    - cargo test --all-features --verbose
-
-rust-nightly:
-  stage: build
-  image: rustlang/rust:nightly
-  cache:
-    key: $CI_JOB_NAME
-    paths:
-      - .cargo
-      - target
-  script: &do
-    - cargo build --all-features --verbose
-    - cargo test --all-features --verbose
-  allow_failure: true
+    - cargo build --color always
+    - cargo fmt -- --check --color always
+    - cargo test --all-features --color always
 
 rust-binary:
   stage: deploy
@@ -44,7 +31,7 @@ rust-binary:
       - .cargo
       - target
   script:
-    - cargo build --release --locked --verbose
+    - cargo build --release --locked --color always
   rules:
     - exists:
         - src/main.rs
@@ -81,29 +68,6 @@ docker:
     - docker pull $CI_REGISTRY_IMAGE:latest || true
     - docker build --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:latest .
     - docker push $CI_REGISTRY_IMAGE:latest
-
-.rust-coverage:
-  stage: build
-  image: rust:latest
-  cache:
-    key: $CI_JOB_NAME
-    paths:
-      - .cargo
-      - target
-  before_script:
-    - cargo install cargo-tarpaulin
-  script:
-    - cargo tarpaulin --all-features --out=Xml --out=Html --output-dir=coverage
-  after_script:
-    - mv coverage/tarpaulin-report.html coverage/index.html
-    - mkdir -p public
-    - mv coverage/ public/coverage/
-  artifacts:
-    paths:
-      - public/
-    reports:
-      cobertura: public/coverage/cobertura.xml
-  coverage: '/(\d+\.\d+)% coverage/'
 
 .pages:
   stage: deploy
