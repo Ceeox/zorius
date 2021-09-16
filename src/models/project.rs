@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::{
     postgres::{PgArgumentBuffer, PgValueRef},
-    query, query_as, Decode, Encode, PgPool, Postgres,
+    query, query_as, Decode, Encode, FromRow, PgPool, Postgres,
 };
 use uuid::Uuid;
 
@@ -11,7 +11,7 @@ use super::customer::CustomerId;
 
 pub type ProjectId = Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromRow)]
 pub struct Project {
     pub id: ProjectId,
     pub customer_id: CustomerId,
@@ -66,9 +66,9 @@ impl Project {
     pub async fn get_projects_for_customer_id(
         pool: &PgPool,
         id: CustomerId,
-    ) -> Result<Vec<ProjectView>, sqlx::Error> {
+    ) -> Result<Vec<Self>, sqlx::Error> {
         Ok(query_as!(
-            ProjectView,
+            Project,
             r#"SELECT *
             FROM projects
             WHERE customer_id = $1;"#,

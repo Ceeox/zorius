@@ -4,7 +4,7 @@ use async_graphql::{
 };
 
 use crate::{
-    api::{claim::Claim, database},
+    api::{calc_list_params, claim::Claim, database},
     models::intern_merchandise::{InternMerchandise as DBInternMerchandise, InternMerchandiseId},
     view::intern_merchandise::{
         IncomingInternMerchandise, InternMerchandise, NewInternMerchandise,
@@ -22,24 +22,11 @@ impl InternMerchandiseQuery {
         id: InternMerchandiseId,
     ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
-        let _ = DBInternMerchandise::test(&database(ctx)?.get_pool(), id).await;
-        Ok(
-            DBInternMerchandise::get_intern_merch_by_id(&database(ctx)?.get_pool(), id)
-                .await?
-                .into(),
-        )
+        let pool = &database(ctx)?.get_pool();
+        Ok(DBInternMerchandise::get_intern_merch_by_id(pool, id)
+            .await?
+            .into())
     }
-
-    // async fn get_intern_merch_by_merch_id(
-    //     &self,
-    //     ctx: &Context<'_>,
-    //     merchandise_id: i32,
-    // ) -> Result<InternMerchandise> {
-    //     let _ = Claim::from_ctx(ctx)?;
-    //     Ok(database(ctx)?
-    //         .get_intern_merch_by_merch_id(merchandise_id)
-    //         .await?)
-    // }
 
     async fn list_intern_merch(
         &self,
@@ -59,30 +46,19 @@ impl InternMerchandiseQuery {
             first,
             last,
             |after, before, first, last| async move {
-                let mut start = after
-                    .map(|after: usize| after.saturating_add(1))
-                    .unwrap_or(0);
-                let mut end = before.unwrap_or(count);
+                let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                if let Some(first) = first {
-                    end = (start.saturating_add(first)).min(end);
-                }
-                if let Some(last) = last {
-                    start = if last > end.saturating_sub(start) {
-                        end
-                    } else {
-                        end.saturating_sub(last)
-                    };
-                }
-                let limit = (end.saturating_sub(start)) as i64;
-
-                let cursor =
-                    DBInternMerchandise::list_intern_merch(pool, start as i64, limit).await?;
+                let merchs =
+                    DBInternMerchandise::list_intern_merch(pool, start as i64, limit as i64)
+                        .await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
-                connection.append(cursor.into_iter().enumerate().map(|(n, merch)| {
-                    Edge::with_additional_fields(n + start, merch.into(), EmptyFields)
-                }));
+                connection.append(
+                    merchs
+                        .into_iter()
+                        .enumerate()
+                        .map(|(n, merch)| Edge::new(n + start, merch.into())),
+                );
                 Ok(connection)
             },
         )

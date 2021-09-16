@@ -8,7 +8,7 @@ use async_graphql_actix_web::{Request, Response};
 pub mod claim;
 pub mod customer;
 pub mod intern_merchandise;
-//pub mod project;
+pub mod project;
 //pub mod role;
 pub mod user;
 //pub mod work_report;
@@ -18,7 +18,7 @@ use crate::{
         claim::Token,
         customer::{CustomerMutation, CustomerQuery},
         intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
-        // project::{ProjectMutation, ProjectQuery},
+        project::{ProjectMutation, ProjectQuery},
         // role::{RoleMutation, RoleQuery},
         user::{UserMutation, UserQuery},
         // work_report::{WorkReportMutation, WorkReportQuery},
@@ -35,7 +35,7 @@ pub struct Query(
     UserQuery,
     // RoleQuery,
     CustomerQuery,
-    // ProjectQuery,
+    ProjectQuery,
     // WorkReportQuery,
     InternMerchandiseQuery,
 );
@@ -45,7 +45,7 @@ pub struct Mutation(
     UserMutation,
     // RoleMutation,
     CustomerMutation,
-    // ProjectMutation,
+    ProjectMutation,
     // WorkReportMutation,
     InternMerchandiseMutation,
 );
@@ -93,4 +93,31 @@ pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a crate::database::Databas
         Err(_e) => Err(Error::new("missing Database in Context!")),
         Ok(r) => Ok(r),
     }
+}
+
+pub fn calc_list_params(
+    count: usize,
+    after: Option<usize>,
+    before: Option<usize>,
+    first: Option<usize>,
+    last: Option<usize>,
+) -> (usize, usize, usize) {
+    let mut start: usize = after
+        .map(|after: usize| after.saturating_add(1))
+        .unwrap_or(0);
+    let mut end: usize = before.unwrap_or(count);
+
+    if let Some(first) = first {
+        end = (start.saturating_add(first)).min(end);
+    }
+    if let Some(last) = last {
+        start = if last > end.saturating_sub(start) {
+            end
+        } else {
+            end.saturating_sub(last)
+        };
+    }
+    let limit = end.saturating_sub(start);
+
+    (start, end, limit)
 }

@@ -7,7 +7,7 @@ use crate::{
         customer::{Customer as DbCustomer, CustomerId},
         project::ProjectId,
     },
-    view::project::Project as ProjectView,
+    view::project::Project,
 };
 
 #[derive(Serialize, Debug, Clone, SimpleObject)]
@@ -16,7 +16,7 @@ pub struct Customer {
     pub name: String,
     pub identifier: String,
     pub note: Option<String>,
-    pub projects: Option<Vec<ProjectView>>,
+    pub projects: Vec<Project>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -28,7 +28,7 @@ impl From<DbCustomer> for Customer {
             name: db.name,
             identifier: db.identifier,
             note: db.note,
-            projects: None,
+            projects: vec![],
             created_at: db.created_at,
             updated_at: db.updated_at,
         }
@@ -40,7 +40,7 @@ pub struct NewCustomer {
     pub name: String,
     pub identifier: String,
     pub note: Option<String>,
-    pub project_ids: Vec<ProjectId>,
+    pub project_ids: Option<Vec<ProjectId>>,
 }
 
 #[derive(Serialize, InputObject)]

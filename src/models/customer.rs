@@ -1,8 +1,11 @@
 use chrono::{DateTime, Utc};
-use sqlx::{query, query_as, PgPool};
+use sqlx::{query, query_as, FromRow, PgPool};
 use uuid::Uuid;
 
-use crate::view::customer::NewCustomer;
+use crate::{
+    models::project::Project,
+    view::customer::{Customer as CustomerView, NewCustomer},
+};
 
 pub type CustomerId = Uuid;
 
@@ -36,19 +39,17 @@ impl Customer {
         Ok(res)
     }
 
-    pub async fn get_customer_by_id(
-        pool: &PgPool,
-        id: CustomerId,
-    ) -> Result<Customer, sqlx::Error> {
-        Ok(query_as!(
+    pub async fn get_customer_by_id(pool: &PgPool, id: CustomerId) -> Result<Self, sqlx::Error> {
+        let res = query_as!(
             Customer,
-            r#"SELECT *
-            FROM customers c
-            WHERE c.id = $1;"#,
+            "SELECT *
+            FROM customers
+            WHERE id = $1",
             id
         )
         .fetch_one(pool)
-        .await?)
+        .await?;
+        Ok(res)
     }
 
     pub async fn count_customers(pool: &PgPool) -> Result<i64, sqlx::Error> {
