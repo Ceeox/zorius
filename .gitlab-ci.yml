@@ -1,4 +1,3 @@
-
 stages:
   - build
   - deploy
@@ -21,24 +20,6 @@ rust-latest:
     - cargo build --color always
     - cargo fmt -- --check --color always
     - cargo test --all-features --color always
-
-rust-binary:
-  stage: deploy
-  image: rust:latest
-  cache:
-    key: $CI_JOB_NAME
-    paths:
-      - .cargo
-      - target
-  script:
-    - cargo build --release --locked --color always
-  rules:
-    - exists:
-        - src/main.rs
-        - src/bin/*.rs
-  artifacts:
-    paths:
-      - target/release/$BINARY_NAME
 
 rust-security:
   stage: build
@@ -69,7 +50,7 @@ docker:
     - docker build --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:latest .
     - docker push $CI_REGISTRY_IMAGE:latest
 
-.pages:
+pages:
   stage: deploy
   image: rustlang/rust:nightly
   before_script:
