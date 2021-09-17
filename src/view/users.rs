@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    models::users::{UserEmail, UserEntity as DbUser, UserId},
+    models::users::{UserEmail, UserEntity, UserId},
     validators::Password,
 };
 
