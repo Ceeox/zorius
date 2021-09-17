@@ -10,7 +10,7 @@ use crate::{
 pub type WorkReportId = Uuid;
 
 #[derive(Debug, Clone, FromRow)]
-pub struct WorkReport {
+pub struct WorkReportEntity {
     id: WorkReportId,
     owner_id: UserId,
     customer_id: CustomerId,
@@ -23,14 +23,14 @@ pub struct WorkReport {
     updated_at: DateTime<Utc>,
 }
 
-impl WorkReport {
+impl WorkReportEntity {
     pub async fn new(
         pool: &PgPool,
         owner_id: UserId,
         new_wr: NewWorkReport,
     ) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            WorkReport,
+            WorkReportEntity,
             r#"INSERT INTO work_reports (
                 owner_id,
                 customer_id,

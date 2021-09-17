@@ -10,14 +10,14 @@ use sqlx::{
 use uuid::Uuid;
 
 use crate::{
-    models::users::{Test, User, UserId},
+    models::users::{UserEntity, UserId},
     view::intern_merchandise::{IncomingInternMerchandise, NewInternMerchandise},
 };
 
 pub type InternMerchandiseId = Uuid;
 
 #[derive(Debug, Clone, FromRow)]
-pub struct InternMerchandise {
+pub struct InternMerchandiseEntity {
     pub id: InternMerchandiseId,
     pub merchandise_id: Option<i64>,
     pub orderer_id: UserId,
@@ -39,14 +39,14 @@ pub struct InternMerchandise {
     pub updated_at: DateTime<Utc>,
 }
 
-impl InternMerchandise {
+impl InternMerchandiseEntity {
     pub async fn new(
         pool: &PgPool,
         orderer_id: UserId,
         new_intern_merch: NewInternMerchandise,
-    ) -> Result<InternMerchandise, sqlx::Error> {
+    ) -> Result<InternMerchandiseEntity, sqlx::Error> {
         let res = query_as!(
-            InternMerchandise,
+            InternMerchandiseEntity,
             r#"INSERT INTO intern_merchandises (
                 merchandise_id,
                 orderer_id,
@@ -110,9 +110,9 @@ impl InternMerchandise {
     pub async fn get_intern_merch_by_id(
         pool: &PgPool,
         id: InternMerchandiseId,
-    ) -> Result<InternMerchandise, sqlx::Error> {
+    ) -> Result<InternMerchandiseEntity, sqlx::Error> {
         Ok(sqlx::query_as!(
-            InternMerchandise,
+            InternMerchandiseEntity,
             r#"SELECT 
                 id,
                 merchandise_id,
@@ -142,70 +142,13 @@ impl InternMerchandise {
         .await?)
     }
 
-    pub async fn test(pool: &PgPool, id: InternMerchandiseId) -> Result<(), sqlx::Error> {
-        let res = sqlx::query_as!(
-            Test,
-            r#"SELECT
-                intern_merchandises.id,
-                merchandise_id,
-                purchased_on,
-                count,
-                cost,
-                status as "status: InternMerchandiseStatus",
-                merchandise_name,
-                use_case,
-                location,
-                article_number,
-                shop,
-                serial_number,
-                arrived_on,
-                url,
-                postage,
-                intern_merchandises.created_at,
-                intern_merchandises.updated_at,
-                (
-                    users.id,
-                    users.email,
-                    users.password_hash,
-                    users.invitation_pending,
-                    users.firstname,
-                    users.lastname,
-                    users.deleted,
-                    users.created_at,
-                    users.updated_at
-                ) AS "orderer: User",
-                (
-                    users.id,
-                    users.email,
-                    users.password_hash,
-                    users.invitation_pending,
-                    users.firstname,
-                    users.lastname,
-                    users.deleted,
-                    users.created_at,
-                    users.updated_at
-                ) AS "project_leader: User"
-            FROM intern_merchandises
-            INNER JOIN users
-                ON (intern_merchandises.orderer_id = users.id)
-                OR (intern_merchandises.project_leader_id = users.id)
-            WHERE intern_merchandises.id = $1;"#,
-            id
-        )
-        .fetch_one(pool)
-        .await;
-
-        println!("{:?}", res);
-        Ok(())
-    }
-
     pub async fn list_intern_merch(
         pool: &PgPool,
         start: i64,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         Ok(query_as!(
-            InternMerchandise,
+            InternMerchandiseEntity,
             r#"SELECT
                     id,
                     merchandise_id,
@@ -251,7 +194,7 @@ impl InternMerchandise {
     pub async fn incoming_intern_merchandise(
         pool: &PgPool,
         update: IncomingInternMerchandise,
-    ) -> Result<InternMerchandise, sqlx::Error> {
+    ) -> Result<InternMerchandiseEntity, sqlx::Error> {
         Ok(query_as!(
             Self,
             r#"UPDATE intern_merchandises
@@ -301,13 +244,13 @@ impl InternMerchandise {
     }
 }
 
-impl<'r> Decode<'r, Postgres> for InternMerchandise {
+impl<'r> Decode<'r, Postgres> for InternMerchandiseEntity {
     fn decode(
         value: <Postgres as sqlx::database::HasValueRef<'r>>::ValueRef,
     ) -> Result<Self, sqlx::error::BoxDynError> {
         let mut decoder = sqlx::postgres::types::PgRecordDecoder::new(value)?;
 
-        Ok(InternMerchandise {
+        Ok(InternMerchandiseEntity {
             id: decoder.try_decode::<InternMerchandiseId>()?,
             merchandise_id: decoder.try_decode::<Option<i64>>()?,
             orderer_id: decoder.try_decode::<UserId>()?,
@@ -331,7 +274,7 @@ impl<'r> Decode<'r, Postgres> for InternMerchandise {
     }
 }
 
-impl<'r> Encode<'r, Postgres> for InternMerchandise {
+impl<'r> Encode<'r, Postgres> for InternMerchandiseEntity {
     fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> sqlx::encode::IsNull {
         let mut encoder = sqlx::postgres::types::PgRecordEncoder::new(buf);
 

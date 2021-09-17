@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    models::users::{User as DbUser, UserEmail, UserId},
+    models::users::{UserEmail, UserEntity as DbUser, UserId},
     validators::Password,
 };
 
@@ -17,8 +17,8 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<DbUser> for User {
-    fn from(db_user: DbUser) -> Self {
+impl From<UserEntity> for User {
+    fn from(db_user: UserEntity) -> Self {
         Self {
             id: db_user.id,
             email: db_user.email,

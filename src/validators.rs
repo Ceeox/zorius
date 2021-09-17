@@ -3,14 +3,16 @@ use url::Url as CrateUrl;
 use uuid::Uuid as CrateUuid;
 
 pub struct Password;
+const MIN_PW_LEN: usize = 8;
+const MAX_PW_LEN: usize = 255;
 
 impl InputValueValidator for Password {
     fn is_valid(&self, value: &Value) -> Result<(), String> {
         if let Value::String(s) = value {
-            if s.len() >= 8 && s.len() <= 64 {
+            if s.len() >= MIN_PW_LEN && s.len() <= MAX_PW_LEN {
                 Ok(())
             } else {
-                Err("password must be longer than 8 chars and lower than 64 chars".to_owned())
+                Err("password must be longer than 8 chars and lower than 255 chars".to_owned())
             }
         } else {
             Ok(())

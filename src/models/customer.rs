@@ -3,14 +3,14 @@ use sqlx::{query, query_as, FromRow, PgPool};
 use uuid::Uuid;
 
 use crate::{
-    models::project::Project,
+    models::project::ProjectEntity,
     view::customer::{Customer as CustomerView, NewCustomer},
 };
 
 pub type CustomerId = Uuid;
 
 #[derive(Debug, Clone)]
-pub struct Customer {
+pub struct CustomerEntity {
     pub id: CustomerId,
     pub name: String,
     pub identifier: String,
@@ -19,10 +19,10 @@ pub struct Customer {
     pub updated_at: DateTime<Utc>,
 }
 
-impl Customer {
+impl CustomerEntity {
     pub async fn new(pool: &PgPool, new_customer: NewCustomer) -> Result<Self, sqlx::Error> {
         let res = query_as!(
-            Customer,
+            CustomerEntity,
             r#"INSERT INTO customers (
                 name,
                 identifier,
@@ -41,7 +41,7 @@ impl Customer {
 
     pub async fn get_customer_by_id(pool: &PgPool, id: CustomerId) -> Result<Self, sqlx::Error> {
         let res = query_as!(
-            Customer,
+            CustomerEntity,
             "SELECT *
             FROM customers
             WHERE id = $1",
@@ -69,7 +69,7 @@ impl Customer {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         Ok(query_as!(
-            Customer,
+            CustomerEntity,
             r#"SELECT *
             FROM customers
             ORDER BY created_at ASC
@@ -111,7 +111,7 @@ impl Customer {
 
     pub async fn delete_customer(pool: &PgPool, id: CustomerId) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            Customer,
+            CustomerEntity,
             r#"DELETE
             FROM customers
             WHERE id = $1

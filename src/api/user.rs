@@ -11,7 +11,7 @@ use crate::{
     models::{
         auth::LoginResult,
         upload::{FileInfo, Storage},
-        users::{User as DbUser, UserEmail, UserId},
+        users::{UserEmail, UserEntity, UserId},
     },
     validators::Password,
     view::users::{NewUser, User, UserUpdate},
@@ -26,15 +26,11 @@ impl UserQuery {
         &self,
         ctx: &Context<'_>,
         #[graphql(validator(Email))] email: String,
-        #[graphql(validator(and(
-            StringMinLength(length = "8"),
-            StringMaxLength(length = "255")
-        )))]
-        password: String,
+        #[graphql(validator(Password))] password: String,
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
 
-        let user = DbUser::user_by_email(database(&ctx)?.get_pool(), &email).await?;
+        let user = UserEntity::user_by_email(database(&ctx)?.get_pool(), &email).await?;
 
         if !user.is_password_correct(&password) {
             return Err(err);
@@ -52,14 +48,14 @@ impl UserQuery {
     async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(User::from(
-            DbUser::user_by_id(database(&ctx)?.get_pool(), id).await?,
+            UserEntity::user_by_id(database(&ctx)?.get_pool(), id).await?,
         ))
     }
 
     async fn get_user_by_email(&self, ctx: &Context<'_>, email: UserEmail) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(User::from(
-            DbUser::user_by_email(database(&ctx)?.get_pool(), &email).await?,
+            UserEntity::user_by_email(database(&ctx)?.get_pool(), &email).await?,
         ))
     }
 
@@ -73,7 +69,7 @@ impl UserQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, User, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let count = DbUser::count_users(database(&ctx)?.get_pool()).await? as usize;
+        let count = UserEntity::count_users(database(&ctx)?.get_pool()).await? as usize;
 
         query(
             after,
@@ -84,7 +80,7 @@ impl UserQuery {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
                 let users =
-                    DbUser::list_users(database(&ctx)?.get_pool(), start as i64, limit as i64)
+                    UserEntity::list_users(database(&ctx)?.get_pool(), start as i64, limit as i64)
                         .await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
@@ -113,11 +109,14 @@ impl UserMutation {
             return Err(Error::new("registration is not enabled"));
         }
 
-        if DbUser::user_by_email(pool, &new_user.email).await.is_ok() {
+        if UserEntity::user_by_email(pool, &new_user.email)
+            .await
+            .is_ok()
+        {
             return Err(Error::new("email already registerd"));
         }
 
-        Ok(DbUser::new(database(&ctx)?.get_pool(), new_user)
+        Ok(UserEntity::new(database(&ctx)?.get_pool(), new_user)
             .await?
             .into())
     }
@@ -131,7 +130,7 @@ impl UserMutation {
         let auth_info = Claim::from_ctx(ctx)?;
         let user_id = auth_info.user_id();
 
-        let user = DbUser::user_by_id(database(&ctx)?.get_pool(), user_id.clone()).await?;
+        let user = UserEntity::user_by_id(database(&ctx)?.get_pool(), user_id.clone()).await?;
 
         if !user.is_password_correct(&old_password) {
             return Err(Error::new("old password is incorrect".to_owned()));
@@ -152,7 +151,7 @@ impl UserMutation {
     ) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
         Ok(
-            DbUser::update_user(database(&ctx)?.get_pool(), user_id, user_update)
+            UserEntity::update_user(database(&ctx)?.get_pool(), user_id, user_update)
                 .await?
                 .into(),
         )

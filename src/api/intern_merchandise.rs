@@ -5,7 +5,7 @@ use async_graphql::{
 
 use crate::{
     api::{calc_list_params, claim::Claim, database},
-    models::intern_merchandise::{InternMerchandise as DBInternMerchandise, InternMerchandiseId},
+    models::intern_merchandise::{InternMerchandiseEntity, InternMerchandiseId},
     view::intern_merchandise::{
         IncomingInternMerchandise, InternMerchandise, NewInternMerchandise,
     },
@@ -23,7 +23,7 @@ impl InternMerchandiseQuery {
     ) -> Result<InternMerchandise> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = &database(ctx)?.get_pool();
-        Ok(DBInternMerchandise::get_intern_merch_by_id(pool, id)
+        Ok(InternMerchandiseEntity::get_intern_merch_by_id(pool, id)
             .await?
             .into())
     }
@@ -38,7 +38,7 @@ impl InternMerchandiseQuery {
     ) -> Result<Connection<usize, InternMerchandise, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = &database(ctx)?.get_pool();
-        let count = DBInternMerchandise::count_intern_merch(pool).await? as usize;
+        let count = InternMerchandiseEntity::count_intern_merch(pool).await? as usize;
 
         query(
             after,
@@ -49,7 +49,7 @@ impl InternMerchandiseQuery {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
                 let merchs =
-                    DBInternMerchandise::list_intern_merch(pool, start as i64, limit as i64)
+                    InternMerchandiseEntity::list_intern_merch(pool, start as i64, limit as i64)
                         .await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
@@ -66,7 +66,7 @@ impl InternMerchandiseQuery {
     }
 
     pub async fn count_intern_merch(&self, ctx: &Context<'_>) -> Result<usize> {
-        Ok(DBInternMerchandise::count_intern_merch(&database(ctx)?.get_pool()).await? as usize)
+        Ok(InternMerchandiseEntity::count_intern_merch(&database(ctx)?.get_pool()).await? as usize)
     }
 }
 
@@ -87,7 +87,7 @@ impl InternMerchandiseMutation {
         let claim = Claim::from_ctx(ctx)?;
         let orderer_id = claim.user_id();
         let pool = &database(ctx)?.get_pool();
-        Ok(DBInternMerchandise::new(pool, orderer_id, new)
+        Ok(InternMerchandiseEntity::new(pool, orderer_id, new)
             .await?
             .into())
     }
@@ -104,7 +104,7 @@ impl InternMerchandiseMutation {
         let _ = Claim::from_ctx(ctx)?;
         let pool = &database(ctx)?.get_pool();
         Ok(
-            DBInternMerchandise::incoming_intern_merchandise(pool, update)
+            InternMerchandiseEntity::incoming_intern_merchandise(pool, update)
                 .await?
                 .into(),
         )
@@ -121,7 +121,7 @@ impl InternMerchandiseMutation {
     ) -> Result<bool> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = &database(ctx)?.get_pool();
-        let merch = DBInternMerchandise::get_intern_merch_by_id(pool, id).await?;
+        let merch = InternMerchandiseEntity::get_intern_merch_by_id(pool, id).await?;
         merch.delete(pool).await?;
 
         Ok(true)

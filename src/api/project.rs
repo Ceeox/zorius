@@ -5,7 +5,7 @@ use async_graphql::{
 
 use crate::{
     api::{calc_list_params, claim::Claim, database},
-    models::project::{Project as DbProject, ProjectId},
+    models::project::{ProjectEntity, ProjectId},
     view::project::{NewProject, Project},
 };
 
@@ -17,7 +17,7 @@ impl ProjectQuery {
     async fn get_project_by_id(&self, ctx: &Context<'_>, id: ProjectId) -> Result<Project> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = &database(ctx)?.get_pool();
-        Ok(DbProject::get_project_by_id(pool, id).await?.into())
+        Ok(ProjectEntity::get_project_by_id(pool, id).await?.into())
     }
 
     async fn list_projects(
@@ -30,7 +30,7 @@ impl ProjectQuery {
     ) -> Result<Connection<usize, Project, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = &database(ctx)?.get_pool();
-        let count = DbProject::count_projects(pool).await? as usize;
+        let count = ProjectEntity::count_projects(pool).await? as usize;
 
         query(
             after,
@@ -40,7 +40,8 @@ impl ProjectQuery {
             |after, before, first, last| async move {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                let projects = DbProject::list_projects(pool, start as i64, limit as i64).await?;
+                let projects =
+                    ProjectEntity::list_projects(pool, start as i64, limit as i64).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection.append(
@@ -64,7 +65,7 @@ impl ProjectMutation {
     async fn new_project(&self, ctx: &Context<'_>, new_project: NewProject) -> Result<Project> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = &database(ctx)?.get_pool();
-        Ok(DbProject::new(pool, new_project).await?.into())
+        Ok(ProjectEntity::new(pool, new_project).await?.into())
     }
 
     // #[graphql(guard(race(
@@ -74,6 +75,6 @@ impl ProjectMutation {
     async fn delete_project(&self, ctx: &Context<'_>, id: ProjectId) -> Result<Project> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = &database(ctx)?.get_pool();
-        Ok(DbProject::delete_project(pool, id).await?.into())
+        Ok(ProjectEntity::delete_project(pool, id).await?.into())
     }
 }

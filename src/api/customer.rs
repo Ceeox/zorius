@@ -7,8 +7,8 @@ use futures::{stream, StreamExt};
 use crate::{
     api::{calc_list_params, claim::Claim, database},
     models::{
-        customer::{self, Customer as DbCustomer, CustomerId},
-        project::Project as DbProject,
+        customer::{self, CustomerEntity, CustomerId},
+        project::ProjectEntity,
     },
     view::customer::{Customer, NewCustomer, UpdateCustomer},
 };
@@ -21,8 +21,8 @@ impl CustomerQuery {
     async fn get_customer_by_id(&self, ctx: &Context<'_>, id: CustomerId) -> Result<Customer> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = database(&ctx)?.get_pool();
-        let customer = DbCustomer::get_customer_by_id(pool, id).await?;
-        let mut projects = DbProject::get_projects_for_customer_id(pool, id)
+        let customer = CustomerEntity::get_customer_by_id(pool, id).await?;
+        let mut projects = ProjectEntity::get_projects_for_customer_id(pool, id)
             .await?
             .into_iter()
             .map(|project| project.into())
@@ -43,7 +43,7 @@ impl CustomerQuery {
     ) -> Result<Connection<usize, Customer, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let pool = database(ctx)?.get_pool();
-        let count = DbCustomer::count_customers(pool).await? as usize;
+        let count = CustomerEntity::count_customers(pool).await? as usize;
 
         query(
             after,
@@ -53,11 +53,12 @@ impl CustomerQuery {
             |after, before, first, last| async move {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                let customers = DbCustomer::list_customer(pool, start as i64, limit as i64).await?;
+                let customers =
+                    CustomerEntity::list_customer(pool, start as i64, limit as i64).await?;
                 let customers: Vec<Customer> = stream::iter(customers)
                     .filter_map(|db_customer| async move {
                         let mut projects =
-                            match DbProject::get_projects_for_customer_id(pool, db_customer.id)
+                            match ProjectEntity::get_projects_for_customer_id(pool, db_customer.id)
                                 .await
                             {
                                 Ok(r) => r.into_iter().map(|project| project.into()).collect(),
@@ -98,7 +99,7 @@ impl CustomerMutation {
         let _ = Claim::from_ctx(ctx)?;
         let pool = database(ctx)?.get_pool();
 
-        Ok(DbCustomer::new(pool, new_customer).await?.into())
+        Ok(CustomerEntity::new(pool, new_customer).await?.into())
     }
 
     // #[graphql(guard(race(
@@ -125,6 +126,6 @@ impl CustomerMutation {
         let _ = Claim::from_ctx(ctx)?;
         let pool = database(ctx)?.get_pool();
 
-        Ok(DbCustomer::delete_customer(pool, id).await?.into())
+        Ok(CustomerEntity::delete_customer(pool, id).await?.into())
     }
 }

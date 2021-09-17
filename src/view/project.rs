@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{
     customer::CustomerId,
-    project::{Project as DbProject, ProjectId},
+    project::{ProjectEntity, ProjectId},
 };
 
 #[derive(Serialize, Debug, Clone, SimpleObject)]
@@ -24,8 +24,8 @@ pub struct NewProject {
     pub note: Option<String>,
 }
 
-impl From<DbProject> for Project {
-    fn from(db: DbProject) -> Self {
+impl From<ProjectEntity> for Project {
+    fn from(db: ProjectEntity) -> Self {
         Self {
             id: db.id,
             customer_id: db.customer_id,

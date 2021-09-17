@@ -17,7 +17,7 @@ pub type UserId = Uuid;
 pub type UserEmail = String;
 
 #[derive(Debug, Clone, FromRow)]
-pub struct User {
+pub struct UserEntity {
     pub id: UserId,
     pub email: String,
     pub password_hash: String,
@@ -29,33 +29,10 @@ pub struct User {
     pub deleted: bool,
 }
 
-#[derive(Debug, FromRow)]
-pub struct Test {
-    pub id: InternMerchandiseId,
-    pub merchandise_id: Option<i64>,
-    pub purchased_on: DateTime<Utc>,
-    pub count: i64,
-    pub cost: Decimal,
-    pub status: InternMerchandiseStatus,
-    pub merchandise_name: String,
-    pub use_case: Option<String>,
-    pub location: Option<String>,
-    pub article_number: String,
-    pub shop: String,
-    pub serial_number: Option<String>,
-    pub arrived_on: Option<DateTime<Utc>>,
-    pub url: Option<String>,
-    pub postage: Option<Decimal>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub orderer: Option<User>,
-    pub project_leader: Option<User>,
-}
-
-impl User {
+impl UserEntity {
     pub async fn new(pool: &PgPool, new_user: NewUser) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            User,
+            UserEntity,
             r#"INSERT INTO users (
                 email,
                 password_hash,
@@ -72,7 +49,7 @@ impl User {
             )
             RETURNING *;"#,
             new_user.email,
-            User::hash_password(&new_user.password),
+            UserEntity::hash_password(&new_user.password),
             true,
             new_user.firstname,
             new_user.lastname
@@ -96,7 +73,7 @@ impl User {
 
     pub async fn user_by_id(pool: &PgPool, id: uuid::Uuid) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            User,
+            UserEntity,
             r#"SELECT *
             FROM users
             WHERE id = $1"#,
@@ -108,7 +85,7 @@ impl User {
 
     pub async fn user_by_email(pool: &PgPool, email: &str) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            User,
+            UserEntity,
             r#"SELECT *
             FROM users
             WHERE email = $1"#,
@@ -124,7 +101,7 @@ impl User {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         Ok(query_as!(
-            User,
+            UserEntity,
             r#"SELECT *
             FROM users
             ORDER BY created_at ASC
@@ -154,7 +131,7 @@ impl User {
         user_update: UserUpdate,
     ) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            User,
+            UserEntity,
             r#"UPDATE users
                 SET firstname = $2,
                 lastname = $3
@@ -186,7 +163,7 @@ impl User {
     }
 }
 
-impl<'r> Decode<'r, Postgres> for User {
+impl<'r> Decode<'r, Postgres> for UserEntity {
     fn decode(value: PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
         let mut decoder = sqlx::postgres::types::PgRecordDecoder::new(value)?;
         Ok(Self {
@@ -203,7 +180,7 @@ impl<'r> Decode<'r, Postgres> for User {
     }
 }
 
-impl<'r> Encode<'r, Postgres> for User {
+impl<'r> Encode<'r, Postgres> for UserEntity {
     fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> sqlx::encode::IsNull {
         let mut encoder = sqlx::postgres::types::PgRecordEncoder::new(buf);
         encoder.encode(&self.id);

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     models::{
         intern_merchandise::{
-            InternMerchandise as DbInternMerchandise, InternMerchandiseId, InternMerchandiseStatus,
+            InternMerchandiseEntity, InternMerchandiseId, InternMerchandiseStatus,
         },
         users::UserId,
     },
@@ -35,8 +35,8 @@ pub struct InternMerchandise {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<DbInternMerchandise> for InternMerchandise {
-    fn from(merch: DbInternMerchandise) -> Self {
+impl From<InternMerchandiseEntity> for InternMerchandise {
+    fn from(merch: InternMerchandiseEntity) -> Self {
         let postage = match merch.postage {
             None => None,
             Some(r) => Some(r.to_string().parse::<f32>().unwrap_or(0.0)),

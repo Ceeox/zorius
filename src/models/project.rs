@@ -12,7 +12,7 @@ use super::customer::CustomerId;
 pub type ProjectId = Uuid;
 
 #[derive(Debug, Clone, FromRow)]
-pub struct Project {
+pub struct ProjectEntity {
     pub id: ProjectId,
     pub customer_id: CustomerId,
     pub name: String,
@@ -21,10 +21,10 @@ pub struct Project {
     pub updated_at: DateTime<Utc>,
 }
 
-impl Project {
+impl ProjectEntity {
     pub async fn new(pool: &PgPool, new_project: NewProject) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            Project,
+            ProjectEntity,
             r#"INSERT INTO projects (
                 customer_id,
                 name,
@@ -53,7 +53,7 @@ impl Project {
 
     pub async fn get_project_by_id(pool: &PgPool, id: ProjectId) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            Project,
+            ProjectEntity,
             r#"SELECT *
             FROM projects
             WHERE id = $1;"#,
@@ -68,7 +68,7 @@ impl Project {
         id: CustomerId,
     ) -> Result<Vec<Self>, sqlx::Error> {
         Ok(query_as!(
-            Project,
+            ProjectEntity,
             r#"SELECT *
             FROM projects
             WHERE customer_id = $1;"#,
@@ -84,7 +84,7 @@ impl Project {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         Ok(query_as!(
-            Project,
+            ProjectEntity,
             r#"SELECT *
             FROM projects
             LIMIT $1
@@ -98,7 +98,7 @@ impl Project {
 
     pub async fn delete_project(pool: &PgPool, id: ProjectId) -> Result<Self, sqlx::Error> {
         Ok(query_as!(
-            Project,
+            ProjectEntity,
             r#"DELETE
             FROM projects
             WHERE id = $1
@@ -110,7 +110,7 @@ impl Project {
     }
 }
 
-impl<'r> Decode<'r, Postgres> for Project {
+impl<'r> Decode<'r, Postgres> for ProjectEntity {
     fn decode(value: PgValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
         let mut decoder = sqlx::postgres::types::PgRecordDecoder::new(value)?;
         Ok(Self {
@@ -124,7 +124,7 @@ impl<'r> Decode<'r, Postgres> for Project {
     }
 }
 
-impl<'r> Encode<'r, Postgres> for Project {
+impl<'r> Encode<'r, Postgres> for ProjectEntity {
     fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> sqlx::encode::IsNull {
         let mut encoder = sqlx::postgres::types::PgRecordEncoder::new(buf);
         encoder.encode(&self.id);

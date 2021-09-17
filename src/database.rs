@@ -4,7 +4,7 @@ use log::{error, info};
 use sqlx::migrate::Migrator;
 use sqlx::{Pool, Postgres};
 
-use crate::{config::CONFIG, models::users::User, view::users::NewUser};
+use crate::{config::CONFIG, models::users::UserEntity, view::users::NewUser};
 
 pub struct Database {
     database: Pool<Postgres>,
@@ -27,14 +27,14 @@ impl Database {
             lastname: CONFIG.admin_user.lastname.clone(),
         };
 
-        if User::user_by_email(&_self.database, &admin_user.email)
+        if UserEntity::user_by_email(&_self.database, &admin_user.email)
             .await
             .is_ok()
         {
             return _self;
         }
 
-        match User::new(&_self.database, admin_user).await {
+        match UserEntity::new(&_self.database, admin_user).await {
             Ok(_) => {}
             Err(e) => error!("Failed to create admin user: {:?}", e),
         }

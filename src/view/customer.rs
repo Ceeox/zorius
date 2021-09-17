@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::{
     models::{
-        customer::{Customer as DbCustomer, CustomerId},
+        customer::{CustomerEntity, CustomerId},
         project::ProjectId,
     },
     view::project::Project,
@@ -21,8 +21,8 @@ pub struct Customer {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<DbCustomer> for Customer {
-    fn from(db: DbCustomer) -> Self {
+impl From<CustomerEntity> for Customer {
+    fn from(db: CustomerEntity) -> Self {
         Self {
             id: db.id,
             name: db.name,
