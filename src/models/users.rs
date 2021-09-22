@@ -133,8 +133,7 @@ impl UserEntity {
         Ok(query_as!(
             UserEntity,
             r#"UPDATE users
-                SET firstname = $2,
-                lastname = $3
+            SET firstname = $2, lastname = $3
             WHERE id = $1
             RETURNING *;"#,
             user_id,

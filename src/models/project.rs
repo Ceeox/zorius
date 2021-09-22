@@ -1,11 +1,11 @@
 use chrono::{DateTime, Utc};
 use sqlx::{
     postgres::{PgArgumentBuffer, PgValueRef},
-    query, query_as, Decode, Encode, FromRow, PgPool, Postgres,
+    query, query_as, Decode, Encode, FromRow, PgPool, Postgres, Type,
 };
 use uuid::Uuid;
 
-use crate::view::project::{NewProject, Project as ProjectView};
+use crate::view::project::NewProject;
 
 use super::customer::CustomerId;
 

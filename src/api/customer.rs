@@ -22,13 +22,7 @@ impl CustomerQuery {
         let _ = Claim::from_ctx(ctx)?;
         let pool = database(&ctx)?.get_pool();
         let customer = CustomerEntity::get_customer_by_id(pool, id).await?;
-        let mut projects = ProjectEntity::get_projects_for_customer_id(pool, id)
-            .await?
-            .into_iter()
-            .map(|project| project.into())
-            .collect();
         let mut res: Customer = customer.into();
-        std::mem::swap(&mut res.projects, &mut projects);
 
         Ok(res)
     }
@@ -109,13 +103,13 @@ impl CustomerMutation {
     async fn update_customer(
         &self,
         ctx: &Context<'_>,
-        _id: CustomerId,
-        _update: UpdateCustomer,
+        id: CustomerId,
+        update: UpdateCustomer,
     ) -> Result<Customer> {
         let _ = Claim::from_ctx(ctx)?;
-        let _pool = database(ctx)?.get_pool();
+        let pool = database(ctx)?.get_pool();
 
-        todo!()
+        Ok(CustomerEntity::update_customer(pool, id, update).await?)
     }
 
     // #[graphql(guard(race(

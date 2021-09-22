@@ -2,6 +2,7 @@ use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
     Context, Object, Result,
 };
+use futures::stream::{self, StreamExt};
 
 use crate::{
     api::{calc_list_params, claim::Claim, database},
@@ -53,12 +54,13 @@ impl InternMerchandiseQuery {
                         .await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
-                connection.append(
-                    merchs
-                        .into_iter()
-                        .enumerate()
-                        .map(|(n, merch)| Edge::new(n + start, merch.into())),
-                );
+                connection
+                    .append_stream(
+                        stream::iter(merchs)
+                            .enumerate()
+                            .map(|(n, merch)| Edge::new(n + start, merch.into())),
+                    )
+                    .await;
                 Ok(connection)
             },
         )

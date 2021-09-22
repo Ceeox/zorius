@@ -45,8 +45,7 @@ impl InternMerchandiseEntity {
         orderer_id: UserId,
         new_intern_merch: NewInternMerchandise,
     ) -> Result<InternMerchandiseEntity, sqlx::Error> {
-        let res = query_as!(
-            InternMerchandiseEntity,
+        let res = query!(
             r#"INSERT INTO intern_merchandises (
                 merchandise_id,
                 orderer_id,
@@ -66,25 +65,7 @@ impl InternMerchandiseEntity {
             )
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
             RETURNING
-                id,
-                merchandise_id,
-                orderer_id,
-                project_leader_id,
-                purchased_on,
-                count,
-                cost,
-                status as "status:_",
-                merchandise_name,
-                use_case,
-                location,
-                article_number,
-                shop,
-                serial_number,
-                arrived_on,
-                url,
-                postage,
-                created_at,
-                updated_at;"#,
+                id;"#,
             None as Option<i64>,
             orderer_id,
             new_intern_merch.project_leader_id,
@@ -104,6 +85,8 @@ impl InternMerchandiseEntity {
         .fetch_one(pool)
         .await?;
 
+        let res = InternMerchandiseEntity::get_intern_merch_by_id(pool, res.id).await?;
+
         Ok(res)
     }
 
@@ -111,7 +94,7 @@ impl InternMerchandiseEntity {
         pool: &PgPool,
         id: InternMerchandiseId,
     ) -> Result<InternMerchandiseEntity, sqlx::Error> {
-        Ok(sqlx::query_as!(
+        let res = sqlx::query_as!(
             InternMerchandiseEntity,
             r#"SELECT 
                 id,
@@ -139,7 +122,9 @@ impl InternMerchandiseEntity {
             id
         )
         .fetch_one(pool)
-        .await?)
+        .await?;
+
+        Ok(res)
     }
 
     pub async fn list_intern_merch(

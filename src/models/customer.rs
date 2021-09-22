@@ -1,10 +1,13 @@
 use chrono::{DateTime, Utc};
-use sqlx::{query, query_as, FromRow, PgPool};
+use sqlx::{postgres::PgRow, query, query_as, PgPool, Row};
 use uuid::Uuid;
 
 use crate::{
     models::project::ProjectEntity,
-    view::customer::{Customer as CustomerView, NewCustomer},
+    view::{
+        customer::{Customer, NewCustomer, UpdateCustomer},
+        project::Project,
+    },
 };
 
 pub type CustomerId = Uuid;
@@ -39,17 +42,44 @@ impl CustomerEntity {
         Ok(res)
     }
 
-    pub async fn get_customer_by_id(pool: &PgPool, id: CustomerId) -> Result<Self, sqlx::Error> {
+    pub async fn get_customer_by_id(
+        pool: &PgPool,
+        id: CustomerId,
+    ) -> Result<Customer, sqlx::Error> {
         let res = query_as!(
             CustomerEntity,
-            "SELECT *
+            r#"SELECT *
             FROM customers
-            WHERE id = $1",
+            WHERE id = $1"#,
             id
         )
         .fetch_one(pool)
         .await?;
-        Ok(res)
+
+        let projects: Vec<ProjectEntity> = query_as!(
+            ProjectEntity,
+            r#"SELECT *
+            FROM projects
+            WHERE customer_id = $1;"#,
+            id
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let projects = projects
+            .into_iter()
+            .map(|p| p.into())
+            .collect::<Vec<Project>>();
+
+        Ok(Customer {
+            id: res.id,
+            name: res.name,
+            identifier: res.identifier,
+            note: res.note,
+            projects,
+            created_at: res.created_at,
+            updated_at: res.updated_at,
+        })
     }
 
     pub async fn count_customers(pool: &PgPool) -> Result<i64, sqlx::Error> {
@@ -82,32 +112,25 @@ impl CustomerEntity {
         .await?)
     }
 
-    // pub async fn update_customer(
-    //     pool: &PgPool,
-    //     id: CustomerId,
-    //     update: UpdateCustomer,
-    // ) -> Result<CustomerView, sqlx::Error> {
-    //     Ok(query_as!(
-    //         CustomerView,
-    //         r#"WITH updated as (
-    //                 UPDATE customers
-    //                 SET name = $2,
-    //                     identifier = $3,
-    //                     note = $4
-    //                 WHERE id = $1
-    //                 RETURNING *
-    //             )
-    //             SELECT updated.*, projects.*
-    //             FROM updated, projects
-    //             WHERE updated.id = projects.customer_id;"#,
-    //         id,
-    //         update.name,
-    //         update.identifier,
-    //         update.note.unwrap_or(None)
-    //     )
-    //     .fetch_one(pool)
-    //     .await?)
-    // }
+    pub async fn update_customer(
+        pool: &PgPool,
+        id: CustomerId,
+        update: UpdateCustomer,
+    ) -> Result<Customer, sqlx::Error> {
+        query_as!(
+            Customer,
+            r#"UPDATE customers
+            SET name = $2, identifier = $3, note = $4
+            WHERE id = $1;"#,
+            id,
+            update.name,
+            update.identifier,
+            update.note.unwrap_or(None)
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(CustomerEntity::get_customer_by_id(pool, id).await?)
+    }
 
     pub async fn delete_customer(pool: &PgPool, id: CustomerId) -> Result<Self, sqlx::Error> {
         Ok(query_as!(

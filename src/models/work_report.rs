@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     models::{customer::CustomerId, project::ProjectId, users::UserId},
-    view::work_report::NewWorkReport,
+    view::work_report::{NewWorkReport, WorkReportUpdate},
 };
 
 pub type WorkReportId = Uuid;
@@ -54,5 +54,44 @@ impl WorkReportEntity {
         )
         .fetch_one(pool)
         .await?)
+    }
+
+    pub async fn work_report_by_id(pool: &PgPool, id: WorkReportId) -> Result<Self, sqlx::Error> {
+        Ok(query_as!(
+            WorkReportEntity,
+            r#"SELECT *
+            FROM work_reports
+            WHERE id = $1"#,
+            id
+        )
+        .fetch_one(pool)
+        .await?)
+    }
+
+    pub async fn list_work_reports(
+        pool: &PgPool,
+        start: i64,
+        limit: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        Ok(query_as!(
+            WorkReportEntity,
+            r#"SELECT *
+            FROM work_reports
+            ORDER BY created_at ASC
+            LIMIT $1
+            OFFSET $2;"#,
+            limit,
+            start
+        )
+        .fetch_all(pool)
+        .await?)
+    }
+
+    pub async fn update_work_report(
+        pool: &PgPool,
+        id: WorkReportId,
+        update: WorkReportUpdate,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        todo!()
     }
 }

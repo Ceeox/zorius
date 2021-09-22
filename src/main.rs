@@ -113,11 +113,11 @@ async fn main() -> Result<(), errors::ZoriusError> {
         App::new()
             .data(schema.clone())
             .wrap(
-                Cors::default()
-                    .allow_any_header()
-                    .allowed_methods(&[Method::GET, Method::POST, Method::OPTIONS])
-                    .allowed_origin("localhost")
-                    .allowed_origin(&CONFIG.domain),
+                Cors::permissive()
+                    // .allow_any_header()
+                    // .allowed_methods(&[Method::GET, Method::POST, Method::OPTIONS])
+                    // .allowed_origin("localhost:13443")
+                    // .allowed_origin(&CONFIG.domain),
             )
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))

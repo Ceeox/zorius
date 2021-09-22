@@ -4,6 +4,7 @@ use async_graphql::{
     Context, Error, Object, Result, Upload,
 };
 use chrono::{Duration, Utc};
+use futures::stream::{self, StreamExt};
 
 use crate::{
     api::{calc_list_params, claim::Claim, database},
@@ -54,9 +55,8 @@ impl UserQuery {
 
     async fn get_user_by_email(&self, ctx: &Context<'_>, email: UserEmail) -> Result<User> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(User::from(
-            UserEntity::user_by_email(database(&ctx)?.get_pool(), &email).await?,
-        ))
+        let pool = database(&ctx)?.get_pool();
+        Ok(User::from(UserEntity::user_by_email(pool, &email).await?))
     }
 
     //#[graphql(guard(RoleGuard(role = "Role::Admin")))]
@@ -84,12 +84,13 @@ impl UserQuery {
                         .await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
-                connection.append(
-                    users
-                        .into_iter()
-                        .enumerate()
-                        .map(|(n, db_user)| Edge::new(n + start, User::from(db_user))),
-                );
+                connection
+                    .append_stream(
+                        stream::iter(users)
+                            .enumerate()
+                            .map(|(n, db_user)| Edge::new(n + start, User::from(db_user))),
+                    )
+                    .await;
                 Ok(connection)
             },
         )

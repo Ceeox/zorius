@@ -1,7 +1,8 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    Context, Error, Object, Result,
+    Context, Object, Result,
 };
+use futures::stream::{self, StreamExt};
 
 use crate::{
     api::{calc_list_params, claim::Claim, database},
@@ -44,12 +45,13 @@ impl ProjectQuery {
                     ProjectEntity::list_projects(pool, start as i64, limit as i64).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
-                connection.append(
-                    projects
-                        .into_iter()
-                        .enumerate()
-                        .map(|(n, project)| Edge::new(n + start, project.into())),
-                );
+                connection
+                    .append_stream(
+                        stream::iter(projects)
+                            .enumerate()
+                            .map(|(n, project)| Edge::new(n + start, project.into())),
+                    )
+                    .await;
                 Ok(connection)
             },
         )
