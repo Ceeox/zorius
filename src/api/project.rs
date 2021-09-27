@@ -3,10 +3,11 @@ use async_graphql::{
     Context, Object, Result,
 };
 use futures::stream::{self, StreamExt};
+use uuid::Uuid;
 
 use crate::{
     api::{calc_list_params, claim::Claim, database},
-    models::project::{ProjectEntity, ProjectId},
+    models::project::{count_projects, delete_project, list_projects, new_project, project_by_id},
     view::project::{NewProject, Project},
 };
 
@@ -15,10 +16,13 @@ pub struct ProjectQuery;
 
 #[Object]
 impl ProjectQuery {
-    async fn get_project_by_id(&self, ctx: &Context<'_>, id: ProjectId) -> Result<Project> {
+    async fn get_project_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Option<Project>> {
         let _ = Claim::from_ctx(ctx)?;
-        let pool = &database(ctx)?.get_pool();
-        Ok(ProjectEntity::get_project_by_id(pool, id).await?.into())
+        let db = &database(ctx)?.db();
+        if let Some(project) = project_by_id(db, id).await? {
+            return Ok(Some(project.into()));
+        }
+        Ok(None)
     }
 
     async fn list_projects(
@@ -30,8 +34,8 @@ impl ProjectQuery {
         last: Option<i32>,
     ) -> Result<Connection<usize, Project, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let pool = &database(ctx)?.get_pool();
-        let count = ProjectEntity::count_projects(pool).await? as usize;
+        let db = &database(ctx)?.db();
+        let count = count_projects(db).await? as usize;
 
         query(
             after,
@@ -41,8 +45,7 @@ impl ProjectQuery {
             |after, before, first, last| async move {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                let projects =
-                    ProjectEntity::list_projects(pool, start as i64, limit as i64).await?;
+                let projects = list_projects(db).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection
@@ -64,19 +67,22 @@ pub struct ProjectMutation;
 
 #[Object]
 impl ProjectMutation {
-    async fn new_project(&self, ctx: &Context<'_>, new_project: NewProject) -> Result<Project> {
+    async fn new_project(&self, ctx: &Context<'_>, new: NewProject) -> Result<Option<Project>> {
         let _ = Claim::from_ctx(ctx)?;
-        let pool = &database(ctx)?.get_pool();
-        Ok(ProjectEntity::new(pool, new_project).await?.into())
+        let db = &database(ctx)?.db();
+        if let Some(project) = new_project(db, new).await? {
+            return Ok(Some(project.into()));
+        }
+        Ok(None)
     }
 
     // #[graphql(guard(race(
     //     RoleGuard(role = "Role::Admin"),
     //     RoleGuard(role = "Role::MerchandiseModerator")
     // )))]
-    async fn delete_project(&self, ctx: &Context<'_>, id: ProjectId) -> Result<Project> {
+    async fn delete_project(&self, ctx: &Context<'_>, id: Uuid) -> Result<bool> {
         let _ = Claim::from_ctx(ctx)?;
-        let pool = &database(ctx)?.get_pool();
-        Ok(ProjectEntity::delete_project(pool, id).await?.into())
+        let db = &database(ctx)?.db();
+        Ok(delete_project(db, id).await? >= 1)
     }
 }

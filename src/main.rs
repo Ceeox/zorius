@@ -2,6 +2,7 @@ use std::io::BufReader;
 use std::{fs::File, time::Duration};
 
 use actix_cors::Cors;
+use actix_web::http::header;
 use actix_web::{
     http::Method,
     middleware::{DefaultHeaders, Logger},
@@ -12,6 +13,7 @@ use log::{debug, error, info};
 use rustls::{
     internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
 };
+use sea_orm::Database as SeaOrmDatabase;
 use sqlx::PgPool;
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -47,7 +49,9 @@ async fn setup_pg() -> Result<Database, sqlx::Error> {
     );
     info!("Connecting to: {:?}", pw_hidden_url);
 
-    Ok(Database::new(PgPool::connect(&url).await?).await)
+    let db = SeaOrmDatabase::connect(&url).await.unwrap();
+
+    Ok(Database::new(PgPool::connect(&url).await?, db).await)
 }
 
 fn setup_log() {
@@ -107,17 +111,28 @@ async fn main() -> Result<(), errors::ZoriusError> {
 
     // Start http server
     let webserver_url = format!("{}:{}", CONFIG.web.ip, CONFIG.web.port);
+
+    let url = match (CONFIG.web.enable_ssl, CONFIG.debug) {
+        (true, true) => format!("https://localhost:{}", CONFIG.web.port),
+        (true, false) => format!("https://{}:{}", CONFIG.domain, CONFIG.web.port),
+        (false, true) => format!("http://localhost:{}", CONFIG.web.port),
+        (false, false) => format!("http://{}:{}", CONFIG.domain, CONFIG.web.port),
+    };
+
     let log_format = CONFIG.web.log_format.clone();
 
     let http_server = HttpServer::new(move || {
         App::new()
             .data(schema.clone())
             .wrap(
-                Cors::permissive()
-                    // .allow_any_header()
-                    // .allowed_methods(&[Method::GET, Method::POST, Method::OPTIONS])
-                    // .allowed_origin("localhost:13443")
-                    // .allowed_origin(&CONFIG.domain),
+                Cors::default()
+                    .allowed_methods(&[Method::GET, Method::POST, Method::OPTIONS])
+                    .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+                    .allowed_header(header::CONTENT_TYPE)
+                    .allowed_origin(&url)
+                    .allowed_origin("http://localhost:4200")
+                    .supports_credentials()
+                    .max_age(3600),
             )
             .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
             .wrap(Logger::new(&log_format))

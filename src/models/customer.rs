@@ -1,147 +1,107 @@
-use chrono::{DateTime, Utc};
-use sqlx::{postgres::PgRow, query, query_as, PgPool, Row};
+use sea_orm::{prelude::*, DatabaseConnection, Set};
 use uuid::Uuid;
 
 use crate::{
-    models::project::ProjectEntity,
-    view::{
-        customer::{Customer, NewCustomer, UpdateCustomer},
-        project::Project,
-    },
+    models::project,
+    view::customer::{NewCustomer, UpdateCustomer},
 };
 
-pub type CustomerId = Uuid;
-
-#[derive(Debug, Clone)]
-pub struct CustomerEntity {
-    pub id: CustomerId,
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "customers")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    pub id: Uuid,
     pub name: String,
     pub identifier: String,
     pub note: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: DateTimeWithTimeZone,
+    pub updated_at: DateTimeWithTimeZone,
 }
 
-impl CustomerEntity {
-    pub async fn new(pool: &PgPool, new_customer: NewCustomer) -> Result<Self, sqlx::Error> {
-        let res = query_as!(
-            CustomerEntity,
-            r#"INSERT INTO customers (
-                name,
-                identifier,
-                note
-            )
-            VALUES ($1,$2,$3)
-            RETURNING *;"#,
-            new_customer.name,
-            new_customer.identifier,
-            new_customer.note,
-        )
-        .fetch_one(pool)
-        .await?;
-        Ok(res)
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(has_many = "project::Entity")]
+    Projects,
+}
+
+impl Related<project::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Projects.def()
     }
+}
 
-    pub async fn get_customer_by_id(
-        pool: &PgPool,
-        id: CustomerId,
-    ) -> Result<Customer, sqlx::Error> {
-        let res = query_as!(
-            CustomerEntity,
-            r#"SELECT *
-            FROM customers
-            WHERE id = $1"#,
-            id
-        )
-        .fetch_one(pool)
-        .await?;
+impl ActiveModelBehavior for ActiveModel {}
 
-        let projects: Vec<ProjectEntity> = query_as!(
-            ProjectEntity,
-            r#"SELECT *
-            FROM projects
-            WHERE customer_id = $1;"#,
-            id
-        )
-        .fetch_all(pool)
-        .await?;
+pub async fn new_customer(
+    db: &DatabaseConnection,
+    update: NewCustomer,
+) -> Result<Option<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
+    let customer_id = ActiveModel {
+        identifier: Set(update.identifier),
+        name: Set(update.name),
+        note: Set(update.note),
+        ..Default::default()
+    };
+    let customer_id = Entity::insert(customer_id).exec(db).await?.last_insert_id;
+    Ok(customer_by_id(db, customer_id).await?)
+}
 
-        let projects = projects
-            .into_iter()
-            .map(|p| p.into())
-            .collect::<Vec<Project>>();
+pub async fn customer_by_id(
+    db: &DatabaseConnection,
+    id: uuid::Uuid,
+) -> Result<Option<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
+    let customer = Entity::find_by_id(id).one(db).await?;
 
-        Ok(Customer {
-            id: res.id,
-            name: res.name,
-            identifier: res.identifier,
-            note: res.note,
-            projects,
-            created_at: res.created_at,
-            updated_at: res.updated_at,
-        })
+    if let Some(customer) = customer {
+        let projects = customer.find_related(project::Entity).all(db).await?;
+        return Ok(Some((customer, projects)));
     }
+    Ok(None)
+}
 
-    pub async fn count_customers(pool: &PgPool) -> Result<i64, sqlx::Error> {
-        Ok(query!(
-            r#"SELECT COUNT(id) 
-            FROM customers;"#
-        )
-        .fetch_one(pool)
-        .await?
-        .count
-        .unwrap_or(0))
-    }
+pub async fn count_customers(db: &DatabaseConnection) -> Result<usize, sea_orm::error::DbErr> {
+    Ok(Entity::find().count(db).await?)
+}
 
-    pub async fn list_customer(
-        pool: &PgPool,
-        start: i64,
-        limit: i64,
-    ) -> Result<Vec<Self>, sqlx::Error> {
-        Ok(query_as!(
-            CustomerEntity,
-            r#"SELECT *
-            FROM customers
-            ORDER BY created_at ASC
-            LIMIT $1
-            OFFSET $2;"#,
-            limit,
-            start,
-        )
-        .fetch_all(pool)
+pub async fn list_customers(
+    db: &DatabaseConnection,
+) -> Result<Vec<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
+    Ok(Entity::find()
+        .find_with_related(project::Entity)
+        .all(db)
         .await?)
-    }
+}
 
-    pub async fn update_customer(
-        pool: &PgPool,
-        id: CustomerId,
-        update: UpdateCustomer,
-    ) -> Result<Customer, sqlx::Error> {
-        query_as!(
-            Customer,
-            r#"UPDATE customers
-            SET name = $2, identifier = $3, note = $4
-            WHERE id = $1;"#,
-            id,
-            update.name,
-            update.identifier,
-            update.note.unwrap_or(None)
-        )
-        .fetch_one(pool)
-        .await?;
-        Ok(CustomerEntity::get_customer_by_id(pool, id).await?)
-    }
+pub async fn delete_customer(
+    db: &DatabaseConnection,
+    id: Uuid,
+) -> Result<u64, sea_orm::error::DbErr> {
+    let customer: ActiveModel = match Entity::find_by_id(id).one(db).await? {
+        Some(customer) => customer.into(),
+        None => return Ok(0),
+    };
+    Ok(Entity::delete(customer).exec(db).await?.rows_affected)
+}
 
-    pub async fn delete_customer(pool: &PgPool, id: CustomerId) -> Result<Self, sqlx::Error> {
-        Ok(query_as!(
-            CustomerEntity,
-            r#"DELETE
-            FROM customers
-            WHERE id = $1
-            RETURNING *;"#,
-            id
-        )
-        .fetch_one(pool)
-        .await?)
+pub async fn update_customer(
+    db: &DatabaseConnection,
+    id: Uuid,
+    update: UpdateCustomer,
+) -> Result<Option<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
+    let customer = Entity::find_by_id(id).one(db).await?;
+    if let Some(customer) = customer {
+        let mut customer: ActiveModel = customer.into();
+        if let Some(name) = update.name {
+            customer.name = Set(name)
+        }
+        if let Some(identifier) = update.identifier {
+            customer.identifier = Set(identifier)
+        }
+        if let Some(note) = update.note {
+            customer.note = Set(note)
+        }
+        customer.update(db).await?;
+        return Ok(customer_by_id(db, id).await?);
     }
+    Ok(None)
 }

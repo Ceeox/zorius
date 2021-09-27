@@ -1,31 +1,33 @@
-use async_graphql::{validators::Email, InputObject, SimpleObject};
-use chrono::{DateTime, Utc};
+use async_graphql::{validators::Email, Enum, InputObject, SimpleObject};
+use chrono::{DateTime, FixedOffset};
+use sea_orm::Order;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{
-    models::users::{UserEmail, UserEntity, UserId},
+    models::users::{self, Column, Model, UserEmail},
     validators::Password,
 };
 
 #[derive(SimpleObject, Debug, Serialize, Clone)]
 pub struct User {
-    pub id: UserId,
+    pub id: Uuid,
     pub email: UserEmail,
     pub firstname: Option<String>,
     pub lastname: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: DateTime<FixedOffset>,
+    pub updated_at: DateTime<FixedOffset>,
 }
 
-impl From<UserEntity> for User {
-    fn from(db_user: UserEntity) -> Self {
+impl From<Model> for User {
+    fn from(model: Model) -> Self {
         Self {
-            id: db_user.id,
-            email: db_user.email,
-            created_at: db_user.created_at,
-            firstname: db_user.firstname,
-            lastname: db_user.lastname,
-            updated_at: db_user.updated_at,
+            id: model.id,
+            email: model.email,
+            created_at: model.created_at,
+            firstname: model.firstname,
+            lastname: model.lastname,
+            updated_at: model.updated_at,
         }
     }
 }
@@ -36,8 +38,8 @@ pub struct NewUser {
     pub email: UserEmail,
     #[graphql(validator(Password))]
     pub password: String,
-    pub firstname: String,
-    pub lastname: String,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
 }
 
 #[derive(InputObject, Debug, Serialize)]
@@ -49,6 +51,42 @@ pub struct PasswordChange {
 
 #[derive(InputObject, Debug, Serialize)]
 pub struct UserUpdate {
-    pub firstname: String,
-    pub lastname: String,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
+}
+
+#[derive(Enum, Debug, Serialize, Copy, Clone, PartialEq, Eq)]
+pub enum OrderBy {
+    Email,
+    CreatedAt,
+    UpdatedAt,
+    Firstname,
+    Lastname,
+}
+
+impl From<OrderBy> for users::Column {
+    fn from(order_by: OrderBy) -> Self {
+        match order_by {
+            OrderBy::Email => Column::Email,
+            OrderBy::CreatedAt => Column::CreatedAt,
+            OrderBy::UpdatedAt => Column::UpdatedAt,
+            OrderBy::Firstname => Column::Firstname,
+            OrderBy::Lastname => Column::Lastname,
+        }
+    }
+}
+
+#[derive(Enum, Debug, Serialize, Copy, Clone, PartialEq, Eq)]
+pub enum OrderDirection {
+    Asc,
+    Desc,
+}
+
+impl From<OrderDirection> for Order {
+    fn from(order_dic: OrderDirection) -> Self {
+        match order_dic {
+            OrderDirection::Asc => Order::Asc,
+            OrderDirection::Desc => Order::Desc,
+        }
+    }
 }

@@ -1,6 +1,6 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    validators::{Email, StringMaxLength, StringMinLength},
+    validators::Email,
     Context, Error, Object, Result, Upload,
 };
 use chrono::{Duration, Utc};
@@ -12,10 +12,13 @@ use crate::{
     models::{
         auth::LoginResult,
         upload::{FileInfo, Storage},
-        users::{UserEmail, UserEntity, UserId},
+        users::{
+            count_users, list_users, new_user, reset_password, update_user, user_by_email,
+            user_by_id, UserEmail, UserId,
+        },
     },
     validators::Password,
-    view::users::{NewUser, User, UserUpdate},
+    view::users::{NewUser, OrderBy, OrderDirection, User, UserUpdate},
 };
 
 #[derive(Default)]
@@ -30,8 +33,12 @@ impl UserQuery {
         #[graphql(validator(Password))] password: String,
     ) -> Result<LoginResult> {
         let err = Error::new("email or password wrong!");
+        let db = database(&ctx)?.db();
 
-        let user = UserEntity::user_by_email(database(&ctx)?.get_pool(), &email).await?;
+        let user = match user_by_email(db, &email).await? {
+            None => return Err(Error::new("user not found")),
+            Some(user) => user,
+        };
 
         if !user.is_password_correct(&password) {
             return Err(err);
@@ -46,17 +53,22 @@ impl UserQuery {
         Ok(LoginResult { token })
     }
 
-    async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<User> {
+    async fn get_user_by_id(&self, ctx: &Context<'_>, id: UserId) -> Result<Option<User>> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(User::from(
-            UserEntity::user_by_id(database(&ctx)?.get_pool(), id).await?,
-        ))
+        let db = database(&ctx)?.db();
+        if let Some(user) = user_by_id(db, id).await? {
+            return Ok(Some(User::from(user)));
+        }
+        Ok(None)
     }
 
-    async fn get_user_by_email(&self, ctx: &Context<'_>, email: UserEmail) -> Result<User> {
+    async fn get_user_by_email(&self, ctx: &Context<'_>, email: UserEmail) -> Result<Option<User>> {
         let _ = Claim::from_ctx(ctx)?;
-        let pool = database(&ctx)?.get_pool();
-        Ok(User::from(UserEntity::user_by_email(pool, &email).await?))
+        let db = database(&ctx)?.db();
+        if let Some(user) = user_by_email(db, &email).await? {
+            return Ok(Some(User::from(user)));
+        }
+        Ok(None)
     }
 
     //#[graphql(guard(RoleGuard(role = "Role::Admin")))]
@@ -67,9 +79,12 @@ impl UserQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        order_by: Option<OrderBy>,
+        dic: Option<OrderDirection>,
     ) -> Result<Connection<usize, User, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
-        let count = UserEntity::count_users(database(&ctx)?.get_pool()).await? as usize;
+        let db = database(&ctx)?.db();
+        let count = count_users(db).await? as usize;
 
         query(
             after,
@@ -79,9 +94,12 @@ impl UserQuery {
             |after, before, first, last| async move {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                let users =
-                    UserEntity::list_users(database(&ctx)?.get_pool(), start as i64, limit as i64)
-                        .await?;
+                let users = list_users(
+                    db,
+                    order_by.unwrap_or(OrderBy::CreatedAt),
+                    dic.unwrap_or(OrderDirection::Asc),
+                )
+                .await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection
@@ -103,23 +121,22 @@ pub struct UserMutation;
 
 #[Object]
 impl UserMutation {
-    async fn register(&self, ctx: &Context<'_>, new_user: NewUser) -> Result<User> {
-        let pool = database(&ctx)?.get_pool();
+    async fn register(&self, ctx: &Context<'_>, new: NewUser) -> Result<Option<User>> {
+        let db = database(&ctx)?.db();
 
         if !CONFIG.registration_enabled {
             return Err(Error::new("registration is not enabled"));
         }
 
-        if UserEntity::user_by_email(pool, &new_user.email)
-            .await
-            .is_ok()
-        {
+        if user_by_email(db, &new.email).await?.is_some() {
             return Err(Error::new("email already registerd"));
         }
 
-        Ok(UserEntity::new(database(&ctx)?.get_pool(), new_user)
-            .await?
-            .into())
+        let new_user = new_user(db, new).await?;
+        if let Some(user) = new_user {
+            return Ok(Some(User::from(user)));
+        }
+        Ok(None)
     }
 
     async fn reset_password(
@@ -130,14 +147,17 @@ impl UserMutation {
     ) -> Result<bool> {
         let auth_info = Claim::from_ctx(ctx)?;
         let user_id = auth_info.user_id();
+        let db = database(&ctx)?.db();
 
-        let user = UserEntity::user_by_id(database(&ctx)?.get_pool(), user_id.clone()).await?;
+        let user = match user_by_id(db, user_id.clone()).await? {
+            None => return Ok(false),
+            Some(user) => user,
+        };
 
         if !user.is_password_correct(&old_password) {
             return Err(Error::new("old password is incorrect".to_owned()));
         } else {
-            user.reset_password(database(&ctx)?.get_pool(), &new_password)
-                .await?;
+            reset_password(db, user_id, &new_password).await?;
         }
 
         Ok(true)
@@ -149,13 +169,14 @@ impl UserMutation {
         ctx: &Context<'_>,
         user_id: UserId,
         user_update: UserUpdate,
-    ) -> Result<User> {
+    ) -> Result<Option<User>> {
         let _ = Claim::from_ctx(ctx)?;
-        Ok(
-            UserEntity::update_user(database(&ctx)?.get_pool(), user_id, user_update)
-                .await?
-                .into(),
-        )
+        let db = database(&ctx)?.db();
+        let updated_user = update_user(db, user_id, user_update).await?;
+        if let Some(user) = updated_user {
+            return Ok(Some(User::from(user)));
+        }
+        Ok(None)
     }
 
     async fn upload_avatar(&self, ctx: &Context<'_>, files: Vec<Upload>) -> Result<Vec<FileInfo>> {
