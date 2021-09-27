@@ -12,7 +12,7 @@ actix-governor = "0.2.4"
 actix-multipart = "0.3.0"
 actix-web = {version = "4.0.0-beta.8", features = ["rustls"]}
 askama = "0.10.5"
-async-graphql = {git = "https://github.com/async-graphql/async-graphql", branch = "actix-web-v4-beta", features = ["chrono", "dataloader", "uuid"]}
+async-graphql = {git = "https://github.com/async-graphql/async-graphql", branch = "actix-web-v4-beta", features = ["chrono", "dataloader", "uuid", "decimal"]}
 async-graphql-actix-web = {git = "https://github.com/async-graphql/async-graphql", branch = "actix-web-v4-beta"}
 async-trait = "0.1.50"
 chrono = {version = "0.4.19", features = ["serde"]}
@@ -34,3 +34,5 @@ sqlx = {version = "0.5.7", features = ["postgres", "json", "runtime-actix-rustls
 tokio = {version = "1.8.1"}
 url = "2.2.2"
 uuid = {version = "0.8.2", features = ["v4", "serde"]}
+sea-orm = {version = "0.2.3", features = ["sqlx-postgres", "runtime-actix-rustls", "macros"], default-features = false}
+rust_decimal = "1.16.0"

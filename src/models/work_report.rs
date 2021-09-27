@@ -1,97 +1,133 @@
-use chrono::{DateTime, Utc};
-use sqlx::{query_as, FromRow, PgPool};
+use chrono::Utc;
+use sea_orm::{prelude::*, DatabaseConnection, Set};
 use uuid::Uuid;
 
-use crate::{
-    models::{customer::CustomerId, project::ProjectId, users::UserId},
-    view::work_report::{NewWorkReport, WorkReportUpdate},
-};
+use crate::view::work_report::{NewWorkReport, WorkReportUpdate};
 
-pub type WorkReportId = Uuid;
-
-#[derive(Debug, Clone, FromRow)]
-pub struct WorkReportEntity {
-    id: WorkReportId,
-    owner_id: UserId,
-    customer_id: CustomerId,
-    project_id: Option<ProjectId>,
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "work_reports")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    id: Uuid,
+    owner_id: Uuid,
+    customer_id: Uuid,
+    project_id: Option<Uuid>,
     description: String,
     invoiced: bool,
-    report_started: DateTime<Utc>,
-    report_ended: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    report_started: DateTimeWithTimeZone,
+    report_ended: Option<DateTimeWithTimeZone>,
+    created_at: DateTimeWithTimeZone,
+    updated_at: DateTimeWithTimeZone,
 }
 
-impl WorkReportEntity {
-    pub async fn new(
-        pool: &PgPool,
-        owner_id: UserId,
-        new_wr: NewWorkReport,
-    ) -> Result<Self, sqlx::Error> {
-        Ok(query_as!(
-            WorkReportEntity,
-            r#"INSERT INTO work_reports (
-                owner_id,
-                customer_id,
-                project_id,
-                invoiced,
-                description
-            )
-            VALUES (
-                $1,
-                $2,
-                $3,
-                $4,
-                $5
-            )
-            RETURNING *;"#,
-            owner_id,
-            new_wr.customer_id,
-            new_wr.project_id,
-            new_wr.invoiced,
-            new_wr.description
-        )
-        .fetch_one(pool)
-        .await?)
-    }
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
 
-    pub async fn work_report_by_id(pool: &PgPool, id: WorkReportId) -> Result<Self, sqlx::Error> {
-        Ok(query_as!(
-            WorkReportEntity,
-            r#"SELECT *
-            FROM work_reports
-            WHERE id = $1"#,
-            id
-        )
-        .fetch_one(pool)
-        .await?)
-    }
+// mod users_to_workreport {
+//     use crate::models::{customer, project, users, work_report};
+//     use sea_orm::prelude::*;
 
-    pub async fn list_work_reports(
-        pool: &PgPool,
-        start: i64,
-        limit: i64,
-    ) -> Result<Vec<Self>, sqlx::Error> {
-        Ok(query_as!(
-            WorkReportEntity,
-            r#"SELECT *
-            FROM work_reports
-            ORDER BY created_at ASC
-            LIMIT $1
-            OFFSET $2;"#,
-            limit,
-            start
-        )
-        .fetch_all(pool)
-        .await?)
-    }
+//     #[derive(Clone, Debug, PartialEq, DeriveActiveModel)]
+//     pub struct Model {
+//         pub owner_id: Uuid,
+//         pub customer_id: Uuid,
+//         pub project_id: Uuid,
+//     }
 
-    pub async fn update_work_report(
-        pool: &PgPool,
-        id: WorkReportId,
-        update: WorkReportUpdate,
-    ) -> Result<Vec<Self>, sqlx::Error> {
-        todo!()
-    }
+//     #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
+//     pub struct Entity;
+
+//     impl EntityName for Entity {
+//         fn schema_name(&self) -> Option<&str> {
+//             Some("public")
+//         }
+
+//         fn table_name(&self) -> &str {
+//             "users_workreport"
+//         }
+//     }
+
+//     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+//     pub enum Relation {
+//         #[sea_orm(
+//             belongs_to = "users::Entity",
+//             from = "Column::OwnerId",
+//             to = "users::Column::Id"
+//         )]
+//         Owner,
+//         #[sea_orm(
+//             belongs_to = "customer::Entity",
+//             from = "Column::CustomerId",
+//             to = "customer::Column::Id"
+//         )]
+//         Customer,
+//         #[sea_orm(
+//             belongs_to = "project::Entity",
+//             from = "Column::ProjectId",
+//             to = "project::Column::Id"
+//         )]
+//         Project,
+//     }
+
+//     #[derive(Debug)]
+//     pub struct UserToInternMerch;
+
+//     impl Linked for UserToInternMerch {
+//         type FromEntity = Entity;
+
+//         type ToEntity = work_report::Entity;
+
+//         fn link(&self) -> Vec<sea_orm::LinkDef> {
+//             vec![
+//                 Relation::Owner.def(),
+//                 Relation::Customer.def(),
+//                 Relation::Project.def(),
+//             ]
+//         }
+//     }
+// }
+
+impl ActiveModelBehavior for ActiveModel {}
+
+pub async fn new_work_report(
+    db: &DatabaseConnection,
+    owner_id: Uuid,
+    new: NewWorkReport,
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
+    let new_work_report = ActiveModel {
+        owner_id: Set(owner_id),
+        customer_id: Set(new.customer_id),
+        project_id: Set(new.project_id),
+        description: Set(new.description),
+        invoiced: Set(new.invoiced),
+        report_started: Set(Utc::now().into()),
+        report_ended: Set(None),
+        ..Default::default()
+    };
+    let work_report_id = Entity::insert(new_work_report)
+        .exec(db)
+        .await?
+        .last_insert_id;
+    Ok(None)
+}
+
+pub async fn work_report_by_id(
+    db: &DatabaseConnection,
+    id: Uuid,
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
+    Ok(Entity::find_by_id(id).one(db).await?)
+}
+
+pub async fn list_work_reports(
+    db: &DatabaseConnection,
+) -> Result<Vec<Model>, sea_orm::error::DbErr> {
+    Ok(Entity::find().all(db).await?)
+}
+
+pub async fn update_work_report(
+    db: &DatabaseConnection,
+    id: Uuid,
+    update: WorkReportUpdate,
+) -> Result<Option<Model>, sqlx::Error> {
+    todo!()
 }

@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS intern_merchandises (
     id UUID PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
     merchandise_id BIGINT,
     orderer_id UUID NOT NULL REFERENCES users,
-    project_leader_id UUID NOT NULL REFERENCES users,
+    project_leader_id UUID REFERENCES users,
     purchased_on TIMESTAMP WITH TIME ZONE NOT NULL,
     count BIGINT NOT NULL,
     cost numeric(15,6) NOT NULL,

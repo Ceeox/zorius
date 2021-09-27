@@ -32,8 +32,8 @@ pub struct Settings {
 pub struct AdminUser {
     pub email: String,
     pub password: String,
-    pub firstname: String,
-    pub lastname: String,
+    pub firstname: Option<String>,
+    pub lastname: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,303 +1,157 @@
-use std::str::FromStr;
-
-use async_graphql::Enum;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::{
-    postgres::PgArgumentBuffer, query, query_as, types::Decimal, Decode, Encode, FromRow, PgPool,
-    Postgres, Type,
-};
+use chrono::Utc;
+use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, Set};
 use uuid::Uuid;
 
 use crate::{
-    models::users::{UserEntity, UserId},
-    view::intern_merchandise::{IncomingInternMerchandise, NewInternMerchandise},
+    models::users,
+    view::intern_merchandise::{
+        IncomingInternMerchandise, InternMerchandise, NewInternMerchandise,
+    },
 };
 
-pub type InternMerchandiseId = Uuid;
-
-#[derive(Debug, Clone, FromRow)]
-pub struct InternMerchandiseEntity {
-    pub id: InternMerchandiseId,
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "intern_merchandises")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    pub id: Uuid,
     pub merchandise_id: Option<i64>,
-    pub orderer_id: UserId,
-    pub project_leader_id: UserId,
-    pub purchased_on: DateTime<Utc>,
+    pub orderer_id: Uuid,
+    pub controller_id: Option<Uuid>,
+    pub project_leader_id: Uuid,
+    pub purchased_on: DateTimeWithTimeZone,
     pub count: i64,
     pub cost: Decimal,
-    pub status: InternMerchandiseStatus,
     pub merchandise_name: String,
     pub use_case: Option<String>,
     pub location: Option<String>,
     pub article_number: String,
     pub shop: String,
     pub serial_number: Option<String>,
-    pub arrived_on: Option<DateTime<Utc>>,
+    pub arrived_on: Option<DateTimeWithTimeZone>,
     pub url: Option<String>,
     pub postage: Option<Decimal>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: DateTimeWithTimeZone,
+    pub updated_at: DateTimeWithTimeZone,
 }
 
-impl InternMerchandiseEntity {
-    pub async fn new(
-        pool: &PgPool,
-        orderer_id: UserId,
-        new_intern_merch: NewInternMerchandise,
-    ) -> Result<InternMerchandiseEntity, sqlx::Error> {
-        let res = query!(
-            r#"INSERT INTO intern_merchandises (
-                merchandise_id,
-                orderer_id,
-                project_leader_id,
-                purchased_on,
-                count,
-                cost,
-                status,
-                merchandise_name,
-                use_case,
-                location,
-                article_number,
-                shop,
-                serial_number,
-                url,
-                postage
-            )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-            RETURNING
-                id;"#,
-            None as Option<i64>,
-            orderer_id,
-            new_intern_merch.project_leader_id,
-            Utc::now().into(),
-            new_intern_merch.count,
-            Decimal::from_str(&new_intern_merch.cost.to_string()).unwrap_or(Decimal::default()),
-            InternMerchandiseStatus::Ordered as _,
-            new_intern_merch.merchandise_name,
-            new_intern_merch.use_case,
-            new_intern_merch.location,
-            new_intern_merch.article_number,
-            new_intern_merch.shop,
-            None as Option<String>,
-            new_intern_merch.url,
-            Decimal::from_str(&new_intern_merch.postage.to_string()).unwrap_or(Decimal::default())
-        )
-        .fetch_one(pool)
-        .await?;
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "users::Entity",
+        from = "Column::OrdererId",
+        to = "users::Column::Id"
+    )]
+    Orderer,
+    #[sea_orm(
+        belongs_to = "users::Entity",
+        from = "Column::ProjectLeaderId",
+        to = "users::Column::Id"
+    )]
+    ProjectLeader,
+}
 
-        let res = InternMerchandiseEntity::get_intern_merch_by_id(pool, res.id).await?;
+#[derive(Debug)]
+pub struct UserToInternMerch;
 
-        Ok(res)
+impl Linked for UserToInternMerch {
+    type FromEntity = Entity;
+
+    type ToEntity = users::Entity;
+
+    fn link(&self) -> Vec<sea_orm::LinkDef> {
+        vec![Relation::Orderer.def()]
     }
+}
 
-    pub async fn get_intern_merch_by_id(
-        pool: &PgPool,
-        id: InternMerchandiseId,
-    ) -> Result<InternMerchandiseEntity, sqlx::Error> {
-        let res = sqlx::query_as!(
-            InternMerchandiseEntity,
-            r#"SELECT 
-                id,
-                merchandise_id,
-                orderer_id,
-                project_leader_id,
-                purchased_on,
-                count,
-                cost,
-                status as "status: _",
-                merchandise_name,
-                use_case,
-                location,
-                article_number,
-                shop,
-                serial_number,
-                arrived_on,
-                url,
-                postage,
-                created_at,
-                updated_at
-            FROM intern_merchandises
-            WHERE id = $1
-            ORDER BY created_at DESC;"#,
-            id
-        )
-        .fetch_one(pool)
-        .await?;
+impl ActiveModelBehavior for ActiveModel {}
 
-        Ok(res)
-    }
-
-    pub async fn list_intern_merch(
-        pool: &PgPool,
-        start: i64,
-        limit: i64,
-    ) -> Result<Vec<Self>, sqlx::Error> {
-        Ok(query_as!(
-            InternMerchandiseEntity,
-            r#"SELECT
-                    id,
-                    merchandise_id,
-                    orderer_id,
-                    project_leader_id,
-                    purchased_on,
-                    count,
-                    cost,
-                    status as "status: _",
-                    merchandise_name,
-                    use_case,
-                    location,
-                    article_number,
-                    shop,
-                    serial_number,
-                    arrived_on,
-                    url,
-                    postage,
-                    created_at,
-                    updated_at
-                FROM intern_merchandises
-                ORDER BY created_at ASC
-                LIMIT $1
-                OFFSET $2;"#,
-            limit,
-            start
-        )
-        .fetch_all(pool)
-        .await?)
-    }
-
-    pub async fn count_intern_merch(pool: &PgPool) -> Result<i64, sqlx::Error> {
-        Ok(sqlx::query!(
-            r#"SELECT COUNT(id)
-            FROM intern_merchandises;"#
-        )
-        .fetch_one(pool)
+pub async fn new_intern_merch(
+    db: &DatabaseConnection,
+    orderer_id: Uuid,
+    update: NewInternMerchandise,
+) -> Result<Option<InternMerchandise>, sea_orm::error::DbErr> {
+    let new_intern_merch = ActiveModel {
+        orderer_id: Set(orderer_id),
+        controller_id: Set(None),
+        project_leader_id: Set(update.project_leader_id),
+        purchased_on: Set(Utc::now().into()),
+        count: Set(update.count),
+        cost: Set(update.cost),
+        merchandise_name: Set(update.merchandise_name),
+        use_case: Set(update.use_case),
+        location: Set(update.location),
+        article_number: Set(update.article_number),
+        shop: Set(update.shop),
+        url: Set(update.url),
+        postage: Set(Some(update.postage)),
+        ..Default::default()
+    };
+    let intern_merch_id = Entity::insert(new_intern_merch)
+        .exec(db)
         .await?
-        .count
-        .unwrap_or_default())
+        .last_insert_id;
+    Ok(intern_merch_by_id(db, intern_merch_id).await?)
+}
+
+pub async fn intern_merch_by_id(
+    db: &DatabaseConnection,
+    id: uuid::Uuid,
+) -> Result<Option<InternMerchandise>, sea_orm::error::DbErr> {
+    if let Some(merch) = Entity::find_by_id(id).one(db).await? {
+        let ocp: (
+            Option<users::Model>,
+            Option<users::Model>,
+            Option<users::Model>,
+        ) = futures::try_join!(
+            users::Entity::find_by_id(merch.orderer_id).one(&db),
+            users::Entity::find_by_id(merch.controller_id.unwrap_or(Uuid::new_v4())).one(&db),
+            users::Entity::find_by_id(merch.project_leader_id).one(&db),
+        )?;
+        let res = (merch, ocp).into();
+        return Ok(Some(res));
     }
 
-    pub async fn incoming_intern_merchandise(
-        pool: &PgPool,
-        update: IncomingInternMerchandise,
-    ) -> Result<InternMerchandiseEntity, sqlx::Error> {
-        Ok(query_as!(
-            Self,
-            r#"UPDATE intern_merchandises
-                SET 
-                    merchandise_id = $2,
-                    serial_number = $3,
-                    arrived_on = NOW()
-                WHERE id = $1
-                RETURNING
-                    id,
-                    merchandise_id,
-                    orderer_id,
-                    project_leader_id,
-                    purchased_on,
-                    count,
-                    cost,
-                    status as "status: _",
-                    merchandise_name,
-                    use_case,
-                    location,
-                    article_number,
-                    shop,
-                    serial_number,
-                    arrived_on,
-                    url,
-                    postage,
-                    created_at,
-                    updated_at;"#,
-            update.id,
-            update.merchandise_id,
-            update.serial_number,
-        )
-        .fetch_one(pool)
+    Ok(None)
+}
+
+pub async fn count_intern_merch(db: &DatabaseConnection) -> Result<usize, sea_orm::error::DbErr> {
+    Ok(Entity::find().count(db).await?)
+}
+
+pub async fn list_intern_merch(
+    db: &DatabaseConnection,
+) -> Result<Vec<Model>, sea_orm::error::DbErr> {
+    Ok(Entity::find()
+        .order_by(Column::CreatedAt, Order::Asc)
+        .all(db)
         .await?)
-    }
-
-    pub async fn delete(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
-        query!(
-            r#"DELETE
-            FROM intern_merchandises
-            WHERE id = $1;"#,
-            self.id
-        )
-        .execute(pool)
-        .await?;
-        Ok(())
-    }
 }
 
-impl<'r> Decode<'r, Postgres> for InternMerchandiseEntity {
-    fn decode(
-        value: <Postgres as sqlx::database::HasValueRef<'r>>::ValueRef,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let mut decoder = sqlx::postgres::types::PgRecordDecoder::new(value)?;
-
-        Ok(InternMerchandiseEntity {
-            id: decoder.try_decode::<InternMerchandiseId>()?,
-            merchandise_id: decoder.try_decode::<Option<i64>>()?,
-            orderer_id: decoder.try_decode::<UserId>()?,
-            project_leader_id: decoder.try_decode::<UserId>()?,
-            purchased_on: decoder.try_decode::<DateTime<Utc>>()?,
-            count: decoder.try_decode::<i64>()?,
-            cost: decoder.try_decode::<Decimal>()?,
-            status: decoder.try_decode::<InternMerchandiseStatus>()?,
-            merchandise_name: decoder.try_decode::<String>()?,
-            use_case: decoder.try_decode::<Option<String>>()?,
-            location: decoder.try_decode::<Option<String>>()?,
-            article_number: decoder.try_decode::<String>()?,
-            shop: decoder.try_decode::<String>()?,
-            serial_number: decoder.try_decode::<Option<String>>()?,
-            arrived_on: decoder.try_decode::<Option<DateTime<Utc>>>()?,
-            url: decoder.try_decode::<Option<String>>()?,
-            postage: decoder.try_decode::<Option<Decimal>>()?,
-            created_at: decoder.try_decode::<DateTime<Utc>>()?,
-            updated_at: decoder.try_decode::<DateTime<Utc>>()?,
-        })
-    }
+pub async fn delete_intern_merch(
+    db: &DatabaseConnection,
+    id: Uuid,
+) -> Result<u64, sea_orm::error::DbErr> {
+    let merch: ActiveModel = match Entity::find_by_id(id).one(db).await? {
+        Some(merch) => merch.into(),
+        None => return Ok(0),
+    };
+    Ok(Entity::delete(merch).exec(db).await?.rows_affected)
 }
 
-impl<'r> Encode<'r, Postgres> for InternMerchandiseEntity {
-    fn encode_by_ref(&self, buf: &mut PgArgumentBuffer) -> sqlx::encode::IsNull {
-        let mut encoder = sqlx::postgres::types::PgRecordEncoder::new(buf);
-
-        encoder.encode(self.id);
-        encoder.encode(self.merchandise_id);
-        encoder.encode(self.orderer_id);
-        encoder.encode(self.project_leader_id);
-        encoder.encode(self.purchased_on);
-        encoder.encode(self.count);
-        encoder.encode(self.cost);
-        encoder.encode(self.status);
-        encoder.encode(self.merchandise_name.clone());
-        encoder.encode(self.use_case.clone());
-        encoder.encode(self.location.clone());
-        encoder.encode(self.article_number.clone());
-        encoder.encode(self.shop.clone());
-        encoder.encode(self.serial_number.clone());
-        encoder.encode(self.arrived_on);
-        encoder.encode(self.url.clone());
-        encoder.encode(self.postage);
-        encoder.finish();
-        sqlx::encode::IsNull::No
+pub async fn incoming_intern_merch(
+    db: &DatabaseConnection,
+    id: Uuid,
+    update: IncomingInternMerchandise,
+) -> Result<Option<InternMerchandise>, sea_orm::error::DbErr> {
+    let merch = Entity::find_by_id(id).one(db).await?;
+    if let Some(merch) = merch {
+        let mut merch: ActiveModel = merch.into();
+        merch.merchandise_id = Set(Some(update.merchandise_id));
+        merch.serial_number = Set(Some(update.serial_number));
+        merch.update(db).await?;
+        return Ok(intern_merch_by_id(db, id).await?);
     }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Type, Enum)]
-#[sqlx(type_name = "intern_merchandise_status", rename_all = "snake_case")]
-pub enum InternMerchandiseStatus {
-    Ordered,
-    Delivered,
-    Stored,
-    Used,
-}
-
-impl Default for InternMerchandiseStatus {
-    fn default() -> Self {
-        InternMerchandiseStatus::Ordered
-    }
+    Ok(None)
 }
 
 // #[derive(Template)]
