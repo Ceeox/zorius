@@ -45,7 +45,7 @@ impl ProjectQuery {
             |after, before, first, last| async move {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                let projects = list_projects(db).await?;
+                let projects = list_projects(db, start, limit).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection

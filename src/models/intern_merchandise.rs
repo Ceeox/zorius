@@ -1,5 +1,6 @@
 use chrono::Utc;
-use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, Set};
+use futures::Future;
+use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
 use uuid::Uuid;
 
 use crate::{
@@ -44,26 +45,78 @@ pub enum Relation {
     Orderer,
     #[sea_orm(
         belongs_to = "users::Entity",
+        from = "Column::ControllerId",
+        to = "users::Column::Id"
+    )]
+    Controller,
+    #[sea_orm(
+        belongs_to = "users::Entity",
         from = "Column::ProjectLeaderId",
         to = "users::Column::Id"
     )]
     ProjectLeader,
 }
 
-#[derive(Debug)]
-pub struct UserToInternMerch;
+impl ActiveModelBehavior for ActiveModel {}
 
-impl Linked for UserToInternMerch {
-    type FromEntity = Entity;
+pub mod users_to_intern_merch {
+    use sea_orm::prelude::*;
+    use uuid::Uuid;
 
-    type ToEntity = users::Entity;
+    use crate::models::intern_merchandise;
 
-    fn link(&self) -> Vec<sea_orm::LinkDef> {
-        vec![Relation::Orderer.def()]
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "combined_intern_merch")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub orderer_id: Uuid,
+        #[sea_orm(primary_key)]
+        pub controller_id: Uuid,
+        #[sea_orm(primary_key)]
+        pub project_leader_id: Uuid,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[sea_orm(
+            belongs_to = "intern_merchandise::Entity",
+            from = "Column::OrdererId",
+            to = "intern_merchandise::Column::OrdererId"
+        )]
+        Orderer,
+        #[sea_orm(
+            belongs_to = "intern_merchandise::Entity",
+            from = "Column::ControllerId",
+            to = "intern_merchandise::Column::ControllerId"
+        )]
+        Controller,
+        #[sea_orm(
+            belongs_to = "intern_merchandise::Entity",
+            from = "Column::ProjectLeaderId",
+            to = "intern_merchandise::Column::ProjectLeaderId"
+        )]
+        ProjectLeader,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+
+    #[derive(Debug)]
+    pub struct UsersToInternMerch;
+
+    impl Linked for UsersToInternMerch {
+        type FromEntity = intern_merchandise::Entity;
+
+        type ToEntity = Entity;
+
+        fn link(&self) -> Vec<sea_orm::LinkDef> {
+            vec![
+                Relation::Orderer.def(),
+                Relation::Controller.def(),
+                Relation::ProjectLeader.def(),
+            ]
+        }
     }
 }
-
-impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn new_intern_merch(
     db: &DatabaseConnection,
@@ -72,7 +125,6 @@ pub async fn new_intern_merch(
 ) -> Result<Option<InternMerchandise>, sea_orm::error::DbErr> {
     let new_intern_merch = ActiveModel {
         orderer_id: Set(orderer_id),
-        controller_id: Set(None),
         project_leader_id: Set(update.project_leader_id),
         purchased_on: Set(Utc::now().into()),
         count: Set(update.count),
@@ -86,6 +138,7 @@ pub async fn new_intern_merch(
         postage: Set(Some(update.postage)),
         ..Default::default()
     };
+    println!("{:#?}", new_intern_merch);
     let intern_merch_id = Entity::insert(new_intern_merch)
         .exec(db)
         .await?
@@ -97,19 +150,13 @@ pub async fn intern_merch_by_id(
     db: &DatabaseConnection,
     id: uuid::Uuid,
 ) -> Result<Option<InternMerchandise>, sea_orm::error::DbErr> {
-    if let Some(merch) = Entity::find_by_id(id).one(db).await? {
-        let ocp: (
-            Option<users::Model>,
-            Option<users::Model>,
-            Option<users::Model>,
-        ) = futures::try_join!(
-            users::Entity::find_by_id(merch.orderer_id).one(&db),
-            users::Entity::find_by_id(merch.controller_id.unwrap_or(Uuid::new_v4())).one(&db),
-            users::Entity::find_by_id(merch.project_leader_id).one(&db),
-        )?;
-        let res = (merch, ocp).into();
-        return Ok(Some(res));
-    }
+    let merch = Entity::find_by_id(id).one(db).await?.unwrap();
+    println!("{:#?}", merch);
+    let users = merch
+        .find_linked(users_to_intern_merch::UsersToInternMerch)
+        .one(db)
+        .await?;
+    println!("{:#?}", users);
 
     Ok(None)
 }
@@ -120,8 +167,12 @@ pub async fn count_intern_merch(db: &DatabaseConnection) -> Result<usize, sea_or
 
 pub async fn list_intern_merch(
     db: &DatabaseConnection,
+    start: usize,
+    limit: usize,
 ) -> Result<Vec<Model>, sea_orm::error::DbErr> {
     Ok(Entity::find()
+        .offset(start as u64)
+        .limit(limit as u64)
         .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
         .await?)

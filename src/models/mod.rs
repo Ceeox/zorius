@@ -7,3 +7,4 @@ pub(crate) mod upload;
 pub(crate) mod users;
 // pub(crate) mod work_record;
 pub(crate) mod work_report;
+pub(crate) mod wr_relation;

@@ -11,7 +11,7 @@ pub mod intern_merchandise;
 pub mod project;
 //pub mod role;
 pub mod user;
-//pub mod work_report;
+pub mod work_report;
 
 use crate::{
     api::{
@@ -21,7 +21,7 @@ use crate::{
         project::{ProjectMutation, ProjectQuery},
         // role::{RoleMutation, RoleQuery},
         user::{UserMutation, UserQuery},
-        // work_report::{WorkReportMutation, WorkReportQuery},
+        work_report::{WorkReportMutation, WorkReportQuery},
     },
     config::CONFIG,
     API_VERSION,
@@ -36,7 +36,7 @@ pub struct Query(
     // RoleQuery,
     CustomerQuery,
     ProjectQuery,
-    // WorkReportQuery,
+    WorkReportQuery,
     InternMerchandiseQuery,
 );
 
@@ -46,7 +46,7 @@ pub struct Mutation(
     // RoleMutation,
     CustomerMutation,
     ProjectMutation,
-    // WorkReportMutation,
+    WorkReportMutation,
     InternMerchandiseMutation,
 );
 

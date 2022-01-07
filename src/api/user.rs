@@ -98,6 +98,8 @@ impl UserQuery {
                     db,
                     order_by.unwrap_or(OrderBy::CreatedAt),
                     dic.unwrap_or(OrderDirection::Asc),
+                    start,
+                    limit,
                 )
                 .await?;
 

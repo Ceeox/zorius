@@ -1,8 +1,8 @@
-use sea_orm::{prelude::*, DatabaseConnection, Set};
+use sea_orm::{prelude::*, DatabaseConnection, QuerySelect, Set};
 use uuid::Uuid;
 
 use crate::{
-    models::project,
+    models::{project, work_report},
     view::customer::{NewCustomer, UpdateCustomer},
 };
 
@@ -22,6 +22,20 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "project::Entity")]
     Projects,
+    #[sea_orm(
+        belongs_to = "work_report::Entity",
+        from = "Column::Id"
+        to = "work_report::Column::OwnerId",
+        on_update = "NoAction",
+        on_delete = "NoAction"
+    )]
+    WorkReport,
+}
+
+impl Related<work_report::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WorkReport.def()
+    }
 }
 
 impl Related<project::Entity> for Entity {
@@ -65,9 +79,13 @@ pub async fn count_customers(db: &DatabaseConnection) -> Result<usize, sea_orm::
 
 pub async fn list_customers(
     db: &DatabaseConnection,
+    start: usize,
+    limit: usize,
 ) -> Result<Vec<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
     Ok(Entity::find()
         .find_with_related(project::Entity)
+        .offset(start as u64)
+        .limit(limit as u64)
         .all(db)
         .await?)
 }

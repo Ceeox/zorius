@@ -1,9 +1,12 @@
 use pwhash::sha512_crypt;
 use uuid::Uuid;
 
-use crate::view::users::{NewUser, OrderBy, OrderDirection, UserUpdate};
+use crate::{
+    models::{intern_merchandise, work_report},
+    view::users::{NewUser, OrderBy, OrderDirection, UserUpdate},
+};
 
-use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, Set};
+use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
 
 pub type UserId = Uuid;
 pub type UserEmail = String;
@@ -39,7 +42,22 @@ impl Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(
+        belongs_to = "work_report::Entity",
+        from = "Column::Id"
+        to = "work_report::Column::OwnerId",
+        on_update = "NoAction",
+        on_delete = "NoAction"
+    )]
+    WorkReport,
+}
+
+impl Related<work_report::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WorkReport.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}
 
@@ -81,9 +99,16 @@ pub async fn list_users(
     db: &DatabaseConnection,
     order_by: OrderBy,
     dic: OrderDirection,
+    start: usize,
+    limit: usize,
 ) -> Result<Vec<Model>, sea_orm::error::DbErr> {
     let order: Column = order_by.into();
-    Ok(Entity::find().order_by(order, dic.into()).all(db).await?)
+    Ok(Entity::find()
+        .offset(start as u64)
+        .limit(limit as u64)
+        .order_by(order, dic.into())
+        .all(db)
+        .await?)
 }
 
 pub async fn count_users(db: &DatabaseConnection) -> Result<usize, sea_orm::error::DbErr> {

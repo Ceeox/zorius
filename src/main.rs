@@ -10,9 +10,8 @@ use actix_web::{
 };
 use async_graphql::{EmptySubscription, Schema};
 use log::{debug, error, info};
-use rustls::{
-    internal::pemfile::certs, internal::pemfile::pkcs8_private_keys, NoClientAuth, ServerConfig,
-};
+use rustls::PrivateKey;
+use rustls::{internal::msgs::codec::Codec, server::NoClientAuth, Certificate, ServerConfig};
 use sea_orm::Database as SeaOrmDatabase;
 use sqlx::PgPool;
 use tokio::time::sleep;
@@ -63,15 +62,15 @@ fn setup_log() {
 }
 
 fn setup_tls() -> ServerConfig {
-    let mut tls_config = ServerConfig::new(NoClientAuth::new());
     let cert_file = &mut BufReader::new(File::open(CONFIG.web.cert_path.clone().unwrap()).unwrap());
     let key_file = &mut BufReader::new(File::open(CONFIG.web.key_path.clone().unwrap()).unwrap());
-    let cert_chain = certs(cert_file).unwrap();
-    let mut keys = pkcs8_private_keys(key_file).unwrap();
-    tls_config
-        .set_single_cert(cert_chain, keys.remove(0))
-        .unwrap();
-    tls_config
+    let cert_chain = Certificate::read_bytes(cert_file.buffer()).unwrap();
+    let key = PrivateKey(key_file.buffer().to_owned());
+    ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(vec![cert_chain], key)
+        .unwrap()
 }
 
 fn check_folders() -> Result<(), ZoriusError> {
@@ -143,7 +142,6 @@ async fn main() -> Result<(), errors::ZoriusError> {
 
     let res = if CONFIG.web.enable_ssl {
         let tls_config = setup_tls();
-
         info!("Starting webserver...");
         http_server
             .bind_rustls(webserver_url, tls_config)?

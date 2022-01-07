@@ -1,6 +1,6 @@
 use actix_web::{error::Error as ActixError, http::StatusCode, HttpResponse, ResponseError};
 use jsonwebtoken::errors::Error as JWTError;
-use sqlx::Error as SqlxError;
+use sea_orm::error::DbErr;
 
 use std::fmt;
 use std::io::Error as StdIoError;
@@ -10,7 +10,7 @@ pub enum ZoriusError {
     IoError(StdIoError),
     JWTError(JWTError),
     ActixError(ActixError),
-    SqlxError(SqlxError),
+    DbError(DbErr),
 }
 
 impl fmt::Display for ZoriusError {
@@ -19,7 +19,7 @@ impl fmt::Display for ZoriusError {
             ZoriusError::IoError(e) => f.write_str(&format!("{}", e)),
             ZoriusError::JWTError(e) => f.write_str(&format!("{}", e)),
             ZoriusError::ActixError(e) => f.write_str(&format!("{:?}", e)),
-            ZoriusError::SqlxError(e) => f.write_str(&format!("{:?}", e)),
+            ZoriusError::DbError(_e) => f.write_str(&format!("Database Error")),
         }
     }
 }
@@ -30,13 +30,13 @@ impl ResponseError for ZoriusError {
             ZoriusError::IoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ZoriusError::JWTError(_) => StatusCode::BAD_REQUEST,
             ZoriusError::ActixError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ZoriusError::SqlxError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ZoriusError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
     fn error_response(&self) -> HttpResponse {
         match self {
-            ZoriusError::IoError(_) | ZoriusError::ActixError(_) | ZoriusError::SqlxError(_) => {
+            ZoriusError::IoError(_) | ZoriusError::ActixError(_) | ZoriusError::DbError(_) => {
                 HttpResponse::InternalServerError().finish()
             }
             ZoriusError::JWTError(_) => HttpResponse::BadRequest().finish(),
@@ -62,8 +62,8 @@ impl From<JWTError> for ZoriusError {
     }
 }
 
-impl From<SqlxError> for ZoriusError {
-    fn from(err: SqlxError) -> Self {
-        ZoriusError::SqlxError(err)
+impl From<DbErr> for ZoriusError {
+    fn from(err: DbErr) -> Self {
+        ZoriusError::DbError(err)
     }
 }

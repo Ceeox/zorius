@@ -59,10 +59,10 @@ CREATE TABLE IF NOT EXISTS intern_merchandises (
     merchandise_id BIGINT,
     orderer_id UUID NOT NULL REFERENCES users,
     project_leader_id UUID REFERENCES users,
+    controller_id UUID REFERENCES users,
     purchased_on TIMESTAMP WITH TIME ZONE NOT NULL,
     count BIGINT NOT NULL,
     cost numeric(15,6) NOT NULL,
-    status intern_merchandise_status NOT NULL,
     merchandise_name TEXT NOT NULL,
     use_case TEXT,
     location TEXT,
@@ -125,3 +125,10 @@ CREATE TRIGGER set_timestamp
 BEFORE UPDATE ON work_reports
 FOR EACH ROW
 EXECUTE PROCEDURE trigger_set_timestamp();
+
+CREATE TABLE IF NOT EXISTS wr_relations (
+    wr_id UUID NOT NULL REFERENCES work_reports,
+    owner_id UUID NOT NULL REFERENCES users,
+    customer_id UUID NOT NULL REFERENCES customers,
+    project_id UUID REFERENCES projects
+);

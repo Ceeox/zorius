@@ -48,7 +48,7 @@ impl CustomerQuery {
             |after, before, first, last| async move {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                let customers = list_customers(db).await?;
+                let customers = list_customers(db, start, limit).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection

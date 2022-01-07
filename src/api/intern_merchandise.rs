@@ -56,7 +56,7 @@ impl InternMerchandiseQuery {
             |after, before, first, last| async move {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                let merchs = list_intern_merch(db).await?;
+                let merchs = list_intern_merch(db, start, limit).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection

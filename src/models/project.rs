@@ -1,7 +1,7 @@
-use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, Set};
+use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
 use uuid::Uuid;
 
-use crate::models::customer;
+use crate::models::{customer, work_report};
 use crate::view::project::NewProject;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -21,9 +21,25 @@ pub enum Relation {
     #[sea_orm(
         belongs_to = "customer::Entity",
         from = "Column::CustomerId",
-        to = "customer::Column::Id"
+        to = "customer::Column::Id",
+        on_update = "NoAction",
+        on_delete = "NoAction"
     )]
     Customer,
+    #[sea_orm(
+        belongs_to = "work_report::Entity",
+        from = "Column::Id"
+        to = "work_report::Column::OwnerId",
+        on_update = "NoAction",
+        on_delete = "NoAction"
+    )]
+    WorkReport,
+}
+
+impl Related<work_report::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WorkReport.def()
+    }
 }
 
 impl Related<customer::Entity> for Entity {
@@ -64,9 +80,13 @@ pub async fn count_projects(db: &DatabaseConnection) -> Result<usize, sea_orm::e
 
 pub async fn list_projects(
     db: &DatabaseConnection,
+    start: usize,
+    limit: usize,
 ) -> Result<Vec<(Model, Option<customer::Model>)>, sea_orm::error::DbErr> {
     Ok(Entity::find()
         .find_also_related(customer::Entity)
+        .offset(start as u64)
+        .limit(limit as u64)
         .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
         .await?)
