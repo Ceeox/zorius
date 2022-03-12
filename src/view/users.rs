@@ -1,22 +1,41 @@
-use async_graphql::{validators::Email, Enum, InputObject, SimpleObject};
-use chrono::{DateTime, FixedOffset};
-use sea_orm::Order;
+use async_graphql::{Enum, InputObject, Object, SimpleObject};
+use entity::user::Model;
+use entity::user::{self, Column};
+use pwhash::sha512_crypt;
+use sea_orm::{prelude::DateTimeUtc, Order};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    models::users::{self, Column, Model, UserEmail},
-    validators::Password,
-};
+use crate::api::MutationType;
+use crate::validators::Password;
 
 #[derive(SimpleObject, Debug, Serialize, Clone)]
 pub struct User {
     pub id: Uuid,
-    pub email: UserEmail,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
-    pub created_at: DateTime<FixedOffset>,
-    pub updated_at: DateTime<FixedOffset>,
+    pub email: String,
+    #[serde(skip)]
+    #[graphql(visible = false)]
+    pub password_hash: String,
+    pub name: Option<String>,
+    pub avatar_filename: Option<String>,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
+    pub deleted_at: Option<DateTimeUtc>,
+}
+
+impl User {
+    pub fn get_id(&self) -> &Uuid {
+        &self.id
+    }
+
+    pub fn hash_password(password: &str) -> String {
+        sha512_crypt::hash(password.as_bytes())
+            .expect("system random number generator cannot be opened!")
+    }
+
+    pub fn is_password_correct(&self, password: &str) -> bool {
+        sha512_crypt::verify(password.as_bytes(), &self.password_hash)
+    }
 }
 
 impl From<Model> for User {
@@ -24,35 +43,35 @@ impl From<Model> for User {
         Self {
             id: model.id,
             email: model.email,
+            password_hash: model.password_hash,
+            name: model.name,
+            avatar_filename: model.avatar_filename,
             created_at: model.created_at,
-            firstname: model.firstname,
-            lastname: model.lastname,
             updated_at: model.updated_at,
+            deleted_at: model.deleted_at,
         }
     }
 }
 
 #[derive(Deserialize, Debug, InputObject)]
 pub struct NewUser {
-    #[graphql(validator(Email))]
-    pub email: UserEmail,
-    #[graphql(validator(Password))]
+    #[graphql(validator(email))]
+    pub email: String,
+    #[graphql(validator(custom = "Password"))]
     pub password: String,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
+    pub name: Option<String>,
 }
 
 #[derive(InputObject, Debug, Serialize)]
 pub struct PasswordChange {
     pub old_password: String,
-    #[graphql(validator(Password))]
+    #[graphql(validator(custom = "Password"))]
     pub new_password: String,
 }
 
 #[derive(InputObject, Debug, Serialize)]
 pub struct UserUpdate {
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
+    pub name: Option<String>,
 }
 
 #[derive(Enum, Debug, Serialize, Copy, Clone, PartialEq, Eq)]
@@ -60,18 +79,16 @@ pub enum OrderBy {
     Email,
     CreatedAt,
     UpdatedAt,
-    Firstname,
-    Lastname,
+    Name,
 }
 
-impl From<OrderBy> for users::Column {
+impl From<OrderBy> for user::Column {
     fn from(order_by: OrderBy) -> Self {
         match order_by {
             OrderBy::Email => Column::Email,
             OrderBy::CreatedAt => Column::CreatedAt,
             OrderBy::UpdatedAt => Column::UpdatedAt,
-            OrderBy::Firstname => Column::Firstname,
-            OrderBy::Lastname => Column::Lastname,
+            OrderBy::Name => Column::Name,
         }
     }
 }
@@ -88,5 +105,22 @@ impl From<OrderDirection> for Order {
             OrderDirection::Asc => Order::Asc,
             OrderDirection::Desc => Order::Desc,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct UserChanged {
+    pub mutation_type: MutationType,
+    pub id: Uuid,
+}
+
+#[Object]
+impl UserChanged {
+    async fn mutation_type(&self) -> MutationType {
+        self.mutation_type
+    }
+
+    async fn id(&self) -> &Uuid {
+        &self.id
     }
 }

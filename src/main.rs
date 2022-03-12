@@ -1,29 +1,34 @@
 use std::io::BufReader;
+use std::iter;
 use std::{fs::File, time::Duration};
 
 use actix_cors::Cors;
+use actix_files::Files;
+use actix_governor::{Governor, GovernorConfigBuilder};
+use actix_web::guard;
 use actix_web::http::header;
+use actix_web::web::{self, Data};
 use actix_web::{
     http::Method,
     middleware::{DefaultHeaders, Logger},
     App, HttpServer,
 };
+use async_graphql::http::MultipartOptions;
 use async_graphql::{EmptySubscription, Schema};
 use log::{debug, error, info};
-use rustls::PrivateKey;
-use rustls::{internal::msgs::codec::Codec, server::NoClientAuth, Certificate, ServerConfig};
-use sea_orm::Database as SeaOrmDatabase;
-use sqlx::PgPool;
+use migration::{Migrator, MigratorTrait};
+use rustls::{Certificate, PrivateKey, ServerConfig};
+use rustls_pemfile::{read_one, Item};
+use sea_orm::{Database as SeaOrmDatabase, DatabaseConnection};
 use tokio::time::sleep;
 use uuid::Uuid;
 
-use crate::{errors::ZoriusError, models::upload::Storage};
+use crate::api::graphql_ws;
+use crate::errors::Error;
 
 mod api;
 mod config;
-mod database;
 mod errors;
-mod helper;
 mod mailer;
 mod models;
 mod validators;
@@ -32,12 +37,11 @@ mod view;
 use crate::{
     api::{graphql, playground, Mutation, Query},
     config::CONFIG,
-    database::Database,
 };
 
 const API_VERSION: &str = "v1";
 
-async fn setup_pg() -> Result<Database, sqlx::Error> {
+async fn setup_pg() -> Result<DatabaseConnection, sea_orm::DbErr> {
     let url = format!(
         "postgres://{}:{}@{}:{}/{}",
         CONFIG.db.username, CONFIG.db.password, CONFIG.db.server, CONFIG.db.port, CONFIG.db.name
@@ -48,9 +52,7 @@ async fn setup_pg() -> Result<Database, sqlx::Error> {
     );
     info!("Connecting to: {:?}", pw_hidden_url);
 
-    let db = SeaOrmDatabase::connect(&url).await.unwrap();
-
-    Ok(Database::new(PgPool::connect(&url).await?, db).await)
+    Ok(SeaOrmDatabase::connect(&url).await?)
 }
 
 fn setup_log() {
@@ -62,18 +64,30 @@ fn setup_log() {
 }
 
 fn setup_tls() -> ServerConfig {
-    let cert_file = &mut BufReader::new(File::open(CONFIG.web.cert_path.clone().unwrap()).unwrap());
-    let key_file = &mut BufReader::new(File::open(CONFIG.web.key_path.clone().unwrap()).unwrap());
-    let cert_chain = Certificate::read_bytes(cert_file.buffer()).unwrap();
-    let key = PrivateKey(key_file.buffer().to_owned());
+    let mut certs = Vec::new();
+    let mut cert_file = BufReader::new(File::open(CONFIG.web.cert_path.clone().unwrap()).unwrap());
+    for item in iter::from_fn(|| read_one(&mut cert_file).transpose()).flatten() {
+        if let Item::X509Certificate(cert) = item {
+            certs.push(Certificate(cert))
+        }
+    }
+
+    let mut key_file = BufReader::new(File::open(CONFIG.web.key_path.clone().unwrap()).unwrap());
+    let key_buf = match read_one(&mut key_file).unwrap().unwrap() {
+        Item::PKCS8Key(key) => key,
+        Item::RSAKey(key) => key,
+        _ => vec![],
+    };
+
+    let key = PrivateKey(key_buf);
     ServerConfig::builder()
         .with_safe_defaults()
         .with_no_client_auth()
-        .with_single_cert(vec![cert_chain], key)
+        .with_single_cert(certs, key)
         .unwrap()
 }
 
-fn check_folders() -> Result<(), ZoriusError> {
+fn check_folders() -> Result<(), Error> {
     use std::path::Path;
     if !Path::new("files").exists() {
         std::fs::create_dir("files")?;
@@ -81,8 +95,8 @@ fn check_folders() -> Result<(), ZoriusError> {
     Ok(())
 }
 
-#[actix_web::main]
-async fn main() -> Result<(), errors::ZoriusError> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     setup_log();
     check_folders()?;
 
@@ -103,9 +117,13 @@ async fn main() -> Result<(), errors::ZoriusError> {
     };
     info!("Successfully connected to database");
 
+    info!("running migrations");
+    Migrator::up(&database, None)
+        .await
+        .expect("migrations failed");
+
     let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
         .data(database)
-        .data(Storage::default())
         .finish();
 
     // Start http server
@@ -120,9 +138,15 @@ async fn main() -> Result<(), errors::ZoriusError> {
 
     let log_format = CONFIG.web.log_format.clone();
 
+    let governor_conf = GovernorConfigBuilder::default()
+        .per_second(1)
+        .burst_size(100)
+        .finish()
+        .unwrap();
+
     let http_server = HttpServer::new(move || {
         App::new()
-            .data(schema.clone())
+            .app_data(Data::new(schema.clone()))
             .wrap(
                 Cors::default()
                     .allowed_methods(&[Method::GET, Method::POST, Method::OPTIONS])
@@ -133,11 +157,32 @@ async fn main() -> Result<(), errors::ZoriusError> {
                     .supports_credentials()
                     .max_age(3600),
             )
-            .wrap(DefaultHeaders::new().header("x-request-id", Uuid::new_v4().to_string()))
+            .wrap(Governor::new(&governor_conf))
+            .wrap(DefaultHeaders::new().add(("x-request-id", Uuid::new_v4().to_string())))
             .wrap(Logger::new(&log_format))
-            .service(graphql)
-            .app_data(schema.clone())
-            .service(playground)
+            .service(
+                web::resource("/graphql")
+                    .guard(guard::Post())
+                    .to(graphql)
+                    .app_data(MultipartOptions::default().max_num_files(5)),
+            )
+            .service(
+                web::resource("/playground")
+                    .guard(guard::Get())
+                    .to(playground),
+            )
+            .service(
+                web::resource("/graphql")
+                    .guard(guard::Get())
+                    .guard(guard::Header("upgrade", "websocket"))
+                    .to(graphql_ws),
+            )
+            .service(
+                Files::new("/", "static")
+                    .index_file("index.html")
+                    .prefer_utf8(true),
+            )
+            .service(Files::new("/avatar", "./static/avatar").prefer_utf8(true))
     });
 
     let res = if CONFIG.web.enable_ssl {

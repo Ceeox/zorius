@@ -1,12 +1,10 @@
 use async_graphql::{InputObject, SimpleObject};
-use chrono::{DateTime, FixedOffset};
+use entity::{customer, project::Model};
+use sea_orm::prelude::DateTimeUtc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    models::{customer, project::Model},
-    view::customer::Customer,
-};
+use crate::view::customer::Customer;
 
 #[derive(Serialize, Debug, Clone, SimpleObject)]
 pub struct Project {
@@ -14,8 +12,9 @@ pub struct Project {
     pub customer: Option<Customer>,
     pub name: String,
     pub note: Option<String>,
-    pub created_at: DateTime<FixedOffset>,
-    pub updated_at: DateTime<FixedOffset>,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
+    pub deleted_at: Option<DateTimeUtc>,
 }
 
 #[derive(Deserialize, Debug, Clone, InputObject)]
@@ -37,6 +36,7 @@ impl From<(Model, Option<customer::Model>)> for Project {
                 projects: None,
                 created_at: c.created_at,
                 updated_at: c.updated_at,
+                deleted_at: c.deleted_at,
             }),
         };
         Self {
@@ -46,6 +46,7 @@ impl From<(Model, Option<customer::Model>)> for Project {
             note: project.note,
             created_at: project.created_at,
             updated_at: project.updated_at,
+            deleted_at: project.deleted_at,
         }
     }
 }

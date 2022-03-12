@@ -11,6 +11,7 @@ use crate::config::CONFIG;
 /// From header is created with the config domain like: zorius@`domain`
 // TODO:    1. return the result to report if the emails failed to send
 //          2. remove `unwraps` and `expects` and replace them
+#[allow(dead_code)]
 pub fn mailer(to: &str, subject: &str, body: &str) {
     if !CONFIG.mailer.enable_mailer {
         return;

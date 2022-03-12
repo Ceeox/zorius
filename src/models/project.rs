@@ -1,54 +1,11 @@
+use entity::{
+    customer,
+    project::{ActiveModel, Column, Entity, Model},
+};
 use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
 use uuid::Uuid;
 
-use crate::models::{customer, work_report};
 use crate::view::project::NewProject;
-
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "projects")]
-pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: Uuid,
-    pub customer_id: Uuid,
-    pub name: String,
-    pub note: Option<String>,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: DateTimeWithTimeZone,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "customer::Entity",
-        from = "Column::CustomerId",
-        to = "customer::Column::Id",
-        on_update = "NoAction",
-        on_delete = "NoAction"
-    )]
-    Customer,
-    #[sea_orm(
-        belongs_to = "work_report::Entity",
-        from = "Column::Id"
-        to = "work_report::Column::OwnerId",
-        on_update = "NoAction",
-        on_delete = "NoAction"
-    )]
-    WorkReport,
-}
-
-impl Related<work_report::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::WorkReport.def()
-    }
-}
-
-impl Related<customer::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Customer.def()
-    }
-}
-
-impl ActiveModelBehavior for ActiveModel {}
 
 pub async fn new_project(
     db: &DatabaseConnection,

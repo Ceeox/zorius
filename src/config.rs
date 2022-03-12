@@ -1,14 +1,8 @@
 use lazy_static::lazy_static;
-use std::{env, net::IpAddr, result::Result};
+use std::{net::IpAddr, result::Result};
 
-use config::{Config, ConfigError, Environment, File};
+use config::{Config, ConfigError, Environment, File, FileFormat};
 use serde::Deserialize;
-
-pub static ENV_NAME: &str = "RUN_MODE";
-pub static DEFAULT_CONFIG_FOLDER: &str = "config";
-pub static DEFAULT_CONFIG_FILE: &str = "default";
-pub static DEVELOPMENT_CONFIG_FILE: &str = "dev";
-pub static PRODUCTION_CONFIG_FILE: &str = "prod";
 
 lazy_static! {
     pub static ref CONFIG: Settings = Settings::new().expect("Failed to load config");
@@ -67,24 +61,20 @@ pub struct MailConfig {
 
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
-        let mut s = Config::new();
-        // load the default config
-        s.merge(File::with_name(&format!(
-            "{}/{}",
-            DEFAULT_CONFIG_FOLDER, DEFAULT_CONFIG_FILE
-        )))?;
-        // check if we're running in debug or prod mode
-        // if run mode is not present always use prod
-        let config_path = match env::var(ENV_NAME) {
-            Ok(mode) if mode.eq(PRODUCTION_CONFIG_FILE) || mode.eq(DEVELOPMENT_CONFIG_FILE) => {
-                format!("{}/{}", DEFAULT_CONFIG_FOLDER, mode)
-            }
-            _ => format!("{}/{}", DEFAULT_CONFIG_FOLDER, PRODUCTION_CONFIG_FILE),
-        };
-        s.merge(File::with_name(&config_path).required(true))?;
-        // override config if values are present in env
-        s.merge(Environment::new().separator("_").ignore_empty(true))?;
+        let mut builder = Config::builder();
+        builder = builder.set_default("default", "1")?;
+        builder = builder.add_source(File::new("config/default", FileFormat::Toml));
 
-        s.try_into()
+        if cfg!(debug_assertions) {
+            builder = builder.add_source(File::new("config/dev", FileFormat::Toml));
+        } else {
+            builder = builder.add_source(File::new("config/prod", FileFormat::Toml));
+        }
+
+        builder = builder.add_source(Environment::default().separator("_").ignore_empty(true));
+
+        let config = builder.build()?;
+
+        config.try_deserialize()
     }
 }

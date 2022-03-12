@@ -1,4 +1,4 @@
-use async_graphql::{validators::IntGreaterThan, InputObject, SimpleObject};
+use async_graphql::{InputObject, SimpleObject};
 use chrono::{DateTime, FixedOffset};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -117,9 +117,9 @@ impl From<Model> for InternMerchandise {
 #[derive(InputObject, Deserialize, Serialize)]
 pub struct NewInternMerchandise {
     pub merchandise_name: String,
-    #[graphql(validator(IntGreaterThan(value = "0")))]
+    #[graphql(validator(minimum = 1))]
     pub count: i64,
-    #[graphql(validator(Url))]
+    #[graphql(validator(url))]
     pub url: Option<String>,
     pub project_leader_id: Uuid,
     pub article_number: String,

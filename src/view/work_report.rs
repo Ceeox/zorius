@@ -1,12 +1,9 @@
 use async_graphql::{InputObject, SimpleObject};
-use chrono::{DateTime, FixedOffset, Utc};
+use sea_orm::prelude::DateTimeUtc;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::{
-    models::work_report::Model,
-    view::{customer::Customer, project::Project, users::User},
-};
+use crate::view::{customer::Customer, project::Project, users::User};
 
 #[derive(Serialize, Debug, InputObject)]
 pub struct NewWorkReport {
@@ -22,8 +19,8 @@ pub struct WorkReportUpdate {
     pub project: Option<Uuid>,
     pub description: Option<String>,
     pub invoiced: Option<bool>,
-    pub report_started: Option<DateTime<FixedOffset>>,
-    pub report_ended: Option<DateTime<FixedOffset>>,
+    pub report_started: Option<DateTimeUtc>,
+    pub report_ended: Option<DateTimeUtc>,
 }
 
 #[derive(SimpleObject, Debug, Serialize, Clone)]
@@ -34,10 +31,10 @@ pub struct WorkReport {
     pub project: Option<Project>,
     pub description: String,
     pub invoiced: bool,
-    pub report_started: DateTime<Utc>,
-    pub report_ended: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub report_started: DateTimeUtc,
+    pub report_ended: Option<DateTimeUtc>,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
 }
 
 // impl From<(Model, combined_work_report::Model)> for WorkReport {

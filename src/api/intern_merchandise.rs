@@ -1,6 +1,6 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    Context, Object, Result,
+    Context, Error, Object, Result,
 };
 use futures::stream::{self, StreamExt};
 use uuid::Uuid;
@@ -56,7 +56,10 @@ impl InternMerchandiseQuery {
             |after, before, first, last| async move {
                 let (start, end, limit) = calc_list_params(count, after, before, first, last);
 
-                let merchs = list_intern_merch(db, start, limit).await?;
+                let merchs = match list_intern_merch(db, start, limit).await {
+                    Ok(r) => r,
+                    Err(e) => return Err(Error::new("")),
+                };
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection

@@ -1,65 +1,9 @@
-use pwhash::sha512_crypt;
+use entity::user::{ActiveModel, Column, Entity, Model};
 use uuid::Uuid;
 
-use crate::{
-    models::{intern_merchandise, work_report},
-    view::users::{NewUser, OrderBy, OrderDirection, UserUpdate},
-};
+use crate::view::users::{NewUser, OrderBy, OrderDirection, User, UserUpdate};
 
-use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
-
-pub type UserId = Uuid;
-pub type UserEmail = String;
-
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "users")]
-pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: Uuid,
-    pub email: String,
-    pub password_hash: String,
-    pub invitation_pending: bool,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: DateTimeWithTimeZone,
-    pub deleted: bool,
-}
-
-impl Model {
-    pub fn get_id(&self) -> &Uuid {
-        &self.id
-    }
-
-    fn hash_password(password: &str) -> String {
-        sha512_crypt::hash(password.as_bytes())
-            .expect("system random number generator cannot be opened!")
-    }
-
-    pub fn is_password_correct(&self, password: &str) -> bool {
-        sha512_crypt::verify(password.as_bytes(), &self.password_hash)
-    }
-}
-
-#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "work_report::Entity",
-        from = "Column::Id"
-        to = "work_report::Column::OwnerId",
-        on_update = "NoAction",
-        on_delete = "NoAction"
-    )]
-    WorkReport,
-}
-
-impl Related<work_report::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::WorkReport.def()
-    }
-}
-
-impl ActiveModelBehavior for ActiveModel {}
+use sea_orm::{prelude::*, DatabaseConnection, QueryOrder, QuerySelect, Set};
 
 pub async fn new_user(
     db: &DatabaseConnection,
@@ -67,11 +11,8 @@ pub async fn new_user(
 ) -> Result<Option<Model>, sea_orm::error::DbErr> {
     let new_user = ActiveModel {
         email: Set(update.email),
-        password_hash: Set(Model::hash_password(&update.password)),
-        invitation_pending: Set(false),
-        firstname: Set(update.firstname),
-        lastname: Set(update.lastname),
-        deleted: Set(false),
+        password_hash: Set(User::hash_password(&update.password)),
+        name: Set(update.name),
         ..Default::default()
     };
     let user_id = Entity::insert(new_user).exec(db).await?.last_insert_id;
@@ -123,12 +64,26 @@ pub async fn update_user(
     let user = user_by_id(db, id).await?;
     if let Some(user) = user {
         let mut user: ActiveModel = user.into();
-        user.firstname = Set(update.firstname);
-        user.lastname = Set(update.lastname);
+        user.name = Set(update.name);
         user.update(db).await?;
-        return Ok(user_by_id(db, id).await?);
+        return user_by_id(db, id).await;
     }
     Ok(None)
+}
+
+pub async fn save_user_avatar(
+    db: &DatabaseConnection,
+    id: Uuid,
+    file: String,
+) -> Result<bool, sea_orm::error::DbErr> {
+    let user = user_by_id(db, id).await?;
+    if let Some(user) = user {
+        let mut user: ActiveModel = user.into();
+        user.avatar_filename = Set(Some(file));
+        user.update(db).await?;
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 pub async fn reset_password(
@@ -141,7 +96,7 @@ pub async fn reset_password(
         let mut user: ActiveModel = user.into();
         user.password_hash = Set(password_hash.to_owned());
         user.update(db).await?;
-        return Ok(user_by_id(db, id).await?);
+        return user_by_id(db, id).await;
     }
     Ok(None)
 }

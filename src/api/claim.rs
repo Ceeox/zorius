@@ -4,8 +4,9 @@ use async_graphql::{Context, Error, Result};
 use chrono::Local;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-use crate::{config::CONFIG, models::users::UserId};
+use crate::config::CONFIG;
 
 pub struct Token(pub String);
 
@@ -63,8 +64,8 @@ impl Claim {
     }
 
     /// Return a reference to the `user_id`
-    pub fn user_id(&self) -> UserId {
-        UserId::parse_str(&self.id.clone()).expect("Couldn't convert UserId from string to Uuid")
+    pub fn user_id(&self) -> Uuid {
+        Uuid::parse_str(&self.id.clone()).expect("Couldn't convert UserId from string to Uuid")
     }
 
     /// Retruns if the token is expired
@@ -76,7 +77,7 @@ impl Claim {
 
 impl ToString for Claim {
     fn to_string(&self) -> String {
-        let key = &EncodingKey::from_secret(&CONFIG.secret_key.as_bytes());
+        let key = &EncodingKey::from_secret(CONFIG.secret_key.as_bytes());
         jsonwebtoken::encode(&Header::new(ALGO), self, key).expect("failed jwt convert to string")
     }
 }

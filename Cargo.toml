@@ -5,34 +5,47 @@ name = "zorius"
 resolver = "2"
 version = "0.1.0"
 
+[worksapce]
+members = [".", "entity", "migration"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-actix-cors = "0.6.0-beta.2"
-actix-governor = "0.2.4"
+actix-cors = "0.6.1"
+actix-files = "0.6.0"
+actix-governor = "0.3.0"
 actix-multipart = "0.3.0"
-actix-web = {version = "4.0.0-beta.8", features = ["rustls"]}
-askama = "0.10.5"
-async-graphql = {git = "https://github.com/async-graphql/async-graphql", branch = "actix-web-v4-beta", features = ["chrono", "dataloader", "uuid", "decimal"]}
-async-graphql-actix-web = {git = "https://github.com/async-graphql/async-graphql", branch = "actix-web-v4-beta"}
-async-trait = "0.1.50"
+actix-web = {version = "4.0.1", features = ["rustls"]}
+askama = "0.11.1"
+async-graphql = {version="3.0.34", features = ["chrono", "dataloader", "uuid", "decimal", "unblock"]}
+async-graphql-actix-web = {version = "3.0.34"}
+async-trait = "0.1.52"
 chrono = {version = "0.4.19", features = ["serde"]}
-config = "0.11.0"
+config = "0.12.0"
 env_logger = "0.9.0"
-futures = "0.3.15"
-jsonwebtoken = "7.2"
+futures = "0.3.21"
+futures-channel = "0.3.21"
+futures-timer = "3.0.2"
+futures-util = "0.3.21"
+jsonwebtoken = "8.0.1"
 lazy_static = "1.4.0"
 lettre = "0.9.6"
 lettre_email = "0.9.4"
 log = "0.4.14"
 pwhash = "1.0.0"
-rustls = "0.20.2"
-serde = "1.0.126"
-serde_derive = "1.0.126"
-serde_json = "1.0.64"
-slab = "0.4.3"
-sqlx = {version = "0.5.7", features = ["postgres", "json", "runtime-actix-rustls", "chrono", "uuid", "decimal"]}
-tokio = {version = "1.8.1"}
+rustls = "0.20.4"
+serde = "1.0.136"
+serde_derive = "1.0.136"
+serde_json = "1.0.79"
+slab = "0.4.5"
+tokio = {version = "1.17.0", features = ["full"]}
 url = "2.2.2"
 uuid = {version = "0.8.2", features = ["v4", "serde"]}
-sea-orm = {version = "0.4.2", features = ["sqlx-postgres", "runtime-actix-rustls", "macros"], default-features = false}
-rust_decimal = "1.16.0"
+sea-orm = {version = "0.6.0", features = ["sqlx-postgres", "runtime-actix-rustls", "macros"], default-features = false}
+rust_decimal = "1.12.4"
+migration = { path = "migration" }
+entity = { path = "entity" }
+rustls-pemfile = "0.3.0"
+image = "0.24.1"
+thiserror = "1.0.30"
+once_cell = "1.9.0"
+mime = "0.3.16"
