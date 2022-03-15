@@ -13,8 +13,6 @@ pub struct Model {
     pub project_id: Option<Uuid>,
     pub description: String,
     pub invoiced: bool,
-    pub report_started: DateTimeUtc,
-    pub report_ended: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub deleted_at: Option<DateTimeUtc>,
@@ -66,22 +64,6 @@ impl Related<project::Entity> for Entity {
     }
 }
 
-pub struct ToWorkReport;
-
-impl Linked for ToWorkReport {
-    type FromEntity = Entity;
-
-    type ToEntity = project::Entity;
-
-    fn link(&self) -> Vec<RelationDef> {
-        vec![
-            Relation::Project.def(),
-            Relation::Customer.def(),
-            Relation::Owner.def(),
-        ]
-    }
-}
-
 impl ActiveModelBehavior for ActiveModel {
     /// Create a new ActiveModel with default values. Also used by `Default::default()`.
     fn new() -> Self {
@@ -112,5 +94,29 @@ impl ActiveModelBehavior for ActiveModel {
     /// Will be triggered after delete
     fn after_delete(self) -> Result<Self, DbErr> {
         Ok(self)
+    }
+}
+
+pub struct WorkReportToUser;
+
+impl Linked for WorkReportToUser {
+    type FromEntity = Entity;
+
+    type ToEntity = user::Entity;
+
+    fn link(&self) -> Vec<RelationDef> {
+        vec![Relation::Owner.def()]
+    }
+}
+
+pub struct WorkReportToProject;
+
+impl Linked for WorkReportToProject {
+    type FromEntity = Entity;
+
+    type ToEntity = project::Entity;
+
+    fn link(&self) -> Vec<RelationDef> {
+        vec![Relation::Project.def()]
     }
 }

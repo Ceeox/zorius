@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::{convert::TryInto, path::PathBuf};
 
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    Context, Error, Object, Result, Subscription, Upload, UploadValue,
+    Context, Object, Subscription, Upload, UploadValue,
 };
 use chrono::{Duration, Utc};
 use futures::stream::{self, StreamExt};
@@ -19,7 +19,7 @@ use crate::{
         MutationType,
     },
     config::CONFIG,
-    errors,
+    errors::{Error, Result},
     models::{
         auth::LoginResult,
         upload::FileInfo,
@@ -43,24 +43,23 @@ impl UserQuery {
         #[graphql(validator(email))] email: String,
         #[graphql(validator(custom = "Password"))] password: String,
     ) -> Result<LoginResult> {
-        let err = Error::new("email or password wrong!");
         let db = database(ctx)?;
 
         let user = match user_by_email(db, &email).await? {
-            None => return Err(Error::new("user not found")),
+            None => return Err(Error::NotFound),
             Some(user) => user,
         };
         let user = User::from(user);
 
         if !user.is_password_correct(&password) {
-            return Err(err);
+            return Err(Error::IncorrectPassword);
         }
         let claim = Claim::new(
-            email,
-            user.get_id().clone().to_string(),
+            &email,
+            &user.get_id().clone().to_string(),
             (Utc::now() + Duration::seconds(CONFIG.token_lifetime)).timestamp() as usize,
         );
-        let token = claim.to_string();
+        let token = claim.try_into()?;
 
         Ok(LoginResult { token })
     }
@@ -93,7 +92,7 @@ impl UserQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
-    ) -> Result<Connection<usize, User, EmptyFields, EmptyFields>> {
+    ) -> async_graphql::Result<Connection<usize, User, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let db = database(ctx)?;
         let count = count_users(db).await? as usize;
@@ -111,7 +110,7 @@ impl UserQuery {
                         .await
                     {
                         Ok(r) => r,
-                        Err(_e) => return Err(Error::new("")),
+                        Err(_e) => return Err(async_graphql::Error::new("")),
                     };
 
                 let mut connection = Connection::new(start > 0, end < count);
@@ -138,11 +137,11 @@ impl UserMutation {
         let db = database(ctx)?;
 
         if !CONFIG.registration_enabled {
-            return Err(Error::new("registration is not enabled"));
+            return Err(Error::RegistrationNotEnabled);
         }
 
         if user_by_email(db, &new.email).await?.is_some() {
-            return Err(Error::new("email already registerd"));
+            return Err(Error::EmailAlreadyRegistred);
         }
 
         let new_user = new_user(db, new).await?;
@@ -160,7 +159,7 @@ impl UserMutation {
         #[graphql(validator(custom = "Password"))] new_password: String,
     ) -> Result<bool> {
         let auth_info = Claim::from_ctx(ctx)?;
-        let user_id = auth_info.user_id();
+        let user_id = auth_info.user_id()?;
         let db = database(ctx)?;
 
         let user = match user_by_id(db, user_id).await? {
@@ -170,7 +169,7 @@ impl UserMutation {
         let user = User::from(user);
 
         if !user.is_password_correct(&old_password) {
-            return Err(Error::new("old password is incorrect".to_owned()));
+            return Err(Error::IncorrectPassword);
         } else {
             reset_password(db, user_id, &new_password).await?;
         }
@@ -195,15 +194,11 @@ impl UserMutation {
     }
 
     #[graphql(guard = "TokenGuard")]
-    async fn upload_avatar(
-        &self,
-        ctx: &Context<'_>,
-        file: Upload,
-    ) -> std::result::Result<FileInfo, errors::Error> {
+    async fn upload_avatar(&self, ctx: &Context<'_>, file: Upload) -> Result<FileInfo> {
         debug!("avatar upload");
-        let claim = Claim::from_ctx(ctx).unwrap();
+        let claim = Claim::from_ctx(ctx)?;
         let db = database(ctx)?;
-        let user_id = claim.user_id();
+        let user_id = claim.user_id()?;
 
         let file_name = format!("{}.png", Uuid::new_v4());
         let path: PathBuf = ["static", "avatar", &file_name].iter().collect();
@@ -213,9 +208,9 @@ impl UserMutation {
             Some(ref content_type) => match content_type.parse::<Mime>() {
                 Ok(r) if r == mime::IMAGE_PNG => ImageFormat::Png,
                 Ok(r) if r == mime::IMAGE_JPEG => ImageFormat::Jpeg,
-                _ => return Err(errors::Error::WrongMediaType),
+                _ => return Err(Error::WrongMediaType),
             },
-            None => return Err(errors::Error::WrongMediaType),
+            None => return Err(Error::WrongMediaType),
         };
 
         let mut vec = Vec::new();
@@ -228,7 +223,7 @@ impl UserMutation {
             let img: DynamicImage = match image::load_from_memory_with_format(&vec, format) {
                 Err(e) => {
                     error!("failed to load image from memory: {e}");
-                    return Err(errors::Error::ImageError(e));
+                    return Err(Error::ImageError(e));
                 }
                 Ok(r) => r,
             };
@@ -244,7 +239,7 @@ impl UserMutation {
             Ok(_) => info!("saved new avatar"),
             Err(e) => {
                 error!("failed to save avatar image: {e:?}");
-                return Err(errors::Error::Unknown);
+                return Err(Error::Unknown);
             }
         }
 

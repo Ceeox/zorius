@@ -1,12 +1,13 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    Context, Error, Object, Result,
+    Context, Object,
 };
 use futures::stream::{self, StreamExt};
 use uuid::Uuid;
 
 use crate::{
     api::{calc_list_params, claim::Claim, database, guards::TokenGuard},
+    errors::Result,
     models::project::{count_projects, delete_project, list_projects, new_project, project_by_id},
     view::project::{NewProject, Project},
 };
@@ -34,7 +35,7 @@ impl ProjectQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
-    ) -> Result<Connection<usize, Project, EmptyFields, EmptyFields>> {
+    ) -> async_graphql::Result<Connection<usize, Project, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let db = &database(ctx)?;
         let count = count_projects(db).await? as usize;
@@ -49,7 +50,7 @@ impl ProjectQuery {
 
                 let projects = match list_projects(db, start, limit).await {
                     Ok(r) => r,
-                    Err(_e) => return Err(Error::new("")),
+                    Err(_e) => return Err(async_graphql::Error::new("")),
                 };
 
                 let mut connection = Connection::new(start > 0, end < count);

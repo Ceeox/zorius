@@ -19,6 +19,21 @@ pub struct Customer {
     pub deleted_at: Option<DateTimeUtc>,
 }
 
+impl From<Model> for Customer {
+    fn from(model: Model) -> Self {
+        Self {
+            id: model.id,
+            name: model.name,
+            identifier: model.identifier,
+            note: model.note,
+            projects: None,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            deleted_at: model.deleted_at,
+        }
+    }
+}
+
 impl From<(Model, Vec<project::Model>)> for Customer {
     fn from((customer, projects): (Model, Vec<project::Model>)) -> Self {
         Self {

@@ -1,16 +1,14 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
-use async_graphql::{Context, Error, Result};
+use async_graphql::{Context, Result};
 use chrono::Local;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::config::CONFIG;
+use crate::{config::CONFIG, errors::Error};
 
 pub struct Token(pub String);
-
-static ALGO: Algorithm = Algorithm::HS512;
 
 /// Claim caontains information about the JWT
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,7 +29,7 @@ pub struct Claim {
 
 impl Claim {
     /// Creates a new Claim with the users email, id and sets the time when the token expires.
-    pub fn new(sub: String, id: String, exp: usize) -> Self {
+    pub fn new(sub: &str, id: &str, exp: usize) -> Self {
         let mut iss = String::new();
         if CONFIG.web.enable_ssl {
             iss.push_str("https://");
@@ -41,8 +39,8 @@ impl Claim {
         iss.push_str(&CONFIG.domain.clone());
         Self {
             iss,
-            sub,
-            id,
+            sub: sub.to_owned(),
+            id: id.to_owned(),
             exp,
             nbf: Local::now().timestamp() as usize,
             iat: Local::now().timestamp() as usize,
@@ -51,55 +49,55 @@ impl Claim {
 
     /// Gets the Claim from async_graphql context
     /// `Token(Sting)` must be present in context
-    pub fn from_ctx(ctx: &Context<'_>) -> Result<Self> {
+    pub fn from_ctx(ctx: &Context<'_>) -> Result<Self, Error> {
         let value: &Token = match ctx.data::<Token>() {
-            Err(_e) => return Err(Error::new("missing token")),
+            Err(_e) => return Err(Error::MissingToken),
             Ok(r) => r,
         };
         let claim = Claim::try_from(value.0.to_owned())?;
         if claim.token_expired() {
-            return Err(Error::new("Token expired!"));
+            return Err(Error::ExpiredToken);
         }
         Ok(claim)
     }
 
     /// Return a reference to the `user_id`
-    pub fn user_id(&self) -> Uuid {
-        Uuid::parse_str(&self.id.clone()).expect("Couldn't convert UserId from string to Uuid")
+    pub fn user_id(&self) -> Result<Uuid, Error> {
+        match Uuid::parse_str(&self.id) {
+            Ok(r) => Ok(r),
+            Err(_) => Err(Error::MalformedToken),
+        }
     }
 
-    /// Retruns if the token is expired
+    /// Chekcs if the token is expired
     pub fn token_expired(&self) -> bool {
         let now = Local::now().timestamp() as usize;
         self.nbf >= now && self.exp <= now
     }
 }
 
-impl ToString for Claim {
-    fn to_string(&self) -> String {
-        let key = &EncodingKey::from_secret(CONFIG.secret_key.as_bytes());
-        jsonwebtoken::encode(&Header::new(ALGO), self, key).expect("failed jwt convert to string")
+impl TryInto<String> for Claim {
+    type Error = jsonwebtoken::errors::Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        let key = EncodingKey::from_secret(CONFIG.secret_key.as_bytes());
+        let algo = Algorithm::HS512;
+
+        jsonwebtoken::encode(&Header::new(algo), &self, &key)
     }
 }
 
 impl TryFrom<String> for Claim {
-    type Error = async_graphql::Error;
+    type Error = jsonwebtoken::errors::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let _split: Vec<&str> = value.split("Bearer").collect();
-        let token = match _split.get(1) {
-            Some(token) => token.trim(),
-            None => return Err(Error::new("missing token")),
-        };
+        let secret = CONFIG.secret_key.as_bytes();
+        let split = value.split(' ').collect::<Vec<&str>>();
+        let token = split.get(1).unwrap_or(&"");
 
-        let key = CONFIG.secret_key.as_bytes();
-        match decode::<Claim>(
-            token,
-            &DecodingKey::from_secret(key),
-            &Validation::new(ALGO),
-        ) {
-            Ok(data) => Ok(data.claims),
-            Err(e) => Err(Error::new(&e.to_string())),
-        }
+        let dec = DecodingKey::from_secret(secret);
+        let vali = Validation::new(Algorithm::HS512);
+
+        Ok(decode::<Claim>(token.trim_matches(' '), &dec, &vali)?.claims)
     }
 }

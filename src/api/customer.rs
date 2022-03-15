@@ -1,12 +1,13 @@
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
-    Context, Error, Object, Result,
+    Context, Object,
 };
 use futures::{stream, StreamExt};
 use uuid::Uuid;
 
 use crate::{
     api::{calc_list_params, claim::Claim, database, guards::TokenGuard},
+    errors::Result,
     models::customer::{
         count_customers, customer_by_id, delete_customer, list_customers, new_customer,
         update_customer,
@@ -37,7 +38,7 @@ impl CustomerQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
-    ) -> Result<Connection<usize, Customer, EmptyFields, EmptyFields>> {
+    ) -> async_graphql::Result<Connection<usize, Customer, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let db = database(ctx)?;
         let count = count_customers(db).await? as usize;
@@ -52,7 +53,7 @@ impl CustomerQuery {
 
                 let customers = match list_customers(db, start, limit).await {
                     Ok(r) => r,
-                    Err(_e) => return Err(Error::new("")),
+                    Err(_e) => return Err(async_graphql::Error::new("")),
                 };
 
                 let mut connection = Connection::new(start > 0, end < count);

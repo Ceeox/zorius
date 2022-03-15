@@ -1,7 +1,7 @@
 use chrono::Utc;
 use entity::{
-    project,
-    work_report::{ActiveModel, Column, Entity, Model, ToWorkReport},
+    customer, project, user,
+    work_report::{ActiveModel, Column, Entity, Model},
 };
 use sea_orm::{prelude::*, DatabaseConnection, Set};
 use uuid::Uuid;
@@ -12,49 +12,49 @@ pub async fn new_work_report(
     db: &DatabaseConnection,
     owner_id: Uuid,
     new: NewWorkReport,
-) -> Result<Option<(Model, Option<project::Model>)>, sea_orm::error::DbErr> {
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
     let new_work_report = ActiveModel {
         owner_id: Set(owner_id),
         customer_id: Set(new.customer_id),
         project_id: Set(new.project_id),
         description: Set(new.description),
         invoiced: Set(new.invoiced),
-        report_started: Set(Utc::now()),
-        report_ended: Set(None),
         ..Default::default()
     };
     let id = Entity::insert(new_work_report)
         .exec(db)
         .await?
         .last_insert_id;
-    Ok(work_report_by_id(db, id, Some(owner_id)).await?)
+    Ok(work_report_by_id(db, id, owner_id).await?)
 }
 
 pub async fn work_report_by_id(
     db: &DatabaseConnection,
     id: Uuid,
-    user_id: Option<Uuid>,
-) -> Result<Option<(Model, Option<project::Model>)>, sea_orm::error::DbErr> {
-    if let Some(id) = user_id {
-        return Entity::find_by_id(id)
-            .filter(Column::OwnerId.eq(id))
-            .find_also_linked(ToWorkReport)
-            // .find_also_related()
-            .one(db)
-            .await;
-    }
-    let wr = Entity::find_by_id(id).one(db).await?;
+    user_id: Uuid,
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
+    let wr = Entity::find_by_id(id)
+        .filter(Column::OwnerId.eq(user_id))
+        .one(db)
+        .await?;
 
-    println!("Workreport: {:#?}", &wr);
-    Ok(None)
+    if let Some(wr) = wr {
+        let owner = wr.find_related(user::Entity).one(db);
+        let customer = wr.find_related(customer::Entity).one(db);
+        let owner = wr.find_related(project::Entity).one(db);
+
+        Ok(Some(wr))
+    } else {
+        Ok(None)
+    }
 }
 
 pub async fn list_work_reports(
     db: &DatabaseConnection,
-    _user_id: Uuid,
+    user_id: Uuid,
 ) -> Result<Vec<Model>, sea_orm::error::DbErr> {
     Ok(Entity::find()
-        // .filter(Column::OwnerId.eq(user_id))
+        .filter(Column::OwnerId.eq(user_id))
         .all(db)
         .await?)
 }
@@ -75,7 +75,7 @@ pub async fn update_work_report(
     id: Uuid,
     user_id: Uuid,
     update: WorkReportUpdate,
-) -> Result<Option<(Model, Option<project::Model>)>, sea_orm::error::DbErr> {
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
     let model = Entity::find_by_id(id)
         .filter(Column::OwnerId.eq(user_id))
         .one(db)
@@ -91,14 +91,8 @@ pub async fn update_work_report(
         if update.invoiced.is_some() {
             wr.invoiced = Set(update.invoiced.unwrap());
         }
-        if update.report_started.is_some() {
-            wr.report_started = Set(update.report_started.unwrap());
-        }
-        if update.report_ended.is_some() {
-            wr.report_ended = Set(update.report_ended);
-        }
         let _ = wr.update(db);
-        return work_report_by_id(db, id, Some(user_id)).await;
+        return work_report_by_id(db, id, user_id).await;
     }
 
     Ok(None)
@@ -119,5 +113,3 @@ pub async fn delete_work_report(
     };
     Ok(Entity::delete(merch).exec(db).await?.rows_affected)
 }
-
-mod tests {}

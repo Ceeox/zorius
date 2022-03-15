@@ -24,6 +24,20 @@ pub struct NewProject {
     pub note: Option<String>,
 }
 
+impl From<Model> for Project {
+    fn from(project: Model) -> Self {
+        Self {
+            id: project.id,
+            customer: None,
+            name: project.name,
+            note: project.note,
+            created_at: project.created_at,
+            updated_at: project.updated_at,
+            deleted_at: project.deleted_at,
+        }
+    }
+}
+
 impl From<(Model, Option<customer::Model>)> for Project {
     fn from((project, customer): (Model, Option<customer::Model>)) -> Self {
         let customer = match customer {
