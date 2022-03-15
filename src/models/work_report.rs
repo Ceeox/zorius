@@ -1,9 +1,8 @@
-use chrono::Utc;
 use entity::{
     customer, project, user,
     work_report::{ActiveModel, Column, Entity, Model},
 };
-use sea_orm::{prelude::*, DatabaseConnection, Set};
+use sea_orm::{prelude::*, DatabaseConnection, DbErr, Set};
 use uuid::Uuid;
 
 use crate::view::work_report::{NewWorkReport, WorkReportUpdate};
@@ -12,7 +11,15 @@ pub async fn new_work_report(
     db: &DatabaseConnection,
     owner_id: Uuid,
     new: NewWorkReport,
-) -> Result<Option<Model>, sea_orm::error::DbErr> {
+) -> Result<
+    Option<(
+        Model,
+        Option<user::Model>,
+        Option<customer::Model>,
+        Option<project::Model>,
+    )>,
+    DbErr,
+> {
     let new_work_report = ActiveModel {
         owner_id: Set(owner_id),
         customer_id: Set(new.customer_id),
@@ -32,18 +39,25 @@ pub async fn work_report_by_id(
     db: &DatabaseConnection,
     id: Uuid,
     user_id: Uuid,
-) -> Result<Option<Model>, sea_orm::error::DbErr> {
+) -> Result<
+    Option<(
+        Model,
+        Option<user::Model>,
+        Option<customer::Model>,
+        Option<project::Model>,
+    )>,
+    DbErr,
+> {
     let wr = Entity::find_by_id(id)
         .filter(Column::OwnerId.eq(user_id))
         .one(db)
         .await?;
 
     if let Some(wr) = wr {
-        let owner = wr.find_related(user::Entity).one(db);
-        let customer = wr.find_related(customer::Entity).one(db);
-        let owner = wr.find_related(project::Entity).one(db);
-
-        Ok(Some(wr))
+        let owner = wr.find_related(user::Entity).one(db).await?;
+        let customer = wr.find_related(customer::Entity).one(db).await?;
+        let project = wr.find_related(project::Entity).one(db).await?;
+        Ok(Some((wr, owner, customer, project)))
     } else {
         Ok(None)
     }
@@ -52,17 +66,14 @@ pub async fn work_report_by_id(
 pub async fn list_work_reports(
     db: &DatabaseConnection,
     user_id: Uuid,
-) -> Result<Vec<Model>, sea_orm::error::DbErr> {
+) -> Result<Vec<Model>, DbErr> {
     Ok(Entity::find()
         .filter(Column::OwnerId.eq(user_id))
         .all(db)
         .await?)
 }
 
-pub async fn count_work_reports(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-) -> Result<usize, sea_orm::error::DbErr> {
+pub async fn count_work_reports(db: &DatabaseConnection, user_id: Uuid) -> Result<usize, DbErr> {
     Ok(Entity::find()
         .filter(Column::OwnerId.eq(user_id))
         .count(db)
@@ -75,7 +86,15 @@ pub async fn update_work_report(
     id: Uuid,
     user_id: Uuid,
     update: WorkReportUpdate,
-) -> Result<Option<Model>, sea_orm::error::DbErr> {
+) -> Result<
+    Option<(
+        Model,
+        Option<user::Model>,
+        Option<customer::Model>,
+        Option<project::Model>,
+    )>,
+    DbErr,
+> {
     let model = Entity::find_by_id(id)
         .filter(Column::OwnerId.eq(user_id))
         .one(db)
@@ -102,7 +121,7 @@ pub async fn delete_work_report(
     db: &DatabaseConnection,
     id: Uuid,
     user_id: Uuid,
-) -> Result<u64, sea_orm::error::DbErr> {
+) -> Result<u64, DbErr> {
     let merch: ActiveModel = match Entity::find_by_id(id)
         .filter(Column::OwnerId.eq(user_id))
         .one(db)

@@ -69,7 +69,7 @@ impl WorkReportQuery {
 
                 let work_reports = match list_work_reports(db, user_id).await {
                     Ok(r) => r,
-                    Err(e) => return Err(Error::SeaOrmError(e)),
+                    Err(e) => return Err(Error::SeaOrm(e)),
                 };
 
                 let mut connection = Connection::new(start > 0, end < count);

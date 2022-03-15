@@ -58,45 +58,27 @@ impl From<Model> for WorkReport {
     }
 }
 
-impl From<(Model, user::Model)> for WorkReport {
-    fn from((model, user_model): (Model, user::Model)) -> Self {
+impl
+    From<(
+        Model,
+        Option<user::Model>,
+        Option<customer::Model>,
+        Option<project::Model>,
+    )> for WorkReport
+{
+    fn from(
+        (model, owner_model, customer_model, project_model): (
+            Model,
+            Option<user::Model>,
+            Option<customer::Model>,
+            Option<project::Model>,
+        ),
+    ) -> Self {
         Self {
             id: model.id,
-            owner: Some(User::from(user_model)),
-            customer: None,
-            project: None,
-            description: model.description,
-            invoiced: model.invoiced,
-            time_records: None,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
-        }
-    }
-}
-
-impl From<(Model, project::Model)> for WorkReport {
-    fn from((model, project_model): (Model, project::Model)) -> Self {
-        Self {
-            id: model.id,
-            owner: None,
-            customer: None,
-            project: Some(Project::from(project_model)),
-            description: model.description,
-            invoiced: model.invoiced,
-            time_records: None,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
-        }
-    }
-}
-
-impl From<(Model, customer::Model)> for WorkReport {
-    fn from((model, customer_model): (Model, customer::Model)) -> Self {
-        Self {
-            id: model.id,
-            owner: None,
-            customer: Some(Customer::from(customer_model)),
-            project: None,
+            owner: owner_model.map(User::from),
+            customer: customer_model.map(Customer::from),
+            project: project_model.map(Project::from),
             description: model.description,
             invoiced: model.invoiced,
             time_records: None,

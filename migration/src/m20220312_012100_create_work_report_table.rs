@@ -37,6 +37,12 @@ impl MigrationTrait for Migration {
                             .default(false),
                     )
                     .col(
+                        ColumnDef::new(Column::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .default(Utc::now())
+                            .not_null(),
+                    )
+                    .col(
                         ColumnDef::new(Column::UpdatedAt)
                             .timestamp_with_time_zone()
                             .default(Utc::now())

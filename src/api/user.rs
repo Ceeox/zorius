@@ -223,7 +223,7 @@ impl UserMutation {
             let img: DynamicImage = match image::load_from_memory_with_format(&vec, format) {
                 Err(e) => {
                     error!("failed to load image from memory: {e}");
-                    return Err(Error::ImageError(e));
+                    return Err(Error::Image(e));
                 }
                 Ok(r) => r,
             };
