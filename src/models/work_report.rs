@@ -2,7 +2,8 @@ use entity::{
     customer, project, user,
     work_report::{ActiveModel, Column, Entity, Model},
 };
-use sea_orm::{prelude::*, DatabaseConnection, DbErr, Set};
+use migration::sea_query::{Expr, IntoCondition};
+use sea_orm::{prelude::*, Condition, DatabaseConnection, DbErr, Set};
 use uuid::Uuid;
 
 use crate::view::work_report::{NewWorkReport, WorkReportUpdate};
@@ -66,11 +67,60 @@ pub async fn work_report_by_id(
 pub async fn list_work_reports(
     db: &DatabaseConnection,
     user_id: Uuid,
-) -> Result<Vec<Model>, DbErr> {
-    Ok(Entity::find()
+) -> Result<
+    Vec<(
+        Model,
+        Option<user::Model>,
+        Option<customer::Model>,
+        Option<project::Model>,
+    )>,
+    DbErr,
+> {
+    let wrs = Entity::find()
         .filter(Column::OwnerId.eq(user_id))
         .all(db)
-        .await?)
+        .await?;
+
+    let owner_con = wrs.iter().fold(Condition::any(), |acc, wr| {
+        acc.add(Expr::col(user::Column::Id).eq(wr.owner_id).into_condition())
+    });
+    let owners = user::Entity::find().filter(owner_con).all(db).await?;
+
+    let customer_con = wrs.iter().fold(Condition::any(), |acc, wr| {
+        acc.add(
+            Expr::col(customer::Column::Id)
+                .eq(wr.customer_id)
+                .into_condition(),
+        )
+    });
+    let customers = customer::Entity::find()
+        .filter(customer_con)
+        .all(db)
+        .await?;
+
+    let project_con = wrs.iter().fold(Condition::any(), |acc, wr| {
+        acc.add(
+            Expr::col(project::Column::Id)
+                .eq(wr.project_id)
+                .into_condition(),
+        )
+    });
+    let projects = project::Entity::find().filter(project_con).all(db).await?;
+
+    let res = wrs.into_iter().fold(Vec::new(), |mut acc, wr| {
+        let owner_pos = owners.iter().position(|o| o.id.eq(&wr.owner_id));
+        let customer_pos = customers.iter().position(|o| o.id.eq(&wr.customer_id));
+        let project_pos = projects.iter().position(|o| Some(o.id).eq(&wr.project_id));
+        acc.push((
+            wr,
+            owner_pos.map(|pos| owners[pos].clone()),
+            customer_pos.map(|pos| customers[pos].clone()),
+            project_pos.map(|pos| projects[pos].clone()),
+        ));
+        acc
+    });
+
+    Ok(res)
 }
 
 pub async fn count_work_reports(db: &DatabaseConnection, user_id: Uuid) -> Result<usize, DbErr> {
