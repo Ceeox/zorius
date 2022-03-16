@@ -111,6 +111,7 @@ pub async fn list_work_reports(
         let owner_pos = owners.iter().position(|o| o.id.eq(&wr.owner_id));
         let customer_pos = customers.iter().position(|o| o.id.eq(&wr.customer_id));
         let project_pos = projects.iter().position(|o| Some(o.id).eq(&wr.project_id));
+        // is there a way to not use clone()?
         acc.push((
             wr,
             owner_pos.map(|pos| owners[pos].clone()),

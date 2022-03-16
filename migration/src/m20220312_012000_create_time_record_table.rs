@@ -5,27 +5,6 @@ use sea_schema::{
     sea_query::extension::postgres::Type,
 };
 
-pub enum TimeRecord {
-    Type,
-    Drive,
-    None,
-}
-
-impl Iden for TimeRecord {
-    fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-        write!(
-            s,
-            "{}",
-            match self {
-                Self::Type => "time_record",
-                Self::Drive => "drive",
-                Self::None => "none",
-            }
-        )
-        .unwrap();
-    }
-}
-
 pub struct Migration;
 
 impl MigrationName for Migration {
@@ -38,24 +17,12 @@ impl MigrationName for Migration {
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .create_type(
-                Type::create()
-                    .as_enum(TimeRecord::Type)
-                    .values([TimeRecord::Drive, TimeRecord::None])
-                    .to_owned(),
-            )
-            .await?;
-        manager
             .create_table(
                 Table::create()
                     .table(Entity)
                     .if_not_exists()
                     .col(ColumnDef::new(Column::Id).integer().primary_key())
                     .col(ColumnDef::new(Column::WorkReportId).uuid().not_null())
-                    // .col(
-                    //     ColumnDef::new(Column::Type)
-                    //         .enumeration("time_record_types", TimeRecord::Type),
-                    // )
                     .col(
                         ColumnDef::new(Column::Start)
                             .timestamp_with_time_zone()
