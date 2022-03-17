@@ -1,3 +1,4 @@
+use chrono::Utc;
 use entity::{time_record::*, user, work_report};
 
 use sea_schema::{
@@ -21,10 +22,11 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Entity)
                     .if_not_exists()
-                    .col(ColumnDef::new(Column::Id).integer().primary_key())
+                    .col(ColumnDef::new(Column::Id).uuid().primary_key())
                     .col(ColumnDef::new(Column::WorkReportId).uuid().not_null())
                     .col(
                         ColumnDef::new(Column::Start)
+                            .default(Utc::now())
                             .timestamp_with_time_zone()
                             .not_null(),
                     )

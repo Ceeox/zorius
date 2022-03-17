@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sea_orm::{prelude::*, Set};
 
-use crate::{customer, project, user};
+use crate::{customer, project, time_record, user};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "work_reports")]
@@ -44,6 +44,8 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     Project,
+    #[sea_orm(has_many = "time_record::Entity")]
+    TimeRecord,
 }
 
 impl Related<user::Entity> for Entity {
@@ -61,6 +63,12 @@ impl Related<customer::Entity> for Entity {
 impl Related<project::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Project.def()
+    }
+}
+
+impl Related<time_record::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TimeRecord.def()
     }
 }
 
@@ -94,29 +102,5 @@ impl ActiveModelBehavior for ActiveModel {
     /// Will be triggered after delete
     fn after_delete(self) -> Result<Self, DbErr> {
         Ok(self)
-    }
-}
-
-pub struct WorkReportToUser;
-
-impl Linked for WorkReportToUser {
-    type FromEntity = Entity;
-
-    type ToEntity = user::Entity;
-
-    fn link(&self) -> Vec<RelationDef> {
-        vec![Relation::Owner.def()]
-    }
-}
-
-pub struct WorkReportToProject;
-
-impl Linked for WorkReportToProject {
-    type FromEntity = Entity;
-
-    type ToEntity = project::Entity;
-
-    fn link(&self) -> Vec<RelationDef> {
-        vec![Relation::Project.def()]
     }
 }

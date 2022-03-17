@@ -4,17 +4,16 @@ use actix_web::{
 };
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
-    Context, EmptySubscription, Enum, MergedObject, MergedSubscription, Object, Result, Schema,
+    Context, EmptySubscription, Enum, ErrorExtensions, MergedObject, MergedSubscription, Object,
+    Result, Schema,
 };
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 use serde::Deserialize;
 
 pub mod claim;
 pub mod customer;
-// pub mod intern_merchandise;
-pub mod project;
-//pub mod role;
 pub mod guards;
+pub mod project;
 pub mod simple_broker;
 pub mod user;
 pub mod work_report;
@@ -23,9 +22,7 @@ use crate::{
     api::{
         claim::Token,
         customer::{CustomerMutation, CustomerQuery},
-        // intern_merchandise::{InternMerchandiseMutation, InternMerchandiseQuery},
         project::{ProjectMutation, ProjectQuery},
-        // role::{RoleMutation, RoleQuery},
         user::{UserMutation, UserQuery, UserSubscription},
         work_report::{WorkReportMutation, WorkReportQuery},
     },
@@ -40,21 +37,17 @@ pub type RootSchema = Schema<Query, Mutation, EmptySubscription>;
 pub struct Query(
     ServerQuery,
     UserQuery,
-    // RoleQuery,
     CustomerQuery,
     ProjectQuery,
     WorkReportQuery,
-    // InternMerchandiseQuery,
 );
 
 #[derive(Default, MergedObject)]
 pub struct Mutation(
     UserMutation,
-    // RoleMutation,
     CustomerMutation,
     ProjectMutation,
     WorkReportMutation,
-    // InternMerchandiseMutation,
 );
 
 #[derive(Default, MergedSubscription)]
@@ -141,7 +134,7 @@ pub async fn on_connection_init(
         data.insert(Token(payload.authorization));
         Ok(data)
     } else {
-        Err(Error::MissingToken.into())
+        Err(Error::MissingToken.extend())
     }
 }
 

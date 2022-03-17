@@ -1,12 +1,17 @@
+use std::vec;
+
 use entity::{
-    customer, project, user,
+    customer, project, time_record, user,
     work_report::{ActiveModel, Column, Entity, Model},
 };
+use log::debug;
 use migration::sea_query::{Expr, IntoCondition};
-use sea_orm::{prelude::*, Condition, DatabaseConnection, DbErr, Set};
+use sea_orm::{
+    prelude::*, Condition, DatabaseConnection, DbErr, Order, QueryOrder, QuerySelect, Set,
+};
 use uuid::Uuid;
 
-use crate::view::work_report::{NewWorkReport, WorkReportUpdate};
+use crate::view::work_report::{NewWorkReport, WorkReportListOptions, WorkReportUpdate};
 
 pub async fn new_work_report(
     db: &DatabaseConnection,
@@ -66,58 +71,105 @@ pub async fn work_report_by_id(
 
 pub async fn list_work_reports(
     db: &DatabaseConnection,
-    user_id: Uuid,
+    options: WorkReportListOptions,
 ) -> Result<
     Vec<(
         Model,
         Option<user::Model>,
         Option<customer::Model>,
         Option<project::Model>,
+        Option<Vec<time_record::Model>>,
     )>,
     DbErr,
 > {
+    debug!("WorkReportListOptions: {options:#?}");
     let wrs = Entity::find()
-        .filter(Column::OwnerId.eq(user_id))
+        .filter(Column::OwnerId.eq(options.for_user_id))
+        .offset(options.start)
+        .limit(options.limit)
+        .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
         .await?;
 
-    let owner_con = wrs.iter().fold(Condition::any(), |acc, wr| {
-        acc.add(Expr::col(user::Column::Id).eq(wr.owner_id).into_condition())
-    });
-    let owners = user::Entity::find().filter(owner_con).all(db).await?;
+    let owners = if options.inc_owner {
+        let owner_con = wrs.iter().fold(Condition::any(), |acc, wr| {
+            acc.add(Expr::col(user::Column::Id).eq(wr.owner_id).into_condition())
+        });
+        Some(user::Entity::find().filter(owner_con).all(db).await?)
+    } else {
+        None
+    };
 
-    let customer_con = wrs.iter().fold(Condition::any(), |acc, wr| {
+    let customers = if options.inc_customers {
+        let customer_con = wrs.iter().fold(Condition::any(), |acc, wr| {
+            acc.add(
+                Expr::col(customer::Column::Id)
+                    .eq(wr.customer_id)
+                    .into_condition(),
+            )
+        });
+        Some(
+            customer::Entity::find()
+                .filter(customer_con)
+                .all(db)
+                .await?,
+        )
+    } else {
+        None
+    };
+
+    let projects = if options.inc_projects {
+        let project_con = wrs.iter().fold(Condition::any(), |acc, wr| {
+            acc.add(
+                Expr::col(project::Column::Id)
+                    .eq(wr.project_id)
+                    .into_condition(),
+            )
+        });
+        Some(project::Entity::find().filter(project_con).all(db).await?)
+    } else {
+        None
+    };
+
+    let time_record_con = wrs.iter().fold(Condition::any(), |acc, wr| {
         acc.add(
-            Expr::col(customer::Column::Id)
-                .eq(wr.customer_id)
+            Expr::col(time_record::Column::WorkReportId)
+                .eq(wr.id)
                 .into_condition(),
         )
     });
-    let customers = customer::Entity::find()
-        .filter(customer_con)
+    let time_records = time_record::Entity::find()
+        .filter(time_record_con)
         .all(db)
         .await?;
-
-    let project_con = wrs.iter().fold(Condition::any(), |acc, wr| {
-        acc.add(
-            Expr::col(project::Column::Id)
-                .eq(wr.project_id)
-                .into_condition(),
-        )
-    });
-    let projects = project::Entity::find().filter(project_con).all(db).await?;
 
     let res = wrs.into_iter().fold(Vec::new(), |mut acc, wr| {
-        let owner_pos = owners.iter().position(|o| o.id.eq(&wr.owner_id));
-        let customer_pos = customers.iter().position(|o| o.id.eq(&wr.customer_id));
-        let project_pos = projects.iter().position(|o| Some(o.id).eq(&wr.project_id));
+        let owner = if let Some(owners) = &owners {
+            let pos = owners.iter().position(|o| o.id.eq(&wr.owner_id));
+            pos.map(|pos| owners[pos].clone())
+        } else {
+            None
+        };
+
+        let customer = if let Some(customers) = &customers {
+            let pos = customers.iter().position(|o| o.id.eq(&wr.customer_id));
+            pos.map(|pos| customers[pos].clone())
+        } else {
+            None
+        };
+        let project = if let Some(projects) = &projects {
+            let project_pos = projects.iter().position(|o| Some(o.id).eq(&wr.project_id));
+            project_pos.map(|pos| projects[pos].clone())
+        } else {
+            None
+        };
+        let time_records: Vec<time_record::Model> = time_records
+            .iter()
+            .filter(|tr| tr.work_report_id.eq(&wr.id))
+            .map(Clone::clone)
+            .collect();
         // is there a way to not use clone()?
-        acc.push((
-            wr,
-            owner_pos.map(|pos| owners[pos].clone()),
-            customer_pos.map(|pos| customers[pos].clone()),
-            project_pos.map(|pos| projects[pos].clone()),
-        ));
+        acc.push((wr, owner, customer, project, Some(time_records)));
         acc
     });
 

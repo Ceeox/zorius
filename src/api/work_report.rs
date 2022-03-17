@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use async_graphql::{
     connection::{query, Connection, Edge, EmptyFields},
     Context, Object,
@@ -12,7 +14,7 @@ use crate::{
         count_work_reports, delete_work_report, list_work_reports, new_work_report,
         update_work_report, work_report_by_id,
     },
-    view::work_report::{NewWorkReport, WorkReport, WorkReportUpdate},
+    view::work_report::{NewWorkReport, WorkReport, WorkReportListOptions, WorkReportUpdate},
 };
 
 #[derive(Default)]
@@ -65,9 +67,43 @@ impl WorkReportQuery {
             first,
             last,
             |after, before, first, last| async move {
-                let (start, end, _limit) = calc_list_params(count, after, before, first, last);
+                let mut start = after.map(|after| after + 1).unwrap_or(0);
+                let mut end = before.unwrap_or(count);
+                if let Some(first) = first {
+                    end = (start + first).min(end);
+                }
+                if let Some(last) = last {
+                    start = if last > end - start { end } else { end - last };
+                }
 
-                let work_reports = match list_work_reports(db, user_id).await {
+                let work_reports = match list_work_reports(
+                    db,
+                    WorkReportListOptions {
+                        for_user_id: user_id,
+                        inc_owner: ctx
+                            .look_ahead()
+                            .field("edges")
+                            .field("node")
+                            .field("owner")
+                            .exists(),
+                        inc_customers: ctx
+                            .look_ahead()
+                            .field("edges")
+                            .field("node")
+                            .field("customer")
+                            .exists(),
+                        inc_projects: ctx
+                            .look_ahead()
+                            .field("edges")
+                            .field("node")
+                            .field("project")
+                            .exists(),
+                        start: start as u64,
+                        limit: end as u64,
+                    },
+                )
+                .await
+                {
                     Ok(r) => r,
                     Err(e) => return Err(Error::SeaOrm(e)),
                 };

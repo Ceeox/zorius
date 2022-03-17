@@ -33,8 +33,6 @@ pub enum Error {
     IncorrectPassword,
     #[error("not found")]
     NotFound,
-    #[error("forbidden")]
-    Forbidden,
     #[error("missing token")]
     MissingToken,
     #[error("malformed token")]
@@ -73,7 +71,6 @@ impl ErrorExtensions for Error {
             Error::EmailAlreadyRegistred => e.set("code", "EMAIL_ALREADY_REGISTERED"),
             Error::RegistrationNotEnabled => e.set("code", "REGISTRATION_NOT_ENABLED"),
             Error::MissingDatabase => e.set("code", "MISSING_DATABASE"),
-            Error::Forbidden => e.set("code", "FORBIDDEN"),
             Error::WrongMediaType => e.set("code", "WRONG_MEDIA_TYPE"),
             Error::Image(_) => e.set("code", "IMAGE_ERROR"),
 

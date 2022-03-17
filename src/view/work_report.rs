@@ -1,5 +1,5 @@
 use async_graphql::{InputObject, SimpleObject};
-use entity::{customer, project, user, work_report::*};
+use entity::{customer, project, time_record, user, work_report::*};
 use sea_orm::prelude::DateTimeUtc;
 use serde::Serialize;
 use uuid::Uuid;
@@ -12,6 +12,16 @@ pub struct NewWorkReport {
     pub project_id: Option<Uuid>,
     pub description: String,
     pub invoiced: bool,
+}
+
+#[derive(Serialize, Debug, InputObject)]
+pub struct WorkReportListOptions {
+    pub for_user_id: Uuid,
+    pub inc_owner: bool,
+    pub inc_customers: bool,
+    pub inc_projects: bool,
+    pub start: u64,
+    pub limit: u64,
 }
 
 #[derive(Serialize, Debug, InputObject)]
@@ -52,6 +62,41 @@ impl From<Model> for WorkReport {
             description: model.description,
             invoiced: model.invoiced,
             time_records: None,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+impl
+    From<(
+        Model,
+        Option<user::Model>,
+        Option<customer::Model>,
+        Option<project::Model>,
+        Option<Vec<time_record::Model>>,
+    )> for WorkReport
+{
+    fn from(
+        (model, owner_model, customer_model, project_model, time_record_model): (
+            Model,
+            Option<user::Model>,
+            Option<customer::Model>,
+            Option<project::Model>,
+            Option<Vec<time_record::Model>>,
+        ),
+    ) -> Self {
+        let time_records =
+            time_record_model.map(|trs| trs.into_iter().map(TimeRecord::from).collect());
+
+        Self {
+            id: model.id,
+            owner: owner_model.map(User::from),
+            customer: customer_model.map(Customer::from),
+            project: project_model.map(Project::from),
+            description: model.description,
+            invoiced: model.invoiced,
+            time_records,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
