@@ -7,7 +7,7 @@ pub struct Migration;
 
 impl MigrationName for Migration {
     fn name(&self) -> &str {
-        "m20220312_012100_create_work_report_table"
+        "m20220312_012000_create_work_report_table"
     }
 }
 
@@ -55,7 +55,9 @@ impl MigrationTrait for Migration {
                             .from_tbl(Entity)
                             .from_col(Column::CustomerId)
                             .to_tbl(customer::Entity)
-                            .to_col(customer::Column::Id),
+                            .to_col(customer::Column::Id)
+                            .on_update(ForeignKeyAction::NoAction)
+                            .on_delete(ForeignKeyAction::NoAction),
                     )
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
@@ -63,7 +65,9 @@ impl MigrationTrait for Migration {
                             .from_tbl(Entity)
                             .from_col(Column::ProjectId)
                             .to_tbl(project::Entity)
-                            .to_col(project::Column::Id),
+                            .to_col(project::Column::Id)
+                            .on_update(ForeignKeyAction::NoAction)
+                            .on_delete(ForeignKeyAction::NoAction),
                     )
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
@@ -71,7 +75,9 @@ impl MigrationTrait for Migration {
                             .from_tbl(Entity)
                             .from_col(Column::OwnerId)
                             .to_tbl(user::Entity)
-                            .to_col(user::Column::Id),
+                            .to_col(user::Column::Id)
+                            .on_update(ForeignKeyAction::NoAction)
+                            .on_delete(ForeignKeyAction::NoAction),
                     )
                     .to_owned(),
             )

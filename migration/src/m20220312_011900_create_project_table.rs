@@ -1,4 +1,4 @@
-use entity::{customer, project, user};
+use entity::{customer, project::*, user};
 
 use chrono::Utc;
 use sea_schema::migration::{sea_orm::prelude::Uuid, sea_query::*, *};
@@ -17,22 +17,18 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(project::Entity)
+                    .table(Entity)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(project::Column::Id)
+                        ColumnDef::new(Column::Id)
                             .uuid()
                             .default(Uuid::new_v4())
                             .not_null()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(project::Column::CustomerId)
-                            .uuid()
-                            .not_null(),
-                    )
-                    .col(ColumnDef::new(project::Column::Name).text().not_null())
-                    .col(ColumnDef::new(project::Column::Note).text())
+                    .col(ColumnDef::new(Column::CustomerId).uuid().not_null())
+                    .col(ColumnDef::new(Column::Name).text().not_null())
+                    .col(ColumnDef::new(Column::Note).text())
                     .col(
                         ColumnDef::new(user::Column::CreatedAt)
                             .timestamp_with_time_zone()
@@ -40,17 +36,17 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(project::Column::UpdatedAt)
+                        ColumnDef::new(Column::UpdatedAt)
                             .timestamp_with_time_zone()
                             .default(Utc::now())
                             .not_null(),
                     )
-                    .col(ColumnDef::new(project::Column::DeletedAt).timestamp_with_time_zone())
+                    .col(ColumnDef::new(Column::DeletedAt).timestamp_with_time_zone())
                     .foreign_key(
                         ForeignKeyCreateStatement::new()
                             .name("FK_project-customer")
-                            .from_tbl(project::Entity)
-                            .from_col(project::Column::CustomerId)
+                            .from_tbl(Entity)
+                            .from_col(Column::CustomerId)
                             .to_tbl(customer::Entity)
                             .to_col(customer::Column::Id),
                     )
@@ -62,7 +58,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(project::Entity).to_owned())
+            .drop_table(Table::drop().table(Entity).to_owned())
             .await?;
         Ok(())
     }

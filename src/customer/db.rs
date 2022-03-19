@@ -1,16 +1,14 @@
-use entity::{
-    customer::{ActiveModel, Entity, Model},
-    project,
-};
-use sea_orm::{prelude::*, DatabaseConnection, QuerySelect, Set};
+use entity::customer::{ActiveModel, Column, Entity, Model};
+use migration::sea_query::{Expr, IntoCondition};
+use sea_orm::{prelude::*, Condition, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
 use uuid::Uuid;
 
-use crate::view::customer::{NewCustomer, UpdateCustomer};
+use super::model::{DbListOptions, NewCustomer, UpdateCustomer};
 
 pub async fn new_customer(
     db: &DatabaseConnection,
     update: NewCustomer,
-) -> Result<Option<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
     let customer_id = ActiveModel {
         identifier: Set(update.identifier),
         name: Set(update.name),
@@ -24,14 +22,8 @@ pub async fn new_customer(
 pub async fn customer_by_id(
     db: &DatabaseConnection,
     id: uuid::Uuid,
-) -> Result<Option<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
-    let customer = Entity::find_by_id(id).one(db).await?;
-
-    if let Some(customer) = customer {
-        let projects = customer.find_related(project::Entity).all(db).await?;
-        return Ok(Some((customer, projects)));
-    }
-    Ok(None)
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
+    Ok(Entity::find_by_id(id).one(db).await?)
 }
 
 pub async fn count_customers(db: &DatabaseConnection) -> Result<usize, sea_orm::error::DbErr> {
@@ -40,13 +32,21 @@ pub async fn count_customers(db: &DatabaseConnection) -> Result<usize, sea_orm::
 
 pub async fn list_customers(
     db: &DatabaseConnection,
-    start: usize,
-    limit: usize,
-) -> Result<Vec<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
+    options: DbListOptions,
+) -> Result<Vec<Model>, sea_orm::error::DbErr> {
+    if let Some(ids) = options.ids {
+        let con = ids.into_iter().fold(Condition::all(), |acc, id| {
+            acc.add(Expr::col(Column::Id).eq(id)).into_condition()
+        });
+        return Entity::find()
+            .filter(con)
+            .order_by(Column::CreatedAt, Order::Asc)
+            .all(db)
+            .await;
+    }
     Ok(Entity::find()
-        .find_with_related(project::Entity)
-        .offset(start as u64)
-        .limit(limit as u64)
+        .offset(options.start as u64)
+        .limit(options.limit as u64)
         .all(db)
         .await?)
 }
@@ -66,7 +66,7 @@ pub async fn update_customer(
     db: &DatabaseConnection,
     id: Uuid,
     update: UpdateCustomer,
-) -> Result<Option<(Model, Vec<project::Model>)>, sea_orm::error::DbErr> {
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
     let customer = Entity::find_by_id(id).one(db).await?;
     if let Some(customer) = customer {
         let mut customer: ActiveModel = customer.into();

@@ -14,7 +14,7 @@ use actix_web::{
     App, HttpServer,
 };
 use async_graphql::http::MultipartOptions;
-use async_graphql::{EmptySubscription, Schema};
+use async_graphql::Schema;
 use log::{debug, error, info};
 use migration::{Migrator, MigratorTrait};
 use rustls::{Certificate, PrivateKey, ServerConfig};
@@ -23,16 +23,22 @@ use sea_orm::{Database as SeaOrmDatabase, DatabaseConnection};
 use tokio::time::sleep;
 use uuid::Uuid;
 
-use crate::api::graphql_ws;
+use crate::api::{graphql_ws, Subscription};
 use crate::errors::Error;
 
 mod api;
+mod claim;
 mod config;
+mod customer;
 mod errors;
+mod guards;
 mod mailer;
-mod models;
+mod project;
+mod simple_broker;
+mod upload;
+mod user;
 mod validators;
-mod view;
+mod work_report;
 
 use crate::{
     api::{graphql, playground, Mutation, Query},
@@ -122,9 +128,13 @@ async fn main() -> Result<(), Error> {
         .await
         .expect("migrations failed");
 
-    let schema = Schema::build(Query::default(), Mutation::default(), EmptySubscription)
-        .data(database)
-        .finish();
+    let schema = Schema::build(
+        Query::default(),
+        Mutation::default(),
+        Subscription::default(),
+    )
+    .data(database)
+    .finish();
 
     // Start http server
     let webserver_url = format!("{}:{}", CONFIG.web.ip, CONFIG.web.port);

@@ -15,6 +15,7 @@ pub struct Model {
     pub password_hash: String,
     pub name: Option<String>,
     pub avatar_filename: Option<String>,
+    pub is_admin: bool,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub deleted_at: Option<DateTimeUtc>,

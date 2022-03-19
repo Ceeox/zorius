@@ -5,6 +5,9 @@ use async_graphql::{
 use futures::stream::{self, StreamExt};
 use uuid::Uuid;
 
+mod db;
+mod model;
+
 use crate::{
     api::{calc_list_params, claim::Claim, database},
     models::intern_merchandise::{

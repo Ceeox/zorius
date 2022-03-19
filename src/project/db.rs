@@ -1,16 +1,14 @@
-use entity::{
-    customer,
-    project::{ActiveModel, Column, Entity, Model},
-};
-use sea_orm::{prelude::*, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
+use entity::project::{ActiveModel, Column, Entity, Model};
+use migration::sea_query::{Expr, IntoCondition};
+use sea_orm::{prelude::*, Condition, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
 use uuid::Uuid;
 
-use crate::view::project::NewProject;
+use super::model::{DbListOptions, NewProject};
 
 pub async fn new_project(
     db: &DatabaseConnection,
     update: NewProject,
-) -> Result<Option<(Model, Option<customer::Model>)>, sea_orm::error::DbErr> {
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
     let new_project = ActiveModel {
         customer_id: Set(update.customer_id),
         name: Set(update.name),
@@ -24,11 +22,8 @@ pub async fn new_project(
 pub async fn project_by_id(
     db: &DatabaseConnection,
     id: uuid::Uuid,
-) -> Result<Option<(Model, Option<customer::Model>)>, sea_orm::error::DbErr> {
-    Ok(Entity::find_by_id(id)
-        .find_also_related(customer::Entity)
-        .one(db)
-        .await?)
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
+    Ok(Entity::find_by_id(id).one(db).await?)
 }
 
 pub async fn count_projects(db: &DatabaseConnection) -> Result<usize, sea_orm::error::DbErr> {
@@ -37,13 +32,22 @@ pub async fn count_projects(db: &DatabaseConnection) -> Result<usize, sea_orm::e
 
 pub async fn list_projects(
     db: &DatabaseConnection,
-    start: usize,
-    limit: usize,
-) -> Result<Vec<(Model, Option<customer::Model>)>, sea_orm::error::DbErr> {
+    options: DbListOptions,
+) -> Result<Vec<Model>, sea_orm::error::DbErr> {
+    if let Some(ids) = options.ids {
+        let con = ids.into_iter().fold(Condition::all(), |acc, id| {
+            acc.add(Expr::col(Column::Id).eq(id)).into_condition()
+        });
+        return Entity::find()
+            .filter(con)
+            .order_by(Column::CreatedAt, Order::Asc)
+            .all(db)
+            .await;
+    }
+
     Ok(Entity::find()
-        .find_also_related(customer::Entity)
-        .offset(start as u64)
-        .limit(limit as u64)
+        .offset(options.start)
+        .limit(options.limit)
         .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
         .await?)
@@ -54,7 +58,7 @@ pub async fn delete_project(
     id: Uuid,
 ) -> Result<u64, sea_orm::error::DbErr> {
     let project: ActiveModel = match project_by_id(db, id).await? {
-        Some(project) => project.0.into(),
+        Some(project) => project.into(),
         None => return Ok(0),
     };
     let res = Entity::delete(project).exec(db).await?;

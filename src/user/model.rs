@@ -1,23 +1,33 @@
-use async_graphql::{Enum, InputObject, Object, SimpleObject};
+use async_graphql::{InputObject, Object, SimpleObject};
 use entity::user::Model;
-use entity::user::{self, Column};
 use pwhash::sha512_crypt;
-use sea_orm::{prelude::DateTimeUtc, Order};
+use sea_orm::prelude::DateTimeUtc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::api::MutationType;
 use crate::validators::Password;
 
+#[derive(Deserialize)]
+pub struct LoginData {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Serialize, SimpleObject)]
+pub struct LoginResult {
+    pub token: String,
+}
+
 #[derive(SimpleObject, Debug, Serialize, Clone)]
 pub struct User {
     pub id: Uuid,
     pub email: String,
-    #[serde(skip)]
-    #[graphql(visible = false)]
+    #[graphql(secret = true, visible = false)]
     pub password_hash: String,
     pub name: Option<String>,
     pub avatar_filename: Option<String>,
+    pub is_admin: bool,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub deleted_at: Option<DateTimeUtc>,
@@ -45,6 +55,7 @@ impl From<Model> for User {
             email: model.email,
             password_hash: model.password_hash,
             name: model.name,
+            is_admin: model.is_admin,
             avatar_filename: model.avatar_filename,
             created_at: model.created_at,
             updated_at: model.updated_at,
@@ -53,13 +64,31 @@ impl From<Model> for User {
     }
 }
 
-#[derive(Deserialize, Debug, InputObject)]
+#[derive(Deserialize, Debug, InputObject, SimpleObject, Default)]
+pub struct ListUserOptions {
+    pub ids: Option<Vec<Uuid>>,
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub first: Option<i32>,
+    pub last: Option<i32>,
+}
+
+#[derive(Debug, Default)]
+pub struct DbListOptions {
+    pub ids: Option<Vec<Uuid>>,
+    pub start: u64,
+    pub limit: u64,
+}
+
+#[derive(Deserialize, Debug, InputObject, SimpleObject)]
 pub struct NewUser {
     #[graphql(validator(email))]
     pub email: String,
     #[graphql(validator(custom = "Password"))]
     pub password: String,
     pub name: Option<String>,
+    #[graphql(visible = false)]
+    pub is_admin: Option<bool>,
 }
 
 #[derive(InputObject, Debug, Serialize)]
@@ -72,40 +101,7 @@ pub struct PasswordChange {
 #[derive(InputObject, Debug, Serialize)]
 pub struct UserUpdate {
     pub name: Option<String>,
-}
-
-#[derive(Enum, Debug, Serialize, Copy, Clone, PartialEq, Eq)]
-pub enum OrderBy {
-    Email,
-    CreatedAt,
-    UpdatedAt,
-    Name,
-}
-
-impl From<OrderBy> for user::Column {
-    fn from(order_by: OrderBy) -> Self {
-        match order_by {
-            OrderBy::Email => Column::Email,
-            OrderBy::CreatedAt => Column::CreatedAt,
-            OrderBy::UpdatedAt => Column::UpdatedAt,
-            OrderBy::Name => Column::Name,
-        }
-    }
-}
-
-#[derive(Enum, Debug, Serialize, Copy, Clone, PartialEq, Eq)]
-pub enum OrderDirection {
-    Asc,
-    Desc,
-}
-
-impl From<OrderDirection> for Order {
-    fn from(order_dic: OrderDirection) -> Self {
-        match order_dic {
-            OrderDirection::Asc => Order::Asc,
-            OrderDirection::Desc => Order::Desc,
-        }
-    }
+    pub is_admin: Option<bool>,
 }
 
 #[derive(Clone)]

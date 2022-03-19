@@ -4,34 +4,23 @@ use actix_web::{
 };
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
-    Context, EmptySubscription, Enum, ErrorExtensions, MergedObject, MergedSubscription, Object,
-    Result, Schema,
+    Context, Enum, ErrorExtensions, MergedObject, MergedSubscription, Object, Result, Schema,
 };
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse, GraphQLSubscription};
 use serde::Deserialize;
 
-pub mod claim;
-pub mod customer;
-pub mod guards;
-pub mod project;
-pub mod simple_broker;
-pub mod user;
-pub mod work_report;
-
 use crate::{
-    api::{
-        claim::Token,
-        customer::{CustomerMutation, CustomerQuery},
-        project::{ProjectMutation, ProjectQuery},
-        user::{UserMutation, UserQuery, UserSubscription},
-        work_report::{WorkReportMutation, WorkReportQuery},
-    },
+    claim::Token,
     config::CONFIG,
+    customer::{CustomerMutation, CustomerQuery, CustomerSubscription},
     errors::Error,
+    project::{ProjectMutation, ProjectQuery, ProjectSubscription},
+    user::{UserMutation, UserQuery, UserSubscription},
+    work_report::{WorkReportMutation, WorkReportQuery, WorkReportSubscription},
     API_VERSION,
 };
 
-pub type RootSchema = Schema<Query, Mutation, EmptySubscription>;
+pub type RootSchema = Schema<Query, Mutation, Subscription>;
 
 #[derive(MergedObject, Default)]
 pub struct Query(
@@ -51,7 +40,12 @@ pub struct Mutation(
 );
 
 #[derive(Default, MergedSubscription)]
-pub struct SubscriptionRoot(UserSubscription);
+pub struct Subscription(
+    UserSubscription,
+    ProjectSubscription,
+    CustomerSubscription,
+    WorkReportSubscription,
+);
 
 #[derive(Enum, Eq, PartialEq, Copy, Clone)]
 pub enum MutationType {
@@ -143,31 +137,4 @@ pub fn database<'a>(ctx: &'a Context<'_>) -> Result<&'a sea_orm::DatabaseConnect
         Err(_e) => Err(Error::MissingDatabase),
         Ok(r) => Ok(r),
     }
-}
-
-pub fn calc_list_params(
-    count: usize,
-    after: Option<usize>,
-    before: Option<usize>,
-    first: Option<usize>,
-    last: Option<usize>,
-) -> (usize, usize, usize) {
-    let mut start: usize = after
-        .map(|after: usize| after.saturating_add(1))
-        .unwrap_or(0);
-    let mut end: usize = before.unwrap_or(count);
-
-    if let Some(first) = first {
-        end = (start.saturating_add(first)).min(end);
-    }
-    if let Some(last) = last {
-        start = if last > end.saturating_sub(start) {
-            end
-        } else {
-            end.saturating_sub(last)
-        };
-    }
-    let limit = end.saturating_sub(start);
-
-    (start, end, limit)
 }

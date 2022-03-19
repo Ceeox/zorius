@@ -5,32 +5,37 @@ use async_graphql::{
     Context, Object, Subscription, Upload, UploadValue,
 };
 use chrono::{Duration, Utc};
+use entity::user::Entity;
 use futures::stream::{self, StreamExt};
 use futures_util::{AsyncReadExt, Stream};
 use image::{imageops::FilterType, DynamicImage, ImageFormat};
 use log::{debug, error, info};
 use mime::Mime;
+use sea_orm::EntityTrait;
 use tokio::task::spawn_blocking;
 use uuid::Uuid;
 
 use crate::{
-    api::{
-        calc_list_params, claim::Claim, database, guards::TokenGuard, simple_broker::SimpleBroker,
-        MutationType,
-    },
+    api::{database, MutationType},
+    claim::Claim,
     config::CONFIG,
     errors::{Error, Result},
-    models::{
-        auth::LoginResult,
-        upload::FileInfo,
-        users::{
-            count_users, list_users, new_user, reset_password, save_user_avatar, update_user,
-            user_by_email, user_by_id,
-        },
-    },
+    guards::TokenGuard,
+    simple_broker::SimpleBroker,
+    upload::FileInfo,
+    user::db::save_user_avatar,
     validators::Password,
-    view::users::{NewUser, OrderBy, OrderDirection, User, UserChanged, UserUpdate},
 };
+
+use self::{
+    db::{
+        count_users, list_users, new_user, reset_password, update_user, user_by_email, user_by_id,
+    },
+    model::{DbListOptions, ListUserOptions, LoginResult, NewUser, User, UserChanged, UserUpdate},
+};
+
+mod db;
+pub mod model;
 
 #[derive(Default)]
 pub struct UserQuery;
@@ -65,53 +70,38 @@ impl UserQuery {
     }
 
     #[graphql(guard = "TokenGuard")]
-    async fn get_user_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Option<User>> {
-        let _ = Claim::from_ctx(ctx)?;
-        let db = database(ctx)?;
-        if let Some(user) = user_by_id(db, id).await? {
-            return Ok(Some(User::from(user)));
-        }
-        Ok(None)
-    }
-
-    #[graphql(guard = "TokenGuard")]
-    async fn get_user_by_email(&self, ctx: &Context<'_>, email: String) -> Result<Option<User>> {
-        let _ = Claim::from_ctx(ctx)?;
-        let db = database(ctx)?;
-        if let Some(user) = user_by_email(db, &email).await? {
-            return Ok(Some(User::from(user)));
-        }
-        Ok(None)
-    }
-
-    #[graphql(guard = "TokenGuard")]
-    async fn list_users(
+    async fn users(
         &self,
         ctx: &Context<'_>,
-        after: Option<String>,
-        before: Option<String>,
-        first: Option<i32>,
-        last: Option<i32>,
+        options: Option<ListUserOptions>,
     ) -> async_graphql::Result<Connection<usize, User, EmptyFields, EmptyFields>> {
         let _ = Claim::from_ctx(ctx)?;
         let db = database(ctx)?;
+        let options = options.unwrap_or_default();
         let count = count_users(db).await? as usize;
+        let mut db_options = DbListOptions {
+            ids: options.ids,
+            ..Default::default()
+        };
 
-        query(
-            after,
-            before,
-            first,
-            last,
+        Ok(query(
+            options.after,
+            options.before,
+            options.first,
+            options.last,
             |after, before, first, last| async move {
-                let (start, end, limit) = calc_list_params(count, after, before, first, last);
+                let mut start = after.map(|after| after + 1).unwrap_or(0);
+                let mut end = before.unwrap_or(10);
+                if let Some(first) = first {
+                    end = (start + first).min(end);
+                }
+                if let Some(last) = last {
+                    start = if last > end - start { end } else { end - last };
+                }
+                db_options.start = start as u64;
+                db_options.limit = end as u64;
 
-                let users =
-                    match list_users(db, OrderBy::CreatedAt, OrderDirection::Asc, start, limit)
-                        .await
-                    {
-                        Ok(r) => r,
-                        Err(_e) => return Err(async_graphql::Error::new("")),
-                    };
+                let users = list_users(db, db_options).await?;
 
                 let mut connection = Connection::new(start > 0, end < count);
                 connection
@@ -121,10 +111,10 @@ impl UserQuery {
                             .map(|(n, db_user)| Edge::new(n + start, User::from(db_user))),
                     )
                     .await;
-                Ok(connection)
+                Ok::<_, Error>(connection)
             },
         )
-        .await
+        .await?)
     }
 }
 
@@ -133,7 +123,7 @@ pub struct UserMutation;
 
 #[Object]
 impl UserMutation {
-    async fn register(&self, ctx: &Context<'_>, new: NewUser) -> Result<Option<User>> {
+    async fn register(&self, ctx: &Context<'_>, mut new: NewUser) -> Result<Option<User>> {
         let db = database(ctx)?;
 
         if !CONFIG.registration_enabled {
@@ -144,8 +134,26 @@ impl UserMutation {
             return Err(Error::EmailAlreadyRegistred);
         }
 
+        if let Ok(claim) = Claim::from_ctx(ctx) {
+            let user_id = claim.user_id()?;
+            let model = Entity::find_by_id(user_id).one(db).await?;
+            if let Some(model) = model {
+                if !model.is_admin {
+                    new.is_admin = None;
+                }
+            }
+        }
+
+        if count_users(db).await? < 1 {
+            new.is_admin = Some(true);
+        }
+
         let new_user = new_user(db, new).await?;
         if let Some(user) = new_user {
+            SimpleBroker::publish(UserChanged {
+                mutation_type: MutationType::Created,
+                id: user.id,
+            });
             return Ok(Some(User::from(user)));
         }
         Ok(None)
@@ -188,6 +196,10 @@ impl UserMutation {
         let db = database(ctx)?;
         let updated_user = update_user(db, user_id, user_update).await?;
         if let Some(user) = updated_user {
+            SimpleBroker::publish(UserChanged {
+                mutation_type: MutationType::Updated,
+                id: user.id,
+            });
             return Ok(Some(User::from(user)));
         }
         Ok(None)
@@ -250,6 +262,11 @@ impl UserMutation {
             }
 
             let _ = save_user_avatar(db, user_id, file_name.clone()).await?;
+
+            SimpleBroker::publish(UserChanged {
+                mutation_type: MutationType::Updated,
+                id: user.id,
+            });
         }
 
         Ok(FileInfo {
