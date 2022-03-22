@@ -10,7 +10,6 @@ lazy_static! {
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub debug: bool,
     pub web: WebServerConfig,
     pub db: DbServerConfig,
     pub secret_key: String,
@@ -19,15 +18,6 @@ pub struct Settings {
     pub registration_enabled: bool,
     pub mailer: MailConfig,
     pub log_level: String,
-    pub admin_user: AdminUser,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AdminUser {
-    pub email: String,
-    pub password: String,
-    pub firstname: Option<String>,
-    pub lastname: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,12 +32,11 @@ pub struct WebServerConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct DbServerConfig {
-    pub server: String,
+    pub host: String,
+    pub port: u16,
+    pub name: String,
     pub username: String,
     pub password: String,
-    pub app_name: String,
-    pub name: String,
-    pub port: u16,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,12 +52,13 @@ impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let mut builder = Config::builder();
         builder = builder.set_default("default", "1")?;
-        builder = builder.add_source(File::new("config/default", FileFormat::Toml));
+        builder = builder.add_source(File::new("config/default", FileFormat::Toml).required(true));
 
         if cfg!(debug_assertions) {
-            builder = builder.add_source(File::new("config/dev", FileFormat::Toml));
+            builder = builder.add_source(File::new("config/dev", FileFormat::Toml).required(false));
         } else {
-            builder = builder.add_source(File::new("config/prod", FileFormat::Toml));
+            builder =
+                builder.add_source(File::new("config/prod", FileFormat::Toml).required(false));
         }
 
         builder = builder.add_source(Environment::default().separator("_").ignore_empty(true));

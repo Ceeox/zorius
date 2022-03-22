@@ -50,11 +50,11 @@ const API_VERSION: &str = "v1";
 async fn setup_pg() -> Result<DatabaseConnection, sea_orm::DbErr> {
     let url = format!(
         "postgres://{}:{}@{}:{}/{}",
-        CONFIG.db.username, CONFIG.db.password, CONFIG.db.server, CONFIG.db.port, CONFIG.db.name
+        CONFIG.db.username, CONFIG.db.password, CONFIG.db.host, CONFIG.db.port, CONFIG.db.name
     );
     let pw_hidden_url = format!(
         "postgres://{}:{}@{}:{}/{}",
-        CONFIG.db.username, "<hidden>", CONFIG.db.server, CONFIG.db.port, CONFIG.db.name
+        CONFIG.db.username, "<hidden>", CONFIG.db.host, CONFIG.db.port, CONFIG.db.name
     );
     info!("Connecting to: {:?}", pw_hidden_url);
 
@@ -98,6 +98,9 @@ fn check_folders() -> Result<(), Error> {
     if !Path::new("files").exists() {
         std::fs::create_dir("files")?;
     }
+    if !Path::new("static").exists() {
+        std::fs::create_dir("static/avatar")?;
+    }
     Ok(())
 }
 
@@ -139,11 +142,9 @@ async fn main() -> Result<(), Error> {
     // Start http server
     let webserver_url = format!("{}:{}", CONFIG.web.ip, CONFIG.web.port);
 
-    let url = match (CONFIG.web.enable_ssl, CONFIG.debug) {
-        (true, true) => format!("https://localhost:{}", CONFIG.web.port),
-        (true, false) => format!("https://{}:{}", CONFIG.domain, CONFIG.web.port),
-        (false, true) => format!("http://localhost:{}", CONFIG.web.port),
-        (false, false) => format!("http://{}:{}", CONFIG.domain, CONFIG.web.port),
+    let url = match CONFIG.web.enable_ssl {
+        true => format!("https://{}:{}", CONFIG.domain, CONFIG.web.port),
+        false => format!("http://{}:{}", CONFIG.domain, CONFIG.web.port),
     };
 
     let log_format = CONFIG.web.log_format.clone();

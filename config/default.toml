@@ -1,5 +1,3 @@
-# Run the application in debug mode
-debug = true
 # which domain to use to generate urls for files
 domain = "localhost"
 # log level to use. Available Options: "trace", "debug", "info", "error", "none"
@@ -14,32 +12,31 @@ token_lifetime = 86400
 
 [web]
 # path to the ssl cert
-cert_path = "cert.pem"
+cert_path = ""
 # should ssl be enabled
 # if zorius is used behind a reverse proxy set this to false
-enable_ssl = true
+enable_ssl = false
 # ip zorius should listen to
 ip = "127.0.0.1"
 # path to the ssl private key
-key_path = "key.pem"
+key_path = ""
 # log format zorius should use
 # available options can be found here: https://actix.rs/actix-web/actix_web/middleware/struct.Logger.html
 log_format = "IP:%a REQUEST:\"%r\" STATUS: %s DURATION: %Dms X-REQUEST-ID:%{x-request-id}o"
 # port zorius should listen
-port = 443
+port = 8080
 
 [db]
-app_name = "zorius"
-# database name
-name = "zorius"
-# password for the database user
-password = ""
+# database dns or ip
+host = "localhost"
 # database port
 port = 5432
-# database dns or ip
-server = ""
+# database name
+name = "zorius"
 # username for the database
 username = "zorius"
+# password for the database user
+password = "zorius"
 
 [mailer]
 # where should zorius send emails to whena status of a merchandise changes
@@ -53,12 +50,3 @@ smtp_password = ""
 # smtp server username
 smtp_username = ""
 
-[admin_user]
-# email for the admin user 
-email = "zorius@localhost"
-# firstname for the admin user 
-firstname = ""
-# lastname for the admin user 
-lastname = ""
-# password for the admin user 
-password = "zorius"

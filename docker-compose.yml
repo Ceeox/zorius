@@ -1,0 +1,33 @@
+version: '3'
+services:
+  api:
+    container_name: zorius-api
+    image: zorius:latest
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DB_HOST=zorius-database
+    ports:
+      - 8080:8080
+    networks:
+      - zorius
+  db:
+    container_name: zorius-database
+    image: postgres:14.2-alpine3.15
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=zorius
+      - POSTGRES_USER=zorius
+      - POSTGRES_PASSWORD=zorius
+    networks:
+      - zorius
+    ports:
+      - 5432:5432
+
+networks:
+  zorius:
+
+volumes:
+  db:
