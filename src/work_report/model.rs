@@ -1,6 +1,9 @@
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, SimpleObject};
 use entity::{customer, project, time_record, user, work_report::*};
-use sea_orm::{prelude::DateTimeUtc, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder};
+use sea_orm::{
+    prelude::{Date, DateTimeUtc},
+    ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder,
+};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -83,6 +86,8 @@ impl From<Model> for WorkReport {
 pub struct ListWorkReportOptions {
     pub ids: Option<Vec<Uuid>>,
     pub for_user_id: Option<Uuid>,
+    pub start_date: Option<Date>,
+    pub end_date: Option<Date>,
     pub after: Option<String>,
     pub before: Option<String>,
     #[graphql(default = 10)]
@@ -102,6 +107,8 @@ pub struct NewWorkReport {
 pub struct DbListOptions {
     pub ids: Option<Vec<Uuid>>,
     pub for_user_id: Uuid,
+    pub start_date: Option<Date>,
+    pub end_date: Option<Date>,
     pub start: u64,
     pub limit: u64,
 }

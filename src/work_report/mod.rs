@@ -48,6 +48,8 @@ impl WorkReportQuery {
         let mut db_options = DbListOptions {
             ids: options.ids,
             for_user_id: user_id,
+            start_date: options.start_date,
+            end_date: options.end_date,
             ..Default::default()
         };
 

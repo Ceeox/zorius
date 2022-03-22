@@ -48,20 +48,25 @@ pub async fn list_work_reports(
     db: &DatabaseConnection,
     options: DbListOptions,
 ) -> Result<Vec<Model>> {
+    let mut entity = Entity::find();
+
     if let Some(ids) = options.ids {
         let con = ids.into_iter().fold(Condition::all(), |acc, id| {
             acc.add(Expr::col(Column::Id).eq(id)).into_condition()
         });
-        return Ok(Entity::find()
-            .filter(con)
-            .filter(Column::OwnerId.eq(options.for_user_id))
-            .order_by(Column::CreatedAt, Order::Asc)
-            .all(db)
-            .await?);
+
+        entity = entity.filter(con);
     }
 
-    Ok(Entity::find()
-        .filter(Column::OwnerId.eq(options.for_user_id))
+    if let Some(start) = options.start_date {
+        entity = entity.filter(Column::CreatedAt.gte(start));
+    }
+
+    if let Some(end) = options.end_date {
+        entity = entity.filter(Column::CreatedAt.lte(end));
+    }
+
+    Ok(entity
         .offset(options.start)
         .limit(options.limit)
         .order_by(Column::CreatedAt, Order::Asc)
