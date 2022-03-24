@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use entity::{
     time_record,
     work_report::{ActiveModel, Column, Entity, Model},
@@ -62,8 +62,10 @@ pub async fn list_work_reports(
         entity = entity.filter(Column::CreatedAt.gte(start));
     }
 
-    if let Some(end) = options.end_date {
-        entity = entity.filter(Column::CreatedAt.lte(end));
+    if let Some(mut end) = options.end_date {
+        // workaround since lte() not includes the end Date, why ever
+        end += Duration::days(1);
+        entity = entity.filter(Column::CreatedAt.lt(end));
     }
 
     Ok(entity
