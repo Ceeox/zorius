@@ -68,6 +68,12 @@ pub async fn list_work_reports(
         entity = entity.filter(Column::CreatedAt.lt(end));
     }
 
+    if let Some(customer_id) = options.for_customer_id {
+        entity = entity.filter(Column::CustomerId.eq(customer_id))
+    } else {
+        entity = entity.filter(Column::OwnerId.eq(options.for_user_id))
+    }
+
     Ok(entity
         .offset(options.start)
         .limit(options.limit)

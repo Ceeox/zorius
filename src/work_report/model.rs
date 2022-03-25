@@ -86,6 +86,7 @@ impl From<Model> for WorkReport {
 pub struct ListWorkReportOptions {
     pub ids: Option<Vec<Uuid>>,
     pub for_user_id: Option<Uuid>,
+    pub for_customer_id: Option<Uuid>,
     pub start_date: Option<Date>,
     pub end_date: Option<Date>,
     pub after: Option<String>,
@@ -107,6 +108,7 @@ pub struct NewWorkReport {
 pub struct DbListOptions {
     pub ids: Option<Vec<Uuid>>,
     pub for_user_id: Uuid,
+    pub for_customer_id: Option<Uuid>,
     pub start_date: Option<Date>,
     pub end_date: Option<Date>,
     pub start: u64,
