@@ -1,4 +1,5 @@
-use sea_orm::prelude::*;
+use chrono::Utc;
+use sea_orm::{prelude::*, Set};
 
 use crate::work_report;
 
@@ -30,4 +31,13 @@ impl Related<work_report::Entity> for Entity {
     }
 }
 
-impl ActiveModelBehavior for ActiveModel {}
+impl ActiveModelBehavior for ActiveModel {
+    fn new() -> Self {
+        Self {
+            id: Set(Uuid::new_v4()),
+            start: Set(Utc::now()),
+            end: Set(None),
+            ..ActiveModelTrait::default()
+        }
+    }
+}

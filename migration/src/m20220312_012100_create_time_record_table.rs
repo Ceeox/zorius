@@ -19,16 +19,10 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(Column::Id)
-                            .uuid()
-                            .default(Uuid::new_v4())
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(Column::Id).uuid().primary_key())
                     .col(ColumnDef::new(Column::WorkReportId).uuid().not_null())
                     .col(
                         ColumnDef::new(Column::Start)
-                            .default(Utc::now())
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
