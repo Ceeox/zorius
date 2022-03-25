@@ -159,25 +159,24 @@ pub async fn update_time_record(
         let models = time_record::Entity::find()
             .filter(time_record::Column::WorkReportId.eq(work_report_id))
             .order_by(time_record::Column::Start, Order::Asc)
-            .one(db)
+            .all(db)
             .await?;
+
+        let running = models.into_iter().find(|m| m.end.is_none());
 
         match command {
             TimeRecordCommand::Start => {
-                let running = models.into_iter().find(|m| m.end.is_none());
-                match running {
-                    Some(_) => return Err(Error::TimeRecordStillRunning),
-                    None => {
-                        let active_model = time_record::ActiveModel {
-                            work_report_id: Set(work_report_id),
-                            ..Default::default()
-                        };
-                        return Ok(Some(active_model.insert(db).await?));
-                    }
+                if running.is_some() {
+                    return Err(Error::TimeRecordStillRunning);
+                } else {
+                    let active_model = time_record::ActiveModel {
+                        work_report_id: Set(work_report_id),
+                        ..Default::default()
+                    };
+                    return Ok(Some(active_model.insert(db).await?));
                 }
             }
             TimeRecordCommand::End => {
-                let running = models.into_iter().find(|m| m.end.is_none());
                 if let Some(running) = running {
                     let mut active_model: time_record::ActiveModel = running.into();
                     active_model.end = Set(Some(Utc::now()));
