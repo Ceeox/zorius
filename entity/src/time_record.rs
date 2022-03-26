@@ -40,4 +40,24 @@ impl ActiveModelBehavior for ActiveModel {
             ..ActiveModelTrait::default()
         }
     }
+
+    /// Will be triggered before insert / update
+    fn before_save(self, _insert: bool) -> Result<Self, DbErr> {
+        Ok(self)
+    }
+
+    /// Will be triggered after insert / update
+    fn after_save(model: Model, _insert: bool) -> Result<Model, DbErr> {
+        Ok(model)
+    }
+
+    /// Will be triggered before delete
+    fn before_delete(self) -> Result<Self, DbErr> {
+        Ok(self)
+    }
+
+    /// Will be triggered after delete
+    fn after_delete(self) -> Result<Self, DbErr> {
+        Ok(self)
+    }
 }

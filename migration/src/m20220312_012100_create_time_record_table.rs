@@ -1,7 +1,5 @@
-use chrono::Utc;
 use entity::{time_record::*, work_report};
-
-use sea_schema::migration::{sea_orm::prelude::Uuid, sea_query::*, *};
+use sea_schema::migration::{sea_query::*, *};
 
 pub struct Migration;
 

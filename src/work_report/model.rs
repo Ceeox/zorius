@@ -119,8 +119,8 @@ pub struct DbListOptions {
 pub struct WorkReportUpdate {
     pub id: Uuid,
     pub for_user_id: Option<Uuid>,
-    pub customer: Option<Uuid>,
-    pub project: Option<Uuid>,
+    pub customer_id: Option<Uuid>,
+    pub project_id: Option<Uuid>,
     pub description: Option<String>,
     pub invoiced: Option<bool>,
     pub start_time_record: Option<bool>,

@@ -100,11 +100,11 @@ pub async fn update_work_report(
         .await?;
     if let Some(wr) = model {
         let mut wr: ActiveModel = wr.into();
-        if let Some(customer) = update.customer {
-            wr.customer_id = Set(customer);
+        if let Some(customer_id) = update.customer_id {
+            wr.customer_id = Set(customer_id);
         }
-        if let Some(project) = update.project {
-            wr.customer_id = Set(project);
+        if let Some(project_id) = update.project_id {
+            wr.customer_id = Set(project_id);
         }
         if let Some(description) = update.description {
             wr.description = Set(description);

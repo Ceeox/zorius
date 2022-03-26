@@ -1,7 +1,6 @@
 use entity::{customer, project::*, user};
 
-use chrono::Utc;
-use sea_schema::migration::{sea_orm::prelude::Uuid, sea_query::*, *};
+use sea_schema::migration::{sea_query::*, *};
 
 pub struct Migration;
 
@@ -19,26 +18,18 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Entity)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(Column::Id)
-                            .uuid()
-                            .default(Uuid::new_v4())
-                            .not_null()
-                            .primary_key(),
-                    )
+                    .col(ColumnDef::new(Column::Id).uuid().primary_key())
                     .col(ColumnDef::new(Column::CustomerId).uuid().not_null())
                     .col(ColumnDef::new(Column::Name).text().not_null())
                     .col(ColumnDef::new(Column::Note).text())
                     .col(
                         ColumnDef::new(user::Column::CreatedAt)
                             .timestamp_with_time_zone()
-                            .default(Utc::now())
                             .not_null(),
                     )
                     .col(
                         ColumnDef::new(Column::UpdatedAt)
                             .timestamp_with_time_zone()
-                            .default(Utc::now())
                             .not_null(),
                     )
                     .col(ColumnDef::new(Column::DeletedAt).timestamp_with_time_zone())
