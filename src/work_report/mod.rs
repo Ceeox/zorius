@@ -61,7 +61,7 @@ impl WorkReportQuery {
             options.last,
             |after, before, first, last| async move {
                 let mut start = after.map(|after| after + 1).unwrap_or(0);
-                let mut end = before.unwrap_or(10);
+                let mut end = before.unwrap_or(count);
                 if let Some(first) = first {
                     end = (start + first).min(end);
                 }

@@ -38,7 +38,6 @@ pub struct ListProjectOptions {
     pub ids: Option<Vec<Uuid>>,
     pub after: Option<String>,
     pub before: Option<String>,
-    #[graphql(default = 10)]
     pub first: Option<i32>,
     pub last: Option<i32>,
 }
