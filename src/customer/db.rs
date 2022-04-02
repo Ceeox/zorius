@@ -34,19 +34,20 @@ pub async fn list_customers(
     db: &DatabaseConnection,
     options: DbListOptions,
 ) -> Result<Vec<Model>, sea_orm::error::DbErr> {
+    let mut entity = Entity::find();
+
     if let Some(ids) = options.ids {
         let con = ids.into_iter().fold(Condition::all(), |acc, id| {
             acc.add(Expr::col(Column::Id).eq(id)).into_condition()
         });
-        return Entity::find()
-            .filter(con)
-            .order_by(Column::CreatedAt, Order::Asc)
-            .all(db)
-            .await;
+
+        entity = entity.filter(con);
     }
-    Ok(Entity::find()
-        .offset(options.start as u64)
-        .limit(options.limit as u64)
+
+    Ok(entity
+        .offset(options.start)
+        .limit(options.limit)
+        .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
         .await?)
 }
