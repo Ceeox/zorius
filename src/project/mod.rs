@@ -18,8 +18,8 @@ use crate::{
 };
 
 use self::{
-    db::{count_projects, delete_project, list_projects, new_project},
-    model::{DbListOptions, ListProjectOptions, NewProject, Project},
+    db::{count_projects, delete_project, list_projects, new_project, update_project},
+    model::{DbListOptions, ListProjectOptions, NewProject, Project, UpdateProject},
 };
 
 use super::simple_broker::SimpleBroker;
@@ -87,6 +87,21 @@ impl ProjectMutation {
         let _ = Claim::from_ctx(ctx)?;
         let db = &database(ctx)?;
         if let Some(project) = new_project(db, new).await? {
+            return Ok(Some(project.into()));
+        }
+        Ok(None)
+    }
+
+    #[graphql(guard = "TokenGuard")]
+    async fn update_project(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+        update: UpdateProject,
+    ) -> Result<Option<Project>> {
+        let _ = Claim::from_ctx(ctx)?;
+        let db = &database(ctx)?;
+        if let Some(project) = update_project(db, id, update).await? {
             return Ok(Some(project.into()));
         }
         Ok(None)

@@ -56,6 +56,12 @@ pub struct NewProject {
     pub note: Option<String>,
 }
 
+#[derive(Deserialize, Debug, Clone, InputObject)]
+pub struct UpdateProject {
+    pub name: Option<String>,
+    pub note: Option<String>,
+}
+
 impl From<Model> for Project {
     fn from(project: Model) -> Self {
         Self {

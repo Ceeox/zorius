@@ -3,7 +3,7 @@ use migration::sea_query::{Expr, IntoCondition};
 use sea_orm::{prelude::*, Condition, DatabaseConnection, Order, QueryOrder, QuerySelect, Set};
 use uuid::Uuid;
 
-use super::model::{DbListOptions, NewProject};
+use super::model::{DbListOptions, NewProject, UpdateProject};
 
 pub async fn new_project(
     db: &DatabaseConnection,
@@ -51,6 +51,28 @@ pub async fn list_projects(
         .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
         .await?)
+}
+
+pub async fn update_project(
+    db: &DatabaseConnection,
+    id: Uuid,
+    update: UpdateProject,
+) -> Result<Option<Model>, sea_orm::error::DbErr> {
+    let mut project: ActiveModel = match project_by_id(db, id).await? {
+        Some(project) => project.into(),
+        None => return Ok(None),
+    };
+
+    if let Some(name) = update.name {
+        project.name = Set(name);
+    }
+
+    if let Some(note) = update.note {
+        project.note = Set(Some(note));
+    }
+    project.update(db).await?;
+
+    Ok(project_by_id(db, id).await?)
 }
 
 pub async fn delete_project(
