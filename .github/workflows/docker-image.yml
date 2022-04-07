@@ -39,6 +39,8 @@ jobs:
             ${{ secrets.DOCKERHUB_USER }}/zorius:latest 
           # build on feature branches, push only on main branch
           push: ${{ github.ref == 'refs/heads/main' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
