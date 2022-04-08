@@ -16,18 +16,18 @@ pub async fn new_customer(
         ..Default::default()
     };
     let customer_id = Entity::insert(customer_id).exec(db).await?.last_insert_id;
-    Ok(customer_by_id(db, customer_id).await?)
+    customer_by_id(db, customer_id).await
 }
 
 pub async fn customer_by_id(
     db: &DatabaseConnection,
     id: uuid::Uuid,
 ) -> Result<Option<Model>, sea_orm::error::DbErr> {
-    Ok(Entity::find_by_id(id).one(db).await?)
+    Entity::find_by_id(id).one(db).await
 }
 
 pub async fn count_customers(db: &DatabaseConnection) -> Result<usize, sea_orm::error::DbErr> {
-    Ok(Entity::find().count(db).await?)
+    Entity::find().count(db).await
 }
 
 pub async fn list_customers(
@@ -44,12 +44,12 @@ pub async fn list_customers(
         entity = entity.filter(con);
     }
 
-    Ok(entity
+    entity
         .offset(options.start)
         .limit(options.limit)
         .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
-        .await?)
+        .await
 }
 
 pub async fn delete_customer(

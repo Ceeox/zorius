@@ -16,18 +16,18 @@ pub async fn new_user(db: &DatabaseConnection, update: NewUser) -> Result<Option
         ..Default::default()
     };
     let user_id = Entity::insert(new_user).exec(db).await?.last_insert_id;
-    Ok(user_by_id(db, user_id).await?)
+    user_by_id(db, user_id).await
 }
 
 pub async fn user_by_id(db: &DatabaseConnection, id: uuid::Uuid) -> Result<Option<Model>, DbErr> {
-    Ok(Entity::find_by_id(id).one(db).await?)
+    Entity::find_by_id(id).one(db).await
 }
 
 pub async fn user_by_email(db: &DatabaseConnection, email: &str) -> Result<Option<Model>, DbErr> {
-    Ok(Entity::find()
+    Entity::find()
         .filter(Column::Email.contains(email))
         .one(db)
-        .await?)
+        .await
 }
 
 pub async fn list_users(
@@ -44,16 +44,16 @@ pub async fn list_users(
             .all(db)
             .await;
     }
-    Ok(Entity::find()
+    Entity::find()
         .offset(options.start as u64)
         .limit(options.limit as u64)
         .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
-        .await?)
+        .await
 }
 
 pub async fn count_users(db: &DatabaseConnection) -> Result<usize, DbErr> {
-    Ok(Entity::find().count(db).await?)
+    Entity::find().count(db).await
 }
 
 pub async fn update_user(

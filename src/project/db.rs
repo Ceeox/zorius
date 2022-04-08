@@ -16,18 +16,18 @@ pub async fn new_project(
         ..Default::default()
     };
     let project_id = Entity::insert(new_project).exec(db).await?.last_insert_id;
-    Ok(project_by_id(db, project_id).await?)
+    project_by_id(db, project_id).await
 }
 
 pub async fn project_by_id(
     db: &DatabaseConnection,
     id: uuid::Uuid,
 ) -> Result<Option<Model>, sea_orm::error::DbErr> {
-    Ok(Entity::find_by_id(id).one(db).await?)
+    Entity::find_by_id(id).one(db).await
 }
 
 pub async fn count_projects(db: &DatabaseConnection) -> Result<usize, sea_orm::error::DbErr> {
-    Ok(Entity::find().count(db).await?)
+    Entity::find().count(db).await
 }
 
 pub async fn list_projects(
@@ -45,12 +45,12 @@ pub async fn list_projects(
             .await;
     }
 
-    Ok(Entity::find()
+    Entity::find()
         .offset(options.start)
         .limit(options.limit)
         .order_by(Column::CreatedAt, Order::Asc)
         .all(db)
-        .await?)
+        .await
 }
 
 pub async fn update_project(
@@ -72,7 +72,7 @@ pub async fn update_project(
     }
     project.update(db).await?;
 
-    Ok(project_by_id(db, id).await?)
+    project_by_id(db, id).await
 }
 
 pub async fn delete_project(

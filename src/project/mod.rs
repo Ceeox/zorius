@@ -43,7 +43,7 @@ impl ProjectQuery {
             ..Default::default()
         };
 
-        Ok(query(
+        query(
             options.after,
             options.before,
             options.first,
@@ -73,7 +73,7 @@ impl ProjectQuery {
                 Ok::<_, Error>(connection)
             },
         )
-        .await?)
+        .await
     }
 }
 

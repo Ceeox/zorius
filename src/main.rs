@@ -58,7 +58,7 @@ async fn setup_pg() -> Result<DatabaseConnection, sea_orm::DbErr> {
     );
     info!("Connecting to: {:?}", pw_hidden_url);
 
-    Ok(SeaOrmDatabase::connect(&url).await?)
+    SeaOrmDatabase::connect(&url).await
 }
 
 fn setup_log() {

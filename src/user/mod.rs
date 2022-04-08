@@ -84,7 +84,7 @@ impl UserQuery {
             ..Default::default()
         };
 
-        Ok(query(
+        query(
             options.after,
             options.before,
             options.first,
@@ -114,7 +114,7 @@ impl UserQuery {
                 Ok::<_, Error>(connection)
             },
         )
-        .await?)
+        .await
     }
 }
 

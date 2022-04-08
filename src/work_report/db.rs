@@ -30,7 +30,7 @@ pub async fn new_work_report(
         .exec(db)
         .await?
         .last_insert_id;
-    Ok(work_report_by_id(db, id, owner_id).await?)
+    work_report_by_id(db, id, owner_id).await
 }
 
 pub async fn work_report_by_id(

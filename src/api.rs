@@ -101,10 +101,10 @@ pub async fn graphql_ws(
     if let Some(token) = token {
         data.insert(token);
     }
-    Ok(GraphQLSubscription::new(Schema::clone(&*schema))
+    GraphQLSubscription::new(Schema::clone(&*schema))
         .with_data(data)
         .on_connection_init(on_connection_init)
-        .start(&http_request, payload)?)
+        .start(&http_request, payload)
 }
 
 pub async fn playground() -> Result<HttpResponse, actix_web::Error> {
