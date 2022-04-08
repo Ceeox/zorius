@@ -82,11 +82,14 @@ pub async fn list_work_reports(
         .await?)
 }
 
-pub async fn count_work_reports(db: &DatabaseConnection, user_id: Uuid) -> Result<usize> {
-    Ok(Entity::find()
-        .filter(Column::OwnerId.eq(user_id))
-        .count(db)
-        .await?)
+pub async fn count_work_reports(db: &DatabaseConnection, options: &DbListOptions) -> Result<usize> {
+    let mut entity = Entity::find();
+    if let Some(customer_id) = options.for_customer_id {
+        entity = entity.filter(Column::CustomerId.eq(customer_id))
+    } else {
+        entity = entity.filter(Column::OwnerId.eq(options.for_user_id))
+    }
+    Ok(entity.count(db).await?)
 }
 
 pub async fn update_work_report(

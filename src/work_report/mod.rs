@@ -44,7 +44,6 @@ impl WorkReportQuery {
         let user_id = claim.user_id()?;
         options.for_user_id = Some(options.for_user_id.unwrap_or(user_id));
         let db = database(ctx)?;
-        let count = count_work_reports(db, user_id).await?;
         let mut db_options = DbListOptions {
             ids: options.ids,
             for_user_id: user_id,
@@ -60,6 +59,7 @@ impl WorkReportQuery {
             options.first,
             options.last,
             |after, before, first, last| async move {
+                let count = count_work_reports(db, &db_options).await?;
                 let mut start = after.map(|after| after + 1).unwrap_or(0);
                 let mut end = before.unwrap_or(count);
                 if let Some(first) = first {
@@ -141,7 +141,7 @@ impl WorkReportMutation {
         let user_id = claim.user_id()?;
         let db = database(ctx)?;
 
-        Ok(delete_work_report(db, id, user_id).await?)
+        delete_work_report(db, id, user_id).await
     }
 }
 
